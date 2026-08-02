@@ -1,0 +1,17 @@
+# Netlify configuration for this Vite + React site.
+# When connected to Git, Netlify runs the build and publishes the compiled
+# output in `dist`.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Single Page App fallback: serve index.html for any path so the app always
+# loads (harmless for this single-page site, and future-proof).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
