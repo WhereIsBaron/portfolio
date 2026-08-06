@@ -115,6 +115,7 @@ export type Project = {
   link: string;
   slug?: string;
   images?: string[];
+  route?: string; // if set, the card navigates to this in-app route instead of opening a gallery
 };
 
 // Build a gallery path list for screenshots in /public/projects/<slug>/NN.png
@@ -125,6 +126,21 @@ const gallery = (slug: string, count: number): string[] =>
   );
 
 export const projects: Project[] = [
+  {
+    name: 'Universal Booking System',
+    category: 'Product',
+    description:
+      'One booking engine any business can drop in and run: hotels, clinics, consultants, photographers, or anything that takes appointments. Configure the resource types, availability, and fields once, and the same flow adapts to the use case.',
+    year: '2025 - Present',
+    tags: ['React', 'TypeScript', 'Config-driven', 'Firebase (next)'],
+    highlights: [
+      'One engine, many verticals: hotel rooms, consultants, photography, clinics, appointments.',
+      'A config-driven flow that reconfigures its resources, dates, and fields per business type.',
+      'Interactive front-end demo live now; Firebase backend for real availability and bookings next.',
+    ],
+    route: '/booking',
+    link: '#',
+  },
   {
     name: 'Classroom Scheduling System',
     category: 'Final Year Project',

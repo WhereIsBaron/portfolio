@@ -10,7 +10,9 @@ import {
   Images,
   GripVertical,
   Pencil,
+  CalendarCheck,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { projects as allProjects, type Project } from '@/data/cv';
 import { useReveal } from '@/hooks/useReveal';
 import { useAuth } from '@/context/AuthContext';
@@ -27,11 +29,13 @@ const categoryIcon: Record<string, React.ReactNode> = {
   Web3: <Blocks size={16} />,
   Tooling: <Terminal size={16} />,
   'Game Dev': <Gamepad2 size={16} />,
+  Product: <CalendarCheck size={16} />,
 };
 
 export default function Projects() {
   const [active, setActive] = useState('All');
   const [selected, setSelected] = useState<Project | null>(null);
+  const navigate = useNavigate();
 
   const { user } = useAuth();
   const { projectOrder, saveProjectOrder } = useLayout();
@@ -113,6 +117,7 @@ export default function Projects() {
           {filtered.map((p, index) => {
             const imgs = p.images ?? [];
             const hasGallery = imgs.length > 0;
+            const hasRoute = Boolean(p.route);
             return (
               <div
                 key={p.name}
@@ -149,6 +154,28 @@ export default function Projects() {
                       <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
                         <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-[#0b0d10] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                           <Images size={15} /> View gallery
+                        </span>
+                      </span>
+                    </button>
+                  )}
+
+                  {!hasGallery && hasRoute && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(p.route!)}
+                      className="relative flex aspect-video items-center justify-center overflow-hidden border-b border-white/10 bg-gradient-to-br from-[var(--brand)]/25 to-[var(--accent)]/10 text-left"
+                      aria-label={`Open ${p.name} demo`}
+                    >
+                      <CalendarCheck
+                        size={44}
+                        className="text-[var(--brand-bright)] transition-transform duration-500 group-hover:scale-110"
+                      />
+                      <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-xs font-medium text-white">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--brand-bright)]" /> Live demo
+                      </span>
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-[#0b0d10] opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                          Open the demo <ArrowUpRight size={15} />
                         </span>
                       </span>
                     </button>
@@ -193,6 +220,14 @@ export default function Projects() {
                           className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-all group-hover:border-white/40 group-hover:bg-white group-hover:text-[#0b0d10]"
                         >
                           <Images size={14} /> {imgs.length} images
+                        </button>
+                      ) : hasRoute ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(p.route!)}
+                          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-all group-hover:border-white/40 group-hover:bg-white group-hover:text-[#0b0d10]"
+                        >
+                          Open the demo <ArrowUpRight size={14} />
                         </button>
                       ) : (
                         p.link &&
