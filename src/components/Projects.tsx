@@ -216,13 +216,25 @@ export default function Projects() {
                         </span>
                       ))}
                       {hasGallery ? (
-                        <button
-                          type="button"
-                          onClick={() => setSelected(p)}
-                          className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-all group-hover:border-white/40 group-hover:bg-white group-hover:text-[#0b0d10]"
-                        >
-                          <Images size={14} /> {imgs.length} images
-                        </button>
+                        <div className="ml-auto flex items-center gap-2">
+                          {p.link && p.link !== '#' && (
+                            <a
+                              href={p.link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-all hover:border-white/40 hover:bg-white hover:text-[#0b0d10]"
+                            >
+                              Visit site <ArrowUpRight size={14} />
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setSelected(p)}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white transition-all group-hover:border-white/40 group-hover:bg-white group-hover:text-[#0b0d10]"
+                          >
+                            <Images size={14} /> {imgs.length} images
+                          </button>
+                        </div>
                       ) : hasRoute ? (
                         <button
                           type="button"

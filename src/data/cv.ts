@@ -141,7 +141,9 @@ export const projects: Project[] = [
       'Peer-tutoring directory and a curated newspaper feed with publisher applications, article review, and per-user posting cooldowns — all admin-moderated.',
       'Runs entirely on Firebase’s free tier (no paid Storage): images are canvas-compressed to base64 within the Firestore 1MB doc cap.',
     ],
-    link: '#',
+    link: 'https://limkonnect.netlify.app/',
+    slug: 'limkonnect',
+    images: gallery('limkonnect', 5),
   },
   {
     name: 'Universal Booking System',
