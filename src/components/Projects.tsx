@@ -7,6 +7,7 @@ import {
   Blocks,
   Terminal,
   Gamepad2,
+  Users,
   Images,
   GripVertical,
   Pencil,
@@ -30,6 +31,7 @@ const categoryIcon: Record<string, React.ReactNode> = {
   Tooling: <Terminal size={16} />,
   'Game Dev': <Gamepad2 size={16} />,
   Product: <CalendarCheck size={16} />,
+  'Community Platform': <Users size={16} />,
 };
 
 export default function Projects() {

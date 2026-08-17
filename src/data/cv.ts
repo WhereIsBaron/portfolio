@@ -127,6 +127,23 @@ const gallery = (slug: string, count: number): string[] =>
 
 export const projects: Project[] = [
   {
+    name: 'Limkonnect — University Community Platform',
+    category: 'Community Platform',
+    description:
+      'A full community platform for the Limkokwing University community — students, staff, and alumni. A single React + Firebase app with a trust-based access ladder (visitor → pending → alumni → verified student/staff → tutor → publisher → admin), manual ID verification, LinkedIn-style profiles, a conflict-detecting timetable engine, moderated forums, peer tutoring, and a curated newspaper feed. Built end-to-end and code-complete across all six phases.',
+    year: '2025 - Present',
+    tags: ['React', 'TypeScript', 'Firebase', 'Firestore', 'Tailwind', 'Netlify'],
+    highlights: [
+      'Trust-based access control enforced both in-app and in Firestore security rules, with anti-privilege-escalation guards so roles can only be granted by an admin.',
+      'Manual ID-verification pipeline: images compressed client-side and stored in an admin-only collection (never readable in-app), with approve/reject-with-reason.',
+      'Timetable engine ported from a custom spec: venue/class/lecturer conflict detection, role-aware master vs. read-only student views, and live filters.',
+      'Custom forums with a slur/leetspeak-bypass word filter and an English-only guard, plus a reports panel with one-click moderation (delete, mute, suspend, remove photo).',
+      'Peer-tutoring directory and a curated newspaper feed with publisher applications, article review, and per-user posting cooldowns — all admin-moderated.',
+      'Runs entirely on Firebase’s free tier (no paid Storage): images are canvas-compressed to base64 within the Firestore 1MB doc cap.',
+    ],
+    link: '#',
+  },
+  {
     name: 'Universal Booking System',
     category: 'Product',
     description:
