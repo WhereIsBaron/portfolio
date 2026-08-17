@@ -146,7 +146,7 @@ export const projects: Project[] = [
     category: 'Community Platform',
     description:
       'A full community platform for the Limkokwing University community — students, staff, and alumni. A single React + Firebase app with a trust-based access ladder (visitor → pending → alumni → verified student/staff → tutor → publisher → admin), manual ID verification, LinkedIn-style profiles, a conflict-detecting timetable engine, moderated forums, peer tutoring, and a curated newspaper feed. Built end-to-end and code-complete across all six phases.',
-    year: '2025 - Present',
+    year: '2026 - Present',
     tags: ['React', 'TypeScript', 'Firebase', 'Firestore', 'Tailwind', 'Netlify'],
     highlights: [
       'Trust-based access control enforced both in-app and in Firestore security rules, with anti-privilege-escalation guards so roles can only be granted by an admin.',
@@ -165,7 +165,7 @@ export const projects: Project[] = [
     category: 'Product',
     description:
       'One booking engine any business can drop in and run: hotels, clinics, consultants, photographers, or anything that takes appointments. Configure the resource types, availability, and fields once, and the same flow adapts to the use case.',
-    year: '2025 - Present',
+    year: '2026 - Present',
     tags: ['React', 'TypeScript', 'Config-driven', 'Firebase (next)'],
     highlights: [
       'One engine, many verticals: hotel rooms, consultants, photography, clinics, appointments.',

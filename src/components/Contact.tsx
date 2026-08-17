@@ -13,6 +13,7 @@ export default function Contact() {
       label: 'Email',
       value: profile.email,
       href: `mailto:${profile.email}`,
+      valueClass: 'whitespace-nowrap text-sm lg:text-base',
     },
     {
       icon: <Phone size={22} className="text-[var(--brand-bright)]" />,
@@ -47,7 +48,7 @@ export default function Contact() {
         </p>
 
         {/* Contact details, front and centre */}
-        <div className="reveal mt-12 grid gap-4 sm:grid-cols-3">
+        <div className="reveal mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {details.map((d) => {
             const inner = (
               <>
@@ -57,7 +58,11 @@ export default function Contact() {
                 <span className="mt-4 block text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
                   {d.label}
                 </span>
-                <span className="mt-1 block break-words text-lg font-medium text-white">
+                <span
+                  className={`mt-1 block break-words font-medium text-white ${
+                    'valueClass' in d ? d.valueClass : 'text-lg'
+                  }`}
+                >
                   {d.value}
                 </span>
               </>
