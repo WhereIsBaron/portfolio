@@ -31,6 +31,13 @@ const RINGS: Ring[] = [
 
 const OUTER_RADIUS = RINGS[RINGS.length - 1].radius;
 
+// Map each ring colour to its gradient glow (filter-free, Firefox-smooth).
+const HALO: Record<string, string> = {
+  'var(--brand-bright)': 'url(#ao-halo-bright)',
+  'var(--brand)': 'url(#ao-halo-brand)',
+  'var(--accent)': 'url(#ao-halo-accent)',
+};
+
 // Deterministic faint starfield for a "space" feel (spread over the 460 box).
 const STARS = [
   [50, 66], [104, 34], [164, 80], [226, 28], [296, 56], [362, 44], [418, 100],
@@ -190,6 +197,23 @@ export default function AgeOrbit() {
               <stop offset="0%" stopColor="var(--surface)" />
               <stop offset="100%" stopColor="var(--bg)" />
             </linearGradient>
+            {/* Gradient-based glows for the orbiting badges — no per-frame filter
+                re-rasterization, so motion stays smooth in Firefox. */}
+            <radialGradient id="ao-halo-bright" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="var(--brand-bright)" stopOpacity="0.55" />
+              <stop offset="65%" stopColor="var(--brand-bright)" stopOpacity="0.16" />
+              <stop offset="100%" stopColor="var(--brand-bright)" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="ao-halo-brand" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.55" />
+              <stop offset="65%" stopColor="var(--brand)" stopOpacity="0.16" />
+              <stop offset="100%" stopColor="var(--brand)" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="ao-halo-accent" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.55" />
+              <stop offset="65%" stopColor="var(--accent)" stopOpacity="0.16" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+            </radialGradient>
             <filter id="ao-glow" x="-80%" y="-80%" width="260%" height="260%">
               <feGaussianBlur stdDeviation="6" result="b" />
               <feMerge>
@@ -268,8 +292,8 @@ export default function AgeOrbit() {
               }}
               transform={`translate(${C} ${C - ring.radius})`}
             >
-              {/* coloured glow halo */}
-              <circle r={21} fill={ring.color} opacity={0.22} filter="url(#ao-soft)" />
+              {/* coloured glow halo — gradient fill, no filter (smooth in Firefox) */}
+              <circle r={24} fill={HALO[ring.color]} />
               <circle r={17.5} fill="url(#ao-badge)" stroke={ring.color} strokeWidth={1.5} />
               <text
                 ref={(el) => {
