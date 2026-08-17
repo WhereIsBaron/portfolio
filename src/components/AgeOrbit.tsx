@@ -4,8 +4,10 @@ import { useEffect, useMemo, useRef } from 'react';
 const BIRTH_MS = Date.parse('1996-09-13T00:00:00+02:00');
 const TZ = 2 * 3600000; // shift so UTC fields read as Gaborone wall-clock time
 
-const SIZE = 460;
+const SIZE = 570;
 const C = SIZE / 2; // centre
+const STAR_BOX = 460; // starfield coords were authored in a 460 box; scale to SIZE
+const STAR_SCALE = SIZE / STAR_BOX;
 
 type Key = 'sec' | 'min' | 'hour' | 'day' | 'month' | 'year';
 
@@ -19,13 +21,15 @@ type Ring = {
 // Inner = fast, outer = slow. Each badge's angle matches its number's value,
 // like nested clock hands.
 const RINGS: Ring[] = [
-  { key: 'sec', unit: 'sec', radius: 43, color: 'var(--brand-bright)' },
-  { key: 'min', unit: 'min', radius: 76, color: 'var(--brand-bright)' },
-  { key: 'hour', unit: 'hr', radius: 109, color: 'var(--brand)' },
-  { key: 'day', unit: 'days', radius: 142, color: 'var(--brand)' },
-  { key: 'month', unit: 'mo', radius: 175, color: 'var(--accent)' },
-  { key: 'year', unit: 'yrs', radius: 208, color: 'var(--accent)' },
+  { key: 'sec', unit: 'sec', radius: 60, color: 'var(--brand-bright)' },
+  { key: 'min', unit: 'min', radius: 98, color: 'var(--brand-bright)' },
+  { key: 'hour', unit: 'hr', radius: 136, color: 'var(--brand)' },
+  { key: 'day', unit: 'days', radius: 174, color: 'var(--brand)' },
+  { key: 'month', unit: 'mo', radius: 212, color: 'var(--accent)' },
+  { key: 'year', unit: 'yrs', radius: 250, color: 'var(--accent)' },
 ];
+
+const OUTER_RADIUS = RINGS[RINGS.length - 1].radius;
 
 // Deterministic faint starfield for a "space" feel (spread over the 460 box).
 const STARS = [
@@ -163,7 +167,7 @@ export default function AgeOrbit() {
       <div className="mt-4 flex justify-center">
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
-          className="h-auto w-full max-w-[400px]"
+          className="h-auto w-full max-w-[460px]"
           role="img"
           aria-label={`Live age: ${init.year} years, ${init.month} months, ${init.day} days`}
         >
@@ -205,8 +209,8 @@ export default function AgeOrbit() {
           {STARS.map(([x, y], i) => (
             <circle
               key={i}
-              cx={x}
-              cy={y}
+              cx={x * STAR_SCALE}
+              cy={y * STAR_SCALE}
               r={i % 5 === 0 ? 1.6 : 1}
               fill="#fff"
               opacity={i % 3 === 0 ? 0.35 : 0.18}
@@ -230,7 +234,7 @@ export default function AgeOrbit() {
           <circle
             cx={C}
             cy={C}
-            r={208}
+            r={OUTER_RADIUS}
             fill="none"
             stroke="var(--accent)"
             strokeOpacity={0.25}
@@ -248,8 +252,8 @@ export default function AgeOrbit() {
           </circle>
 
           {/* sun */}
-          <circle cx={C} cy={C} r={40} fill="url(#ao-sun-halo)" filter="url(#ao-soft)">
-            <animate attributeName="r" values="40;52;40" dur="4.5s" repeatCount="indefinite" />
+          <circle cx={C} cy={C} r={28} fill="url(#ao-sun-halo)" filter="url(#ao-soft)">
+            <animate attributeName="r" values="28;36;28" dur="4.5s" repeatCount="indefinite" />
             <animate attributeName="opacity" values="0.9;0.5;0.9" dur="4.5s" repeatCount="indefinite" />
           </circle>
           <circle cx={C} cy={C} r={22} fill="url(#ao-sun)" filter="url(#ao-glow)" />
@@ -265,23 +269,23 @@ export default function AgeOrbit() {
               transform={`translate(${C} ${C - ring.radius})`}
             >
               {/* coloured glow halo */}
-              <circle r={18} fill={ring.color} opacity={0.22} filter="url(#ao-soft)" />
-              <circle r={15} fill="url(#ao-badge)" stroke={ring.color} strokeWidth={1.5} />
+              <circle r={21} fill={ring.color} opacity={0.22} filter="url(#ao-soft)" />
+              <circle r={17.5} fill="url(#ao-badge)" stroke={ring.color} strokeWidth={1.5} />
               <text
                 ref={(el) => {
                   numRefs.current[ring.key] = el;
                 }}
                 textAnchor="middle"
-                y={-1}
+                y={0}
                 className="fill-white"
-                style={{ fontSize: 12, fontWeight: 700 }}
+                style={{ fontSize: 14, fontWeight: 700 }}
               >
                 {init.values[ring.key]}
               </text>
               <text
                 textAnchor="middle"
-                y={9}
-                style={{ fontSize: 6.5, fill: ring.color, letterSpacing: 0.3 }}
+                y={11}
+                style={{ fontSize: 7.5, fill: ring.color, letterSpacing: 0.3 }}
               >
                 {ring.unit}
               </text>
