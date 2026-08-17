@@ -28,27 +28,24 @@ export default function Skills() {
               <h3 className="font-display text-xl text-white">
                 {group.category}
               </h3>
-              <div className="mt-6 space-y-4">
+              <div className="mt-5 flex flex-wrap gap-2">
                 {group.items.map((skill) => (
-                  <div key={skill.name}>
-                    <div className="mb-2 flex items-center justify-between text-sm">
-                      <span className="text-[var(--muted)]">{skill.name}</span>
-                      <span className="text-xs text-[var(--muted)]/70">
-                        {skill.level}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-[var(--brand)] to-[var(--brand-bright)] transition-[width] duration-1000 ease-out"
-                        style={{ width: `${skill.level}%` }}
-                      />
-                    </div>
-                  </div>
+                  <span
+                    key={skill}
+                    className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-[var(--muted)] transition-colors hover:border-white/25 hover:text-white"
+                  >
+                    {skill}
+                  </span>
                 ))}
               </div>
             </div>
           ))}
         </div>
+
+        <p className="reveal mt-10 max-w-2xl text-sm text-[var(--muted)]">
+          These are the languages, frameworks, and tools I’ve worked with so far — the
+          list keeps growing as I take on new projects and expand my skillset.
+        </p>
       </div>
     </section>
   );
