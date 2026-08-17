@@ -1,4 +1,5 @@
 import { profile, stats, focusAreas } from '@/data/cv';
+import AgeOrbit from '@/components/AgeOrbit';
 
 export default function About() {
   return (
@@ -96,6 +97,8 @@ export default function About() {
                 </a>
               </p>
             </div>
+
+            <AgeOrbit />
           </div>
         </div>
       </div>
