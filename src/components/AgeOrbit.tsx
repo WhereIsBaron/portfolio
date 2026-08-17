@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 // Birthdate anchored to Gaborone time (UTC+2). Time defaults to 00:00.
 const BIRTH_MS = Date.parse('1996-09-13T00:00:00+02:00');
+const TZ = 2 * 3600000; // shift so UTC fields read as Gaborone wall-clock time
 
-const SIZE = 420;
+const SIZE = 460;
 const C = SIZE / 2; // centre
 
+type Key = 'sec' | 'min' | 'hour' | 'day' | 'month' | 'year';
+
 type Ring = {
-  key: 'sec' | 'min' | 'hour' | 'day' | 'year';
+  key: Key;
   unit: string;
   radius: number;
   color: string;
@@ -16,38 +19,75 @@ type Ring = {
 // Inner = fast, outer = slow. Each badge's angle matches its number's value,
 // like nested clock hands.
 const RINGS: Ring[] = [
-  { key: 'sec', unit: 'sec', radius: 56, color: 'var(--brand-bright)' },
-  { key: 'min', unit: 'min', radius: 92, color: 'var(--brand-bright)' },
-  { key: 'hour', unit: 'hr', radius: 128, color: 'var(--brand)' },
-  { key: 'day', unit: 'days', radius: 164, color: 'var(--brand)' },
-  { key: 'year', unit: 'yrs', radius: 196, color: 'var(--accent)' },
+  { key: 'sec', unit: 'sec', radius: 43, color: 'var(--brand-bright)' },
+  { key: 'min', unit: 'min', radius: 76, color: 'var(--brand-bright)' },
+  { key: 'hour', unit: 'hr', radius: 109, color: 'var(--brand)' },
+  { key: 'day', unit: 'days', radius: 142, color: 'var(--brand)' },
+  { key: 'month', unit: 'mo', radius: 175, color: 'var(--accent)' },
+  { key: 'year', unit: 'yrs', radius: 208, color: 'var(--accent)' },
 ];
 
-// Deterministic faint starfield for a "space" feel.
+// Deterministic faint starfield for a "space" feel (spread over the 460 box).
 const STARS = [
-  [46, 60], [96, 30], [150, 74], [206, 26], [270, 52], [330, 40], [380, 92],
-  [30, 140], [388, 168], [58, 210], [364, 236], [40, 300], [392, 300],
-  [86, 360], [150, 392], [214, 372], [286, 384], [344, 356], [372, 120],
-  [120, 116], [300, 108], [76, 264], [346, 288], [176, 40],
+  [50, 66], [104, 34], [164, 80], [226, 28], [296, 56], [362, 44], [418, 100],
+  [34, 154], [426, 184], [64, 230], [400, 258], [44, 330], [430, 330],
+  [94, 396], [164, 430], [236, 408], [314, 422], [378, 392], [408, 132],
+  [132, 128], [330, 118], [84, 290], [380, 316], [194, 44], [258, 430], [150, 300],
 ] as const;
 
-type Readout = { years: number; days: number; hh: number; mm: number; ss: number };
+type Breakdown = { year: number; month: number; day: number; hh: number; mm: number; ss: number };
+type Frames = { values: Record<Key, number>; fracs: Record<Key, number> };
 
-const bday = (year: number) => Date.parse(`${year}-09-13T00:00:00+02:00`);
+function compute(nowMs: number): Breakdown & Frames {
+  const nUTC = nowMs + TZ;
+  const b = new Date(BIRTH_MS + TZ);
+  const n = new Date(nUTC);
 
-function computeReadout(nowMs: number): Readout {
-  let years = new Date(nowMs).getFullYear() - 1996;
-  while (bday(1996 + years) > nowMs) years--;
-  while (bday(1996 + years + 1) <= nowMs) years++;
-  let rem = nowMs - bday(1996 + years);
-  const days = Math.floor(rem / 86400000);
-  rem -= days * 86400000;
-  const hh = Math.floor(rem / 3600000);
-  rem -= hh * 3600000;
-  const mm = Math.floor(rem / 60000);
-  rem -= mm * 60000;
-  const ss = Math.floor(rem / 1000);
-  return { years, days, hh, mm, ss };
+  // Calendar breakdown (years / months / days / h:m:s since birth).
+  let ss = n.getUTCSeconds() - b.getUTCSeconds();
+  let mm = n.getUTCMinutes() - b.getUTCMinutes();
+  let hh = n.getUTCHours() - b.getUTCHours();
+  let day = n.getUTCDate() - b.getUTCDate();
+  let month = n.getUTCMonth() - b.getUTCMonth();
+  let year = n.getUTCFullYear() - b.getUTCFullYear();
+  if (ss < 0) { ss += 60; mm--; }
+  if (mm < 0) { mm += 60; hh--; }
+  if (hh < 0) { hh += 24; day--; }
+  if (day < 0) {
+    const prevMonthDays = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), 0)).getUTCDate();
+    day += prevMonthDays;
+    month--;
+  }
+  if (month < 0) { month += 12; year--; }
+
+  // Continuous fractions for smooth orbit angles.
+  const msOfDay = ((nUTC % 86400000) + 86400000) % 86400000;
+  const secFrac = (msOfDay % 60000) / 60000;
+  const minFrac = (msOfDay % 3600000) / 3600000;
+  const hourFrac = msOfDay / 86400000;
+
+  const totalMonths = year * 12 + month;
+  const lastMo = Date.UTC(b.getUTCFullYear(), b.getUTCMonth() + totalMonths, b.getUTCDate());
+  const nextMo = Date.UTC(b.getUTCFullYear(), b.getUTCMonth() + totalMonths + 1, b.getUTCDate());
+  const dayFrac = (nUTC - lastMo) / (nextMo - lastMo);
+
+  const bdThis = Date.UTC(b.getUTCFullYear() + year, b.getUTCMonth(), b.getUTCDate());
+  const bdNext = Date.UTC(b.getUTCFullYear() + year + 1, b.getUTCMonth(), b.getUTCDate());
+  const yearFrac = (nUTC - bdThis) / (bdNext - bdThis);
+
+  return {
+    year, month, day, hh, mm, ss,
+    values: { sec: ss, min: mm, hour: hh, day, month, year },
+    fracs: {
+      sec: secFrac,
+      min: minFrac,
+      hour: hourFrac,
+      day: dayFrac,
+      month: yearFrac,
+      // Offset half a turn so year never overlaps the month badge.
+      year: (yearFrac + 0.5) % 1,
+    },
+  };
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -55,7 +95,12 @@ const pad = (n: number) => String(n).padStart(2, '0');
 export default function AgeOrbit() {
   const badgeRefs = useRef<Record<string, SVGGElement | null>>({});
   const numRefs = useRef<Record<string, SVGTextElement | null>>({});
-  const [readout, setReadout] = useState<Readout>(() => computeReadout(Date.now()));
+  const yrRef = useRef<HTMLSpanElement | null>(null);
+  const moRef = useRef<HTMLSpanElement | null>(null);
+  const dyRef = useRef<HTMLSpanElement | null>(null);
+  const clockRef = useRef<HTMLSpanElement | null>(null);
+
+  const init = useMemo(() => compute(Date.now()), []);
 
   const reduced = useMemo(
     () =>
@@ -70,37 +115,27 @@ export default function AgeOrbit() {
     let lastSec = -1;
 
     const paint = (nowMs: number) => {
-      const since = nowMs - BIRTH_MS;
-      const totalSec = Math.floor(since / 1000);
-
-      const r = computeReadout(nowMs);
-      const bdThis = bday(1996 + r.years);
-      const lifeYear = bday(1996 + r.years + 1) - bdThis;
-      const yearFrac = (nowMs - bdThis) / lifeYear;
-
-      const state: Record<Ring['key'], { val: number; frac: number }> = {
-        sec: { val: totalSec % 60, frac: ((since / 1000) % 60) / 60 },
-        min: { val: Math.floor(totalSec / 60) % 60, frac: ((since / 60000) % 60) / 60 },
-        hour: { val: Math.floor(totalSec / 3600) % 24, frac: ((since / 3600000) % 24) / 24 },
-        day: { val: r.days, frac: yearFrac },
-        // Offset half a turn so the year badge never overlaps the day badge
-        // (both advance once per year of life).
-        year: { val: r.years, frac: (yearFrac + 0.5) % 1 },
-      };
+      const s = compute(nowMs);
 
       for (const ring of RINGS) {
-        const { val, frac } = state[ring.key];
-        const theta = frac * 2 * Math.PI;
+        const theta = s.fracs[ring.key] * 2 * Math.PI;
         const x = C + ring.radius * Math.sin(theta);
         const y = C - ring.radius * Math.cos(theta);
         badgeRefs.current[ring.key]?.setAttribute('transform', `translate(${x} ${y})`);
         const num = numRefs.current[ring.key];
-        if (num) num.textContent = String(val);
+        const v = String(s.values[ring.key]);
+        if (num && num.textContent !== v) num.textContent = v;
       }
 
-      if (totalSec !== lastSec) {
-        lastSec = totalSec;
-        setReadout(r);
+      // Readout text only needs a refresh once per second (no React re-render).
+      const wholeSec = Math.floor(nowMs / 1000);
+      if (wholeSec !== lastSec) {
+        lastSec = wholeSec;
+        if (yrRef.current) yrRef.current.textContent = String(s.year);
+        if (moRef.current) moRef.current.textContent = String(s.month);
+        if (dyRef.current) dyRef.current.textContent = String(s.day);
+        if (clockRef.current)
+          clockRef.current.textContent = `${pad(s.hh)}:${pad(s.mm)}:${pad(s.ss)}`;
       }
     };
 
@@ -128,11 +163,9 @@ export default function AgeOrbit() {
       <div className="mt-4 flex justify-center">
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
-          className="h-auto w-full max-w-[340px]"
+          className="h-auto w-full max-w-[400px]"
           role="img"
-          aria-label={`Live age: ${readout.years} years, ${readout.days} days, ${pad(
-            readout.hh
-          )}:${pad(readout.mm)}:${pad(readout.ss)}`}
+          aria-label={`Live age: ${init.year} years, ${init.month} months, ${init.day} days`}
         >
           <defs>
             <radialGradient id="ao-space" cx="50%" cy="50%" r="50%">
@@ -197,7 +230,7 @@ export default function AgeOrbit() {
           <circle
             cx={C}
             cy={C}
-            r={196}
+            r={208}
             fill="none"
             stroke="var(--accent)"
             strokeOpacity={0.25}
@@ -209,26 +242,18 @@ export default function AgeOrbit() {
               type="rotate"
               from={`0 ${C} ${C}`}
               to={`360 ${C} ${C}`}
-              dur="90s"
+              dur="120s"
               repeatCount="indefinite"
             />
           </circle>
 
           {/* sun */}
           <circle cx={C} cy={C} r={40} fill="url(#ao-sun-halo)" filter="url(#ao-soft)">
-            <animate attributeName="r" values="36;46;36" dur="4s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.9;0.5;0.9" dur="4s" repeatCount="indefinite" />
+            <animate attributeName="r" values="40;52;40" dur="4.5s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.9;0.5;0.9" dur="4.5s" repeatCount="indefinite" />
           </circle>
-          <circle cx={C} cy={C} r={20} fill="url(#ao-sun)" filter="url(#ao-glow)" />
-          <circle
-            cx={C}
-            cy={C}
-            r={20}
-            fill="none"
-            stroke="#fff"
-            strokeOpacity={0.5}
-            strokeWidth={1}
-          />
+          <circle cx={C} cy={C} r={22} fill="url(#ao-sun)" filter="url(#ao-glow)" />
+          <circle cx={C} cy={C} r={22} fill="none" stroke="#fff" strokeOpacity={0.5} strokeWidth={1} />
 
           {/* orbiting badges: live number + unit label */}
           {RINGS.map((ring) => (
@@ -240,13 +265,8 @@ export default function AgeOrbit() {
               transform={`translate(${C} ${C - ring.radius})`}
             >
               {/* coloured glow halo */}
-              <circle r={20} fill={ring.color} opacity={0.22} filter="url(#ao-soft)" />
-              <circle
-                r={17}
-                fill="url(#ao-badge)"
-                stroke={ring.color}
-                strokeWidth={1.5}
-              />
+              <circle r={18} fill={ring.color} opacity={0.22} filter="url(#ao-soft)" />
+              <circle r={15} fill="url(#ao-badge)" stroke={ring.color} strokeWidth={1.5} />
               <text
                 ref={(el) => {
                   numRefs.current[ring.key] = el;
@@ -254,14 +274,14 @@ export default function AgeOrbit() {
                 textAnchor="middle"
                 y={-1}
                 className="fill-white"
-                style={{ fontSize: 13, fontWeight: 700 }}
+                style={{ fontSize: 12, fontWeight: 700 }}
               >
-                0
+                {init.values[ring.key]}
               </text>
               <text
                 textAnchor="middle"
-                y={10}
-                style={{ fontSize: 7, fill: ring.color, letterSpacing: 0.3 }}
+                y={9}
+                style={{ fontSize: 6.5, fill: ring.color, letterSpacing: 0.3 }}
               >
                 {ring.unit}
               </text>
@@ -271,13 +291,15 @@ export default function AgeOrbit() {
       </div>
 
       {/* exact live readout */}
-      <p className="mt-4 text-center font-display text-2xl font-light text-white tabular-nums">
-        {readout.years}
-        <span className="text-base text-[var(--muted)]"> yrs </span>
-        {readout.days}
-        <span className="text-base text-[var(--muted)]"> days </span>
-        <span className="text-[var(--brand-bright)]">
-          {pad(readout.hh)}:{pad(readout.mm)}:{pad(readout.ss)}
+      <p className="mt-4 text-center font-display text-xl font-light text-white tabular-nums sm:text-2xl">
+        <span ref={yrRef}>{init.year}</span>
+        <span className="text-sm text-[var(--muted)] sm:text-base"> yrs </span>
+        <span ref={moRef}>{init.month}</span>
+        <span className="text-sm text-[var(--muted)] sm:text-base"> mo </span>
+        <span ref={dyRef}>{init.day}</span>
+        <span className="text-sm text-[var(--muted)] sm:text-base"> d </span>
+        <span ref={clockRef} className="text-[var(--brand-bright)]">
+          {pad(init.hh)}:{pad(init.mm)}:{pad(init.ss)}
         </span>
       </p>
     </div>
