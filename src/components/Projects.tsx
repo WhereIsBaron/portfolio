@@ -115,7 +115,7 @@ export default function Projects() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           {filtered.map((p, index) => {
             const imgs = p.images ?? [];
             const hasGallery = imgs.length > 0;
@@ -135,7 +135,7 @@ export default function Projects() {
                   </div>
                 )}
 
-                <article className="reveal group flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-[var(--surface)] transition-colors hover:border-[var(--brand)]/40">
+                <article className="reveal group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface)] transition-colors hover:border-[var(--brand)]/40">
                   {hasGallery && (
                     <button
                       type="button"
@@ -183,7 +183,7 @@ export default function Projects() {
                     </button>
                   )}
 
-                  <div className="flex flex-1 flex-col p-7">
+                  <div className="flex flex-1 flex-col p-5">
                     <div className="flex items-center justify-between">
                       <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-[var(--brand-bright)]">
                         {categoryIcon[p.category]}
@@ -192,21 +192,21 @@ export default function Projects() {
                       <span className="text-xs text-[var(--muted)]/70">{p.year}</span>
                     </div>
 
-                    <h3 className="mt-5 font-display text-2xl text-white">{p.name}</h3>
-                    <p className="mt-3 text-[var(--muted)]">{p.description}</p>
+                    <h3 className="mt-4 font-display text-lg text-white">{p.name}</h3>
+                    <p className="mt-2 text-sm text-[var(--muted)]">{p.description}</p>
 
                     {p.highlights && (
-                      <ul className="mt-5 space-y-2">
+                      <ul className="mt-3 space-y-1.5">
                         {p.highlights.map((h) => (
-                          <li key={h} className="flex gap-2 text-sm text-[var(--muted)]">
-                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--brand-bright)]" />
+                          <li key={h} className="flex gap-2 text-xs text-[var(--muted)]">
+                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--brand-bright)]" />
                             <span>{h}</span>
                           </li>
                         ))}
                       </ul>
                     )}
 
-                    <div className="mt-auto flex flex-wrap items-center gap-2 pt-6">
+                    <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
                       {p.tags.map((t) => (
                         <span
                           key={t}
