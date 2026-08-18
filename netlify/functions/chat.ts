@@ -12,20 +12,29 @@ type Role = 'user' | 'assistant';
 type ChatMessage = { role: Role; content: string };
 
 type ProviderName = 'gemini' | 'groq';
-type ProviderConfig = { url: string; model: string; keyEnv: string; label: string };
+type ProviderConfig = {
+  url: string;
+  model: string;
+  keyEnv: string;
+  label: string;
+  // Extra body params merged into the request (e.g. Groq's gpt-oss models are
+  // reasoning models — keep reasoning shallow so the budget goes to the answer).
+  extraBody?: Record<string, unknown>;
+};
 
 const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   gemini: {
     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    model: 'gemini-2.5-flash-lite',
+    model: 'gemini-3.5-flash-lite',
     keyEnv: 'GEMINI_API_KEY',
     label: 'Gemini',
   },
   groq: {
     url: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-versatile',
+    model: 'openai/gpt-oss-20b',
     keyEnv: 'GROQ_API_KEY',
     label: 'Groq',
+    extraBody: { reasoning_effort: 'low' },
   },
 };
 
@@ -104,6 +113,7 @@ async function callProvider(
         model: cfg.model,
         max_tokens: MAX_OUTPUT_TOKENS,
         messages: [{ role: 'system', content: systemPrompt }, ...messages],
+        ...cfg.extraBody,
       }),
     });
   } catch {
