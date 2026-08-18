@@ -9,6 +9,11 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Serverless functions (the AI chat proxy lives in netlify/functions/chat.ts).
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 # Single Page App fallback: serve index.html for any path so the app always
 # loads (harmless for this single-page site, and future-proof).
 [[redirects]]
