@@ -132,44 +132,49 @@ async function openStream(
 }
 
 // Transform an upstream OpenAI-style SSE stream into a plain-text token stream.
+// Uses a start-loop (rather than pull) so reading continues reliably to the end.
 function toTextStream(upstream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
   const reader = upstream.getReader();
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
-  let buffer = '';
 
   return new ReadableStream<Uint8Array>({
-    async pull(controller) {
+    async start(controller) {
+      let buffer = '';
       try {
-        const { done, value } = await reader.read();
-        if (done) {
-          controller.close();
-          return;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? ''; // keep any partial line for the next chunk
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? ''; // keep any partial line for the next chunk
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith('data:')) continue;
-          const data = trimmed.slice(5).trim();
-          if (data === '[DONE]') {
-            controller.close();
-            return;
-          }
-          try {
-            const json = JSON.parse(data);
-            const delta: unknown = json?.choices?.[0]?.delta?.content;
-            if (typeof delta === 'string' && delta.length) {
-              controller.enqueue(encoder.encode(delta));
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data:')) continue;
+            const data = trimmed.slice(5).trim();
+            if (data === '[DONE]') {
+              controller.close();
+              return;
             }
-          } catch {
-            // keep-alive / non-JSON line — ignore
+            try {
+              const json = JSON.parse(data);
+              const delta: unknown = json?.choices?.[0]?.delta?.content;
+              if (typeof delta === 'string' && delta.length) {
+                controller.enqueue(encoder.encode(delta));
+              }
+            } catch {
+              // keep-alive / non-JSON line — ignore
+            }
           }
         }
-      } catch {
         controller.close();
+      } catch {
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
       }
     },
     cancel() {
