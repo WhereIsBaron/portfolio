@@ -35,6 +35,14 @@ export default function ChatWidget() {
     setInput('');
     setLoading(true);
 
+    // Append the streamed answer into the last assistant bubble as tokens arrive.
+    const setAnswer = (content: string) =>
+      setMessages((m) => {
+        const copy = m.slice();
+        copy[copy.length - 1] = { role: 'assistant', content };
+        return copy;
+      });
+
     try {
       const res = await fetch('/.netlify/functions/chat', {
         method: 'POST',
@@ -45,18 +53,59 @@ export default function ChatWidget() {
           messages: next.filter((m) => m !== GREETING),
         }),
       });
-      const data = await res.json().catch(() => ({}));
-      const reply: string =
-        data?.reply ??
-        "Sorry — I couldn't reach the assistant just now. Please try again in a moment.";
-      setMessages((m) => [...m, { role: 'assistant', content: reply }]);
+
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        setLoading(false);
+        setMessages((m) => [
+          ...m,
+          {
+            role: 'assistant',
+            content:
+              data?.error ??
+              "Sorry — I couldn't reach the assistant just now. Please try again in a moment.",
+          },
+        ]);
+        return;
+      }
+
+      // Stream the plain-text token response.
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = '';
+      let started = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        if (!chunk) continue;
+        acc += chunk;
+        if (!started) {
+          started = true;
+          setLoading(false); // first token arrived — swap typing dots for text
+          setMessages((m) => [...m, { role: 'assistant', content: acc }]);
+        } else {
+          setAnswer(acc);
+        }
+      }
+
+      if (!started) {
+        setLoading(false);
+        setMessages((m) => [
+          ...m,
+          {
+            role: 'assistant',
+            content: "Sorry — I couldn't generate a reply. Please try again.",
+          },
+        ]);
+      }
     } catch {
+      setLoading(false);
       setMessages((m) => [
         ...m,
         { role: 'assistant', content: 'Network error — please try again.' },
       ]);
-    } finally {
-      setLoading(false);
     }
   };
 
