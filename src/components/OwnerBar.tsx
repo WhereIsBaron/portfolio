@@ -34,7 +34,7 @@ export default function OwnerBar() {
     <>
       {status && (
         <div
-          className={`fixed bottom-20 right-4 z-[80] flex items-center gap-2 rounded-lg px-4 py-2 text-sm text-white shadow-lg ${
+          className={`fixed top-24 right-4 z-[80] flex items-center gap-2 rounded-lg px-4 py-2 text-sm text-white shadow-lg ${
             isError ? 'bg-red-600' : 'bg-[var(--brand)]'
           }`}
         >

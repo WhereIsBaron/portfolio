@@ -115,13 +115,13 @@ export default function ChatWidget() {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? 'Close chat' : 'Open chat'}
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--brand)] text-[#0b0d10] shadow-lg transition-transform hover:scale-105 hover:bg-[var(--brand-bright)]"
+        className="fixed bottom-20 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--brand)] text-[#0b0d10] shadow-lg transition-transform hover:scale-105 hover:bg-[var(--brand-bright)]"
       >
         {open ? <X size={22} /> : <MessageCircle size={22} />}
       </button>
 
       {open && (
-        <div className="fixed bottom-24 right-5 z-50 flex h-[32rem] max-h-[calc(100vh-8rem)] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
+        <div className="fixed bottom-40 right-5 z-50 flex h-[32rem] max-h-[calc(100vh-12rem)] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
             <div className="flex items-center gap-2">

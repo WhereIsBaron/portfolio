@@ -115,7 +115,7 @@ export default function Projects() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p, index) => {
             const imgs = p.images ?? [];
             const hasGallery = imgs.length > 0;
