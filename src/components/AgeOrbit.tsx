@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { profile } from '@/data/cv';
 
 // Birthdate anchored to Gaborone time (UTC+2). Time defaults to 00:00.
-const BIRTH_MS = Date.parse('1996-09-13T00:00:00+02:00');
+const BIRTH_MS = Date.parse(`${profile.birthDate}T00:00:00+02:00`);
 const TZ = 2 * 3600000; // shift so UTC fields read as Gaborone wall-clock time
 
 const SIZE = 570;

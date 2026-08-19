@@ -6,6 +6,7 @@ export const profile = {
   tagline:
     'Software engineer and full-stack developer. I design, build, and maintain websites, databases, mobile apps, games, and automation solutions, with a problem-solving mindset and real attention to detail.',
   location: 'Gaborone, Botswana',
+  birthDate: '1996-09-13', // Gaborone time (UTC+2); drives the live age counter + AI assistant
   email: 'andrewpjlangeveldt@gmail.com',
   phone: '+267 76541693',
   license: "Driver's License: Class B",
