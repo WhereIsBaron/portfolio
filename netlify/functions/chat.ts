@@ -45,6 +45,49 @@ const MAX_MESSAGES = 20; // trim overly long histories
 const MAX_CHARS_PER_MSG = 2000; // reject oversized single messages
 const MAX_OUTPUT_TOKENS = 400; // short answers keep cost/latency low
 
+// ---- Per-IP rate limit (backed by Supabase) ----
+const RATE_LIMIT_MAX = 20; // messages allowed per IP per window
+const RATE_LIMIT_WINDOW_SECONDS = 600; // 10 minutes
+
+// Netlify sets x-nf-client-connection-ip to the real visitor IP; fall back to
+// the first hop of x-forwarded-for. Returns '' when we can't determine it.
+function clientIp(req: Request): string {
+  const direct = req.headers.get('x-nf-client-connection-ip');
+  if (direct) return direct.trim();
+  const fwd = req.headers.get('x-forwarded-for');
+  if (fwd) return fwd.split(',')[0].trim();
+  return '';
+}
+
+// Ask Supabase whether this IP may send another message. FAILS OPEN: if the
+// rate-limit env is not configured, or Supabase errors, we allow the request
+// rather than break the chat over a non-critical guard.
+async function underRateLimit(ip: string): Promise<boolean> {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return true; // not configured → allow
+
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/check_chat_rate_limit`, {
+      method: 'POST',
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        client_ip: ip,
+        max_requests: RATE_LIMIT_MAX,
+        window_seconds: RATE_LIMIT_WINDOW_SECONDS,
+      }),
+    });
+    if (!res.ok) return true; // Supabase error → allow
+    return (await res.json()) === true;
+  } catch {
+    return true; // network error → allow
+  }
+}
+
 // ---- CV-grounded system prompt ----
 function buildSystemPrompt(): string {
   const skills = skillGroups
@@ -215,6 +258,15 @@ export default async (req: Request): Promise<Response> => {
     }));
 
   if (messages.length === 0) return jsonResponse(400, { error: 'No messages provided' });
+
+  // Per-IP rate limit (skipped when we can't identify the caller).
+  const ip = clientIp(req);
+  if (ip && !(await underRateLimit(ip))) {
+    return jsonResponse(429, {
+      error:
+        "You've sent a lot of messages in a short time. Please wait a few minutes and try again.",
+    });
+  }
 
   // Provider selection: request → ACTIVE_PROVIDER env → default. Allow-list only.
   const requested = payload.provider;
