@@ -26,6 +26,7 @@ export default function ChatWidget() {
   const [loading, setLoading] = useState(false);
   const [prompt, setPrompt] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -33,6 +34,53 @@ export default function ChatWidget() {
       behavior: 'smooth',
     });
   }, [messages, loading, open]);
+
+  // A soft two-note chime when the greeting appears. Synthesized (no asset), and
+  // silent-on-failure — browsers block audio until the visitor has interacted, so
+  // it may not sound on a cold landing; the primer below readies it on first input.
+  const playChime = () => {
+    try {
+      const ctx = audioCtxRef.current ?? new AudioContext();
+      audioCtxRef.current = ctx;
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      const now = ctx.currentTime;
+      [880, 1174.66].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        const t = now + i * 0.12;
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.09, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.24);
+      });
+    } catch {
+      /* Web Audio unavailable or blocked — no sound, no error */
+    }
+  };
+
+  // Ready the audio context on the visitor's first interaction, so the chime can
+  // actually play (browsers require a user gesture before audio is allowed).
+  useEffect(() => {
+    const prime = () => {
+      try {
+        const ctx = audioCtxRef.current ?? new AudioContext();
+        audioCtxRef.current = ctx;
+        ctx.resume().catch(() => {});
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener('pointerdown', prime, { once: true });
+    window.addEventListener('keydown', prime, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', prime);
+      window.removeEventListener('keydown', prime);
+    };
+  }, []);
 
   // Pop the proactive greeting once per session, shortly after landing.
   useEffect(() => {
@@ -43,7 +91,10 @@ export default function ChatWidget() {
       /* private mode / storage blocked — just show it this once */
     }
     if (seen) return;
-    const t = setTimeout(() => setPrompt(true), PROMPT_DELAY_MS);
+    const t = setTimeout(() => {
+      setPrompt(true);
+      playChime();
+    }, PROMPT_DELAY_MS);
     return () => clearTimeout(t);
   }, []);
 
