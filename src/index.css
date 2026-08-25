@@ -76,3 +76,15 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #3a424f;
 }
+
+/* Mount animation for the chat greeting bubble. */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

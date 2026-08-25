@@ -11,12 +11,20 @@ const GREETING: Msg = {
     "Hi! I'm Andrew's AI assistant. Ask me anything about his skills, projects, or experience.",
 };
 
+// Proactive greeting shown to a visitor a few seconds after they land. Once per
+// browser session (dismiss or open the chat and it won't nag again on reloads /
+// in-app navigation).
+const PROMPT_TEXT = '👋 Curious about Andrew? Ask me anything about his work.';
+const PROMPT_SEEN_KEY = 'chatPromptSeen';
+const PROMPT_DELAY_MS = 3500;
+
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [provider, setProvider] = useState<Provider>('gemini');
   const [messages, setMessages] = useState<Msg[]>([GREETING]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [prompt, setPrompt] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,6 +33,34 @@ export default function ChatWidget() {
       behavior: 'smooth',
     });
   }, [messages, loading, open]);
+
+  // Pop the proactive greeting once per session, shortly after landing.
+  useEffect(() => {
+    let seen = false;
+    try {
+      seen = sessionStorage.getItem(PROMPT_SEEN_KEY) === '1';
+    } catch {
+      /* private mode / storage blocked — just show it this once */
+    }
+    if (seen) return;
+    const t = setTimeout(() => setPrompt(true), PROMPT_DELAY_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Mark the greeting handled so it won't reappear this session.
+  const dismissPrompt = () => {
+    setPrompt(false);
+    try {
+      sessionStorage.setItem(PROMPT_SEEN_KEY, '1');
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const openChat = () => {
+    setOpen(true);
+    dismissPrompt();
+  };
 
   const send = async () => {
     const text = input.trim();
@@ -111,9 +147,32 @@ export default function ChatWidget() {
 
   return (
     <>
+      {/* Proactive greeting bubble — invites the visitor to open the chat. */}
+      {prompt && !open && (
+        <div
+          role="dialog"
+          aria-label="Chat assistant greeting"
+          className="fixed bottom-36 right-5 z-50 flex w-64 max-w-[calc(100vw-2.5rem)] items-start gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 shadow-2xl motion-safe:animate-[fadeInUp_0.25s_ease-out]"
+        >
+          <button
+            onClick={openChat}
+            className="flex-1 text-left text-sm leading-snug text-[var(--text)]"
+          >
+            {PROMPT_TEXT}
+          </button>
+          <button
+            onClick={dismissPrompt}
+            aria-label="Dismiss"
+            className="shrink-0 rounded-md p-0.5 text-[var(--muted)] transition-colors hover:text-[var(--text)]"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Launcher */}
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? setOpen(false) : openChat())}
         aria-label={open ? 'Close chat' : 'Open chat'}
         className="fixed bottom-20 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--brand)] text-[#0b0d10] shadow-lg transition-transform hover:scale-105 hover:bg-[var(--brand-bright)]"
       >
