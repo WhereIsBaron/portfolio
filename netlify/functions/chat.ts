@@ -176,7 +176,7 @@ ${refs}
 # About this website
 - A single-page React + TypeScript app (Vite), styled with Tailwind, deployed on Netlify. Main sections: About, Skills, Projects, Education, Contact.
 - The hero has a live "Age, live" orbit animation counting ${profile.shortName}'s age in real time.
-- Projects appear as cards; several open image galleries, and the Universal Booking System opens an interactive in-app demo (at /booking).
+- Projects appear as cards; several open image galleries. Two open interactive in-app demos: the Universal Booking System (at /booking) and a CRM System (at /crm) with contacts, a deal pipeline, activity tracking, and a dashboard, populated with sample data from public APIs.
 - You — this chat assistant — are powered by a secure serverless function with two AI providers (Gemini and Groq) and per-visitor rate limiting.
 
 # Rules

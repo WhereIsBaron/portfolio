@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from '@/pages/Home';
 import BookingPage from '@/pages/BookingPage';
+import CrmPage from '@/pages/CrmPage';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import ScrollToHash from '@/components/ScrollToHash';
 import ChatWidget from '@/components/ChatWidget';
@@ -16,6 +17,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/booking" element={<BookingPage />} />
+            <Route path="/crm" element={<CrmPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
           </Routes>
           <ChatWidget />

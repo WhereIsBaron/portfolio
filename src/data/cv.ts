@@ -177,6 +177,21 @@ export const projects: Project[] = [
     link: '#',
   },
   {
+    name: 'CRM System',
+    category: 'Product',
+    description:
+      'A full customer-relationship platform simulated end to end: contacts with searchable profiles, a deal pipeline that moves through stages, activity tracking (calls, emails, meetings, tasks), and a live dashboard of pipeline value and forecasts. Sample identities are pulled from a public API so the demo feels real.',
+    year: '2026 - Present',
+    tags: ['React', 'TypeScript', 'Public APIs', 'Supabase (next)'],
+    highlights: [
+      'Interactive dashboard, contacts, kanban pipeline, and activity feed — all fully clickable.',
+      'Sample data populated live from randomuser.me, with DiceBear avatars and a seeded generator.',
+      'Front-end demo live now; a Supabase-backed version with persisted records is next.',
+    ],
+    route: '/crm',
+    link: '#',
+  },
+  {
     name: 'Classroom Scheduling System',
     category: 'Final Year Project',
     description:
