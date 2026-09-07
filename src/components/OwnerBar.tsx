@@ -131,12 +131,7 @@ export default function OwnerBar() {
                 <X size={18} />
               </button>
             </div>
-            <p className="mb-4 text-sm text-[var(--muted)]">
-              Sign in to rearrange projects and screenshots. Visitors always see your saved
-              arrangement, view-only.
-            </p>
-
-            <form onSubmit={submit} className="space-y-3">
+            <form onSubmit={submit} className="mt-4 space-y-3">
               <div>
                 <label className="mb-1 block text-sm text-[var(--muted)]">Email</label>
                 <input
