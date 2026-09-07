@@ -192,6 +192,21 @@ export const projects: Project[] = [
     link: '#',
   },
   {
+    name: 'ERP System',
+    category: 'Product',
+    description:
+      'A full enterprise resource-planning suite simulated end to end, modelled on systems like ERPNext: double-entry accounting with a chart of accounts and journal, inventory with warehouses and stock valuation, sales and purchase order flows, manufacturing work orders, HR and payroll, project tracking, and a fixed-asset register with depreciation — all feeding a live financial dashboard. Real products and people are pulled from public APIs so the data feels genuine.',
+    year: '2026 - Present',
+    tags: ['React', 'TypeScript', 'Public APIs', 'Supabase (next)'],
+    highlights: [
+      'Eleven interactive modules: dashboard, accounting, inventory, sales, buying, manufacturing, HR, projects, assets, reports, and settings.',
+      'Real order flows: advance and bill sales orders, receive purchase orders, run manufacturing batches, and restock low inventory — the accounts and reports update as you go.',
+      'Inventory items come live from DummyJSON and staff from randomuser.me, layered on a seeded generator; a Supabase-backed version with persisted records is next.',
+    ],
+    route: '/erp',
+    link: '#',
+  },
+  {
     name: 'Classroom Scheduling System',
     category: 'Final Year Project',
     description:

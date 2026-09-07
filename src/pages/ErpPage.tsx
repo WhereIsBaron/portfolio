@@ -1,0 +1,739 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  ArrowLeft, LayoutDashboard, Wallet, Boxes, ShoppingCart, Truck, Factory,
+  UsersRound, FolderKanban, Landmark, BarChart3, Settings as SettingsIcon,
+  Search, ChevronRight, Menu, Database, AlertTriangle, TrendingUp, TrendingDown,
+  Package, DollarSign, ClipboardList, Building2,
+} from 'lucide-react';
+import {
+  fetchErpData, money, avatarFor, orderTotal,
+  WAREHOUSES, DEPARTMENTS, SO_FLOW, PO_FLOW,
+  type ErpData, type Item, type Customer, type Supplier, type SalesOrder, type PurchaseOrder,
+  type WorkOrder, type Employee, type Project, type Asset, type Account, type JournalEntry,
+  type SOStatus, type POStatus, type WOStatus, type AcctType,
+} from '@/data/erpSeed';
+
+type Tab =
+  | 'dashboard' | 'accounting' | 'inventory' | 'sales' | 'buying' | 'manufacturing'
+  | 'hr' | 'projects' | 'assets' | 'reports' | 'settings';
+
+const NAV: { id: Tab; label: string; icon: typeof Boxes }[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'accounting', label: 'Accounting', icon: Wallet },
+  { id: 'inventory', label: 'Inventory', icon: Boxes },
+  { id: 'sales', label: 'Sales', icon: ShoppingCart },
+  { id: 'buying', label: 'Buying', icon: Truck },
+  { id: 'manufacturing', label: 'Manufacturing', icon: Factory },
+  { id: 'hr', label: 'HR', icon: UsersRound },
+  { id: 'projects', label: 'Projects', icon: FolderKanban },
+  { id: 'assets', label: 'Assets', icon: Landmark },
+  { id: 'reports', label: 'Reports', icon: BarChart3 },
+  { id: 'settings', label: 'Settings', icon: SettingsIcon },
+];
+
+const SO_STYLE: Record<SOStatus, string> = {
+  Draft: 'bg-white/5 text-[var(--muted)] border-white/10',
+  'To Deliver': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  'To Bill': 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  Completed: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  Cancelled: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+};
+const PO_STYLE: Record<POStatus, string> = {
+  Draft: 'bg-white/5 text-[var(--muted)] border-white/10',
+  'To Receive': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  'To Bill': 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  Completed: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+};
+const WO_STYLE: Record<WOStatus, string> = {
+  'Not Started': 'bg-white/5 text-[var(--muted)] border-white/10',
+  'In Process': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  Completed: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+};
+const ACCT_ORDER: AcctType[] = ['Asset', 'Liability', 'Equity', 'Income', 'Expense'];
+
+const fmtDate = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+const card = 'rounded-2xl border border-white/10 bg-[var(--surface)]';
+
+function Thumb({ src, name, size = 40 }: { src: string; name: string; size?: number }) {
+  const [err, setErr] = useState(false);
+  if (err || !src) {
+    return (
+      <span className="flex items-center justify-center rounded-lg border border-white/10 bg-[var(--bg-soft)] text-[var(--muted)]" style={{ width: size, height: size }}>
+        <Package size={size * 0.5} />
+      </span>
+    );
+  }
+  return <img src={src} alt={name} onError={() => setErr(true)} className="rounded-lg border border-white/10 bg-white object-cover" style={{ width: size, height: size }} />;
+}
+function Avatar({ src, name, size = 36 }: { src: string; name: string; size?: number }) {
+  const [err, setErr] = useState(false);
+  const url = err || !src ? avatarFor(name) : src;
+  return <img src={url} alt={name} onError={() => setErr(true)} className="rounded-full border border-white/10 bg-[var(--bg-soft)] object-cover" style={{ width: size, height: size }} />;
+}
+
+export default function ErpPage() {
+  const [loading, setLoading] = useState(true);
+  const [d, setD] = useState<ErpData | null>(null);
+  const [tab, setTab] = useState<Tab>('dashboard');
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchErpData().then((data) => { if (!cancelled) { setD(data); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, []);
+
+  const go = (t: Tab) => { setTab(t); setNavOpen(false); };
+
+  // Mutations
+  const advanceSO = (id: string) => setD((s) => !s ? s : ({ ...s, salesOrders: s.salesOrders.map((o) => {
+    if (o.id !== id) return o; const i = SO_FLOW.indexOf(o.status as any);
+    return i >= 0 && i < SO_FLOW.length - 1 ? { ...o, status: SO_FLOW[i + 1] } : o;
+  }) }));
+  const advancePO = (id: string) => setD((s) => !s ? s : ({ ...s, purchaseOrders: s.purchaseOrders.map((o) => {
+    if (o.id !== id) return o; const i = PO_FLOW.indexOf(o.status);
+    return i >= 0 && i < PO_FLOW.length - 1 ? { ...o, status: PO_FLOW[i + 1] } : o;
+  }) }));
+  const produceWO = (id: string) => setD((s) => !s ? s : ({ ...s, workOrders: s.workOrders.map((w) => {
+    if (w.id !== id) return w;
+    const produced = Math.min(w.qty, w.produced + Math.ceil(w.qty * 0.25));
+    const status: WOStatus = produced >= w.qty ? 'Completed' : 'In Process';
+    return { ...w, produced, status };
+  }) }));
+  const restock = (id: string) => setD((s) => !s ? s : ({ ...s, items: s.items.map((it) =>
+    it.id === id ? { ...it, stock: it.reorder * 3 } : it) }));
+
+  return (
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-[var(--bg)]/85 backdrop-blur">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setNavOpen((v) => !v)} className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-white/5 hover:text-white lg:hidden" aria-label="Toggle navigation"><Menu size={20} /></button>
+            <Link to="/" className="font-display text-lg font-semibold tracking-tight text-white">Andrew<span className="text-[var(--brand-bright)]">.</span>ERP</Link>
+            <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-[var(--muted)] sm:inline-flex"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--brand-bright)]" /> Live demo</span>
+          </div>
+          <Link to="/#work" className="inline-flex items-center gap-2 text-sm text-[var(--muted)] transition-colors hover:text-white"><ArrowLeft size={15} /> Back to portfolio</Link>
+        </div>
+      </header>
+
+      <div className="mx-auto flex max-w-[1400px]">
+        <aside className={`${navOpen ? 'block' : 'hidden'} fixed inset-x-0 top-[57px] z-20 border-b border-white/10 bg-[var(--bg)] px-3 py-3 lg:sticky lg:top-[57px] lg:block lg:h-[calc(100vh-57px)] lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r lg:py-6`}>
+          <nav className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:flex lg:flex-col">
+            {NAV.map((n) => (
+              <button key={n.id} onClick={() => go(n.id)} className={`inline-flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors ${tab === n.id ? 'bg-[var(--brand-bright)] font-medium text-[#0b0d10]' : 'text-[var(--muted)] hover:bg-white/5 hover:text-white'}`}>
+                <n.icon size={16} className="shrink-0" /> {n.label}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <h1 className="mb-5 font-display text-2xl text-white">{NAV.find((n) => n.id === tab)?.label}</h1>
+          {loading || !d ? (
+            <div className="py-24 text-center text-[var(--muted)]">Loading sample data…</div>
+          ) : (
+            <>
+              {tab === 'dashboard' && <Dashboard d={d} go={go} />}
+              {tab === 'accounting' && <Accounting d={d} />}
+              {tab === 'inventory' && <Inventory d={d} onRestock={restock} />}
+              {tab === 'sales' && <Sales d={d} onAdvance={advanceSO} />}
+              {tab === 'buying' && <Buying d={d} onAdvance={advancePO} />}
+              {tab === 'manufacturing' && <Manufacturing d={d} onProduce={produceWO} />}
+              {tab === 'hr' && <HR d={d} />}
+              {tab === 'projects' && <Projects d={d} />}
+              {tab === 'assets' && <Assets d={d} />}
+              {tab === 'reports' && <Reports d={d} />}
+              {tab === 'settings' && <SettingsView d={d} />}
+            </>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+function Dashboard({ d, go }: { d: ErpData; go: (t: Tab) => void }) {
+  const revenue = d.monthly.reduce((s, m) => s + m.revenue, 0);
+  const expenses = d.monthly.reduce((s, m) => s + m.expenses, 0);
+  const profit = revenue - expenses;
+  const stockValue = d.items.reduce((s, it) => s + it.stock * it.cost, 0);
+  const lowStock = d.items.filter((it) => it.stock <= it.reorder).length;
+  const openSO = d.salesOrders.filter((o) => o.status !== 'Completed' && o.status !== 'Cancelled').length;
+  const openPO = d.purchaseOrders.filter((o) => o.status !== 'Completed').length;
+  const receivable = d.customers.reduce((s, c) => s + c.outstanding, 0);
+  const maxM = Math.max(1, ...d.monthly.map((m) => Math.max(m.revenue, m.expenses)));
+
+  const cards = [
+    { label: 'Revenue (6mo)', value: money(revenue), icon: TrendingUp, tab: 'reports' as Tab },
+    { label: 'Expenses (6mo)', value: money(expenses), icon: TrendingDown, tab: 'accounting' as Tab },
+    { label: 'Net profit', value: money(profit), icon: DollarSign, tab: 'accounting' as Tab },
+    { label: 'Stock value', value: money(stockValue), icon: Boxes, tab: 'inventory' as Tab },
+    { label: 'Open sales orders', value: openSO.toString(), icon: ShoppingCart, tab: 'sales' as Tab },
+    { label: 'Open purchase orders', value: openPO.toString(), icon: Truck, tab: 'buying' as Tab },
+    { label: 'Receivables', value: money(receivable), icon: ClipboardList, tab: 'accounting' as Tab },
+    { label: 'Low-stock items', value: lowStock.toString(), icon: AlertTriangle, tab: 'inventory' as Tab },
+  ];
+
+  const soStatuses = ['Draft', 'To Deliver', 'To Bill', 'Completed'] as SOStatus[];
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {cards.map((c) => (
+          <button key={c.label} onClick={() => go(c.tab)} className={`${card} p-4 text-left transition-colors hover:border-white/25`}>
+            <c.icon size={16} className="text-[var(--brand-bright)]" />
+            <div className="mt-3 font-display text-xl text-white">{c.value}</div>
+            <div className="text-xs text-[var(--muted)]">{c.label}</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className={`${card} p-6`}>
+          <h3 className="font-display text-lg text-white">Revenue vs expenses</h3>
+          <div className="mt-6 flex h-44 gap-4">
+            {d.monthly.map((m) => (
+              <div key={m.label} className="flex flex-1 flex-col items-center gap-2">
+                <div className="flex w-full flex-1 items-end justify-center gap-1">
+                  <div className="w-1/2 rounded-t bg-[var(--brand-bright)]" style={{ height: `${(m.revenue / maxM) * 100}%` }} title={`Revenue ${money(m.revenue)}`} />
+                  <div className="w-1/2 rounded-t bg-white/25" style={{ height: `${(m.expenses / maxM) * 100}%` }} title={`Expenses ${money(m.expenses)}`} />
+                </div>
+                <div className="text-xs text-[var(--muted)]">{m.label}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex gap-4 text-xs text-[var(--muted)]">
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[var(--brand-bright)]" /> Revenue</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-white/25" /> Expenses</span>
+          </div>
+        </div>
+
+        <div className={`${card} p-6`}>
+          <h3 className="font-display text-lg text-white">Sales orders by status</h3>
+          <div className="mt-4 space-y-3">
+            {soStatuses.map((st) => {
+              const n = d.salesOrders.filter((o) => o.status === st).length;
+              const pct = (n / Math.max(1, d.salesOrders.length)) * 100;
+              return (
+                <div key={st}>
+                  <div className="flex justify-between text-sm"><span className="text-[var(--muted)]">{st}</span><span className="text-white">{n}</span></div>
+                  <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${pct}%` }} /></div>
+                </div>
+              );
+            })}
+          </div>
+          <button onClick={() => go('sales')} className="mt-4 text-xs text-[var(--brand-bright)]">Open sales →</button>
+        </div>
+      </div>
+
+      <ApiCredit d={d} />
+    </div>
+  );
+}
+
+// ── Accounting ───────────────────────────────────────────────────────────────
+function Accounting({ d }: { d: ErpData }) {
+  const income = d.accounts.filter((a) => a.type === 'Income').reduce((s, a) => s + a.balance, 0);
+  const expense = d.accounts.filter((a) => a.type === 'Expense').reduce((s, a) => s + a.balance, 0);
+  const profit = income - expense;
+  const byType = (t: AcctType) => d.accounts.filter((a) => a.type === t);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className={`${card} p-6 lg:col-span-1`}>
+          <h3 className="font-display text-lg text-white">Profit &amp; Loss</h3>
+          <div className="mt-4 space-y-2 text-sm">
+            <Line label="Income" value={money(income)} />
+            <Line label="Expenses" value={`(${money(expense)})`} muted />
+            <div className="my-2 border-t border-white/10" />
+            <div className="flex justify-between font-medium">
+              <span className="text-white">Net profit</span>
+              <span className={profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{money(profit)}</span>
+            </div>
+            <div className="text-xs text-[var(--muted)]">Margin {income ? Math.round((profit / income) * 100) : 0}%</div>
+          </div>
+        </div>
+
+        <div className={`${card} p-6 lg:col-span-2`}>
+          <h3 className="font-display text-lg text-white">Chart of accounts</h3>
+          <div className="mt-3 space-y-4">
+            {ACCT_ORDER.map((t) => (
+              <div key={t}>
+                <div className="text-xs uppercase tracking-wide text-[var(--muted)]">{t}</div>
+                <div className="mt-1 divide-y divide-white/5">
+                  {byType(t).map((a) => (
+                    <div key={a.name} className="flex justify-between py-1.5 text-sm"><span className="text-[var(--text)]">{a.name}</span><span className="text-white tabular-nums">{money(a.balance)}</span></div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className={`${card} overflow-hidden`}>
+        <div className="border-b border-white/10 p-4"><h3 className="font-display text-lg text-white">Recent journal entries</h3></div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="bg-[var(--bg-soft)] text-xs uppercase tracking-wide text-[var(--muted)]">
+              <tr><th className="px-4 py-3 font-medium">Date</th><th className="px-4 py-3 font-medium">Voucher</th><th className="px-4 py-3 font-medium">Account</th><th className="px-4 py-3 text-right font-medium">Debit</th><th className="px-4 py-3 text-right font-medium">Credit</th></tr>
+            </thead>
+            <tbody>
+              {d.journal.map((j) => (
+                <tr key={j.id} className="border-t border-white/5">
+                  <td className="px-4 py-2.5 text-[var(--muted)]">{fmtDate(j.date)}</td>
+                  <td className="px-4 py-2.5 text-[var(--text)]">{j.voucher}</td>
+                  <td className="px-4 py-2.5 text-[var(--text)]">{j.account}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-white">{j.debit ? money(j.debit) : '—'}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-white">{j.credit ? money(j.credit) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+function Line({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  return <div className="flex justify-between"><span className="text-[var(--muted)]">{label}</span><span className={muted ? 'text-[var(--muted)] tabular-nums' : 'text-white tabular-nums'}>{value}</span></div>;
+}
+
+// ── Inventory ────────────────────────────────────────────────────────────────
+function Inventory({ d, onRestock }: { d: ErpData; onRestock: (id: string) => void }) {
+  const [search, setSearch] = useState('');
+  const [wh, setWh] = useState('All');
+  const [lowOnly, setLowOnly] = useState(false);
+  const rows = d.items.filter((it) => {
+    if (wh !== 'All' && it.warehouse !== wh) return false;
+    if (lowOnly && it.stock > it.reorder) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return [it.name, it.code, it.category, it.brand].some((f) => f.toLowerCase().includes(q));
+  });
+  const totalVal = d.items.reduce((s, it) => s + it.stock * it.cost, 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="SKUs" value={d.items.length.toString()} />
+        <Kpi label="Stock value" value={money(totalVal)} />
+        <Kpi label="Low stock" value={d.items.filter((it) => it.stock <= it.reorder).length.toString()} />
+        <Kpi label="Warehouses" value={WAREHOUSES.length.toString()} />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-[var(--surface)] px-3 py-2">
+          <Search size={16} className="text-[var(--muted)]" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search item, SKU, category…" className="w-full bg-transparent text-sm text-white outline-none placeholder:text-[var(--muted)]" />
+        </div>
+        <select value={wh} onChange={(e) => setWh(e.target.value)} className="rounded-xl border border-white/10 bg-[var(--surface)] px-3 py-2 text-sm text-white outline-none">
+          <option value="All">All warehouses</option>
+          {WAREHOUSES.map((w) => <option key={w} value={w}>{w}</option>)}
+        </select>
+        <button onClick={() => setLowOnly((v) => !v)} className={`rounded-xl border px-3 py-2 text-sm transition-colors ${lowOnly ? 'border-[var(--brand-bright)] bg-[var(--brand-bright)]/10 text-[var(--brand-bright)]' : 'border-white/10 text-[var(--muted)] hover:text-white'}`}>Low stock</button>
+      </div>
+
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+            <tr><th className="px-4 py-3 font-medium">Item</th><th className="px-4 py-3 font-medium">Category</th><th className="px-4 py-3 font-medium">Warehouse</th><th className="px-4 py-3 text-right font-medium">Price</th><th className="px-4 py-3 text-right font-medium">Stock</th><th className="px-4 py-3 text-right font-medium">Value</th><th className="px-4 py-3" /></tr>
+          </thead>
+          <tbody>
+            {rows.map((it) => {
+              const low = it.stock <= it.reorder;
+              return (
+                <tr key={it.id} className="border-t border-white/5">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Thumb src={it.thumbnail} name={it.name} />
+                      <div className="min-w-0"><div className="truncate font-medium text-white">{it.name}</div><div className="text-xs text-[var(--muted)]">{it.code} · {it.brand}</div></div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 capitalize text-[var(--muted)]">{it.category}</td>
+                  <td className="px-4 py-3 text-[var(--muted)]">{it.warehouse}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-white">{money(it.price)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    <span className={low ? 'text-rose-300' : 'text-white'}>{it.stock}</span>
+                    {low && <AlertTriangle size={13} className="ml-1 inline text-rose-300" />}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-[var(--muted)]">{money(it.stock * it.cost)}</td>
+                  <td className="px-4 py-3 text-right">{low && <button onClick={() => onRestock(it.id)} className="rounded-lg bg-[var(--brand-bright)]/15 px-2.5 py-1 text-xs text-[var(--brand-bright)] transition-colors hover:bg-[var(--brand-bright)]/25">Restock</button>}</td>
+                </tr>
+              );
+            })}
+            {rows.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-[var(--muted)]">No items match.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Sales ────────────────────────────────────────────────────────────────────
+function Sales({ d, onAdvance }: { d: ErpData; onAdvance: (id: string) => void }) {
+  const cust = Object.fromEntries(d.customers.map((c) => [c.id, c]));
+  const total = d.salesOrders.reduce((s, o) => s + orderTotal(o.lines), 0);
+  const open = d.salesOrders.filter((o) => o.status !== 'Completed' && o.status !== 'Cancelled');
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Orders" value={d.salesOrders.length.toString()} />
+        <Kpi label="Open" value={open.length.toString()} />
+        <Kpi label="Order value" value={money(total)} />
+        <Kpi label="Customers" value={d.customers.length.toString()} />
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+            <tr><th className="px-4 py-3 font-medium">Order</th><th className="px-4 py-3 font-medium">Customer</th><th className="px-4 py-3 font-medium">Date</th><th className="px-4 py-3 text-right font-medium">Amount</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
+          </thead>
+          <tbody>
+            {d.salesOrders.map((o) => {
+              const canAdvance = o.status !== 'Completed' && o.status !== 'Cancelled';
+              const nextLabel = o.status === 'Draft' ? 'Submit' : o.status === 'To Deliver' ? 'Deliver' : o.status === 'To Bill' ? 'Bill' : '';
+              return (
+                <tr key={o.id} className="border-t border-white/5">
+                  <td className="px-4 py-3 font-medium text-white">{o.number}</td>
+                  <td className="px-4 py-3 text-[var(--muted)]">{cust[o.customerId]?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-[var(--muted)]">{fmtDate(o.date)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-white">{money(orderTotal(o.lines))}</td>
+                  <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${SO_STYLE[o.status]}`}>{o.status}</span></td>
+                  <td className="px-4 py-3 text-right">{canAdvance && nextLabel && <button onClick={() => onAdvance(o.id)} className="rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white">{nextLabel}</button>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Buying ───────────────────────────────────────────────────────────────────
+function Buying({ d, onAdvance }: { d: ErpData; onAdvance: (id: string) => void }) {
+  const sup = Object.fromEntries(d.suppliers.map((s) => [s.id, s]));
+  const payable = d.suppliers.reduce((s, x) => s + x.outstanding, 0);
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Purchase orders" value={d.purchaseOrders.length.toString()} />
+        <Kpi label="To receive" value={d.purchaseOrders.filter((o) => o.status === 'To Receive').length.toString()} />
+        <Kpi label="Payables" value={money(payable)} />
+        <Kpi label="Suppliers" value={d.suppliers.length.toString()} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="overflow-x-auto rounded-2xl border border-white/10">
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+              <tr><th className="px-4 py-3 font-medium">Order</th><th className="px-4 py-3 font-medium">Supplier</th><th className="px-4 py-3 text-right font-medium">Amount</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
+            </thead>
+            <tbody>
+              {d.purchaseOrders.map((o) => {
+                const canAdvance = o.status !== 'Completed';
+                const nextLabel = o.status === 'Draft' ? 'Submit' : o.status === 'To Receive' ? 'Receive' : o.status === 'To Bill' ? 'Bill' : '';
+                return (
+                  <tr key={o.id} className="border-t border-white/5">
+                    <td className="px-4 py-3 font-medium text-white">{o.number}</td>
+                    <td className="px-4 py-3 text-[var(--muted)]">{sup[o.supplierId]?.name ?? '—'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-white">{money(orderTotal(o.lines))}</td>
+                    <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${PO_STYLE[o.status]}`}>{o.status}</span></td>
+                    <td className="px-4 py-3 text-right">{canAdvance && nextLabel && <button onClick={() => onAdvance(o.id)} className="rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white">{nextLabel}</button>}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className={`${card} h-fit p-5`}>
+          <h3 className="font-display text-lg text-white">Suppliers</h3>
+          <div className="mt-3 divide-y divide-white/5">
+            {d.suppliers.map((s) => (
+              <div key={s.id} className="flex items-center justify-between py-2.5 text-sm">
+                <div className="min-w-0"><div className="truncate text-white">{s.name}</div><div className="text-xs text-[var(--muted)]">{s.category}</div></div>
+                <span className="shrink-0 text-[var(--muted)]">{s.outstanding ? money(s.outstanding) : '—'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Manufacturing ────────────────────────────────────────────────────────────
+function Manufacturing({ d, onProduce }: { d: ErpData; onProduce: (id: string) => void }) {
+  const item = Object.fromEntries(d.items.map((i) => [i.id, i]));
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {d.workOrders.map((w) => {
+        const it = item[w.itemId];
+        const pct = Math.round((w.produced / w.qty) * 100);
+        return (
+          <div key={w.id} className={`${card} p-5`}>
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-white">{w.number}</span>
+              <span className={`rounded-full border px-2.5 py-0.5 text-xs ${WO_STYLE[w.status]}`}>{w.status}</span>
+            </div>
+            <div className="mt-2 flex items-center gap-3">
+              <Thumb src={it?.thumbnail ?? ''} name={it?.name ?? ''} size={34} />
+              <div className="min-w-0"><div className="truncate text-sm text-white">{it?.name ?? '—'}</div><div className="text-xs text-[var(--muted)]">Due {fmtDate(w.due)}</div></div>
+            </div>
+            <div className="mt-4">
+              <div className="flex justify-between text-sm"><span className="text-[var(--muted)]">Produced</span><span className="text-white">{w.produced} / {w.qty}</span></div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${pct}%` }} /></div>
+            </div>
+            {w.status !== 'Completed' && (
+              <button onClick={() => onProduce(w.id)} className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-bright)] py-2 text-sm font-medium text-[#0b0d10] transition-colors hover:bg-white"><Factory size={14} /> Produce batch</button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── HR ───────────────────────────────────────────────────────────────────────
+function HR({ d }: { d: ErpData }) {
+  const [dept, setDept] = useState('All');
+  const rows = d.employees.filter((e) => dept === 'All' || e.department === dept);
+  const payroll = Math.round(d.employees.reduce((s, e) => s + e.salary, 0) / 12);
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Employees" value={d.employees.length.toString()} />
+        <Kpi label="On leave" value={d.employees.filter((e) => e.status === 'On Leave').length.toString()} />
+        <Kpi label="Departments" value={DEPARTMENTS.length.toString()} />
+        <Kpi label="Monthly payroll" value={money(payroll)} />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {['All', ...DEPARTMENTS].map((dp) => (
+          <button key={dp} onClick={() => setDept(dp)} className={`rounded-full px-3 py-1.5 text-xs transition-colors ${dept === dp ? 'bg-[var(--brand-bright)] text-[#0b0d10]' : 'border border-white/10 text-[var(--muted)] hover:text-white'}`}>{dp}</button>
+        ))}
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <table className="w-full min-w-[640px] text-left text-sm">
+          <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+            <tr><th className="px-4 py-3 font-medium">Employee</th><th className="px-4 py-3 font-medium">Department</th><th className="px-4 py-3 font-medium">Designation</th><th className="px-4 py-3 font-medium">Joined</th><th className="px-4 py-3 text-right font-medium">Salary</th><th className="px-4 py-3 font-medium">Status</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((e) => (
+              <tr key={e.id} className="border-t border-white/5">
+                <td className="px-4 py-3"><div className="flex items-center gap-3"><Avatar src={e.avatar} name={e.name} /><div className="min-w-0"><div className="truncate font-medium text-white">{e.name}</div><div className="truncate text-xs text-[var(--muted)]">{e.email}</div></div></div></td>
+                <td className="px-4 py-3 text-[var(--muted)]">{e.department}</td>
+                <td className="px-4 py-3 text-[var(--muted)]">{e.designation}</td>
+                <td className="px-4 py-3 text-[var(--muted)]">{fmtDate(e.joinDate)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-white">{money(e.salary)}</td>
+                <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${e.status === 'Active' ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300' : 'border-amber-500/30 bg-amber-500/15 text-amber-300'}`}>{e.status}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Projects ─────────────────────────────────────────────────────────────────
+function Projects({ d }: { d: ErpData }) {
+  const cust = Object.fromEntries(d.customers.map((c) => [c.id, c]));
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {d.projects.map((p) => {
+        const over = p.spent > p.budget;
+        return (
+          <div key={p.id} className={`${card} p-5`}>
+            <div className="flex items-center justify-between">
+              <span className={`rounded-full border px-2.5 py-0.5 text-xs ${p.status === 'Completed' ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300' : p.status === 'On Hold' ? 'border-amber-500/30 bg-amber-500/15 text-amber-300' : 'border-sky-500/30 bg-sky-500/15 text-sky-300'}`}>{p.status}</span>
+              <span className="text-xs text-[var(--muted)]">{p.tasksDone}/{p.tasksTotal} tasks</span>
+            </div>
+            <h3 className="mt-3 font-medium text-white">{p.name}</h3>
+            <div className="text-xs text-[var(--muted)]">{cust[p.customerId]?.name ?? '—'}</div>
+            <div className="mt-4">
+              <div className="flex justify-between text-sm"><span className="text-[var(--muted)]">Progress</span><span className="text-white">{p.percent}%</span></div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${p.percent}%` }} /></div>
+            </div>
+            <div className="mt-3 flex justify-between text-sm">
+              <span className="text-[var(--muted)]">Budget {money(p.budget)}</span>
+              <span className={over ? 'text-rose-300' : 'text-[var(--muted)]'}>Spent {money(p.spent)}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Assets ───────────────────────────────────────────────────────────────────
+function Assets({ d }: { d: ErpData }) {
+  const now = Date.now();
+  const rows = d.assets.map((a) => {
+    const ageYears = (now - a.purchaseDate) / (365 * 86_400_000);
+    const depreciated = Math.min(a.purchaseValue, a.purchaseValue * (ageYears / a.life));
+    return { ...a, current: Math.max(0, a.purchaseValue - depreciated), depreciated };
+  });
+  const totalValue = rows.reduce((s, a) => s + a.purchaseValue, 0);
+  const totalCurrent = rows.reduce((s, a) => s + a.current, 0);
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Kpi label="Assets" value={d.assets.length.toString()} />
+        <Kpi label="Purchase value" value={money(totalValue)} />
+        <Kpi label="Book value (now)" value={money(totalCurrent)} />
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+            <tr><th className="px-4 py-3 font-medium">Asset</th><th className="px-4 py-3 font-medium">Category</th><th className="px-4 py-3 font-medium">Purchased</th><th className="px-4 py-3 text-right font-medium">Cost</th><th className="px-4 py-3 text-right font-medium">Depreciation</th><th className="px-4 py-3 text-right font-medium">Book value</th><th className="px-4 py-3 font-medium">Status</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((a) => (
+              <tr key={a.id} className="border-t border-white/5">
+                <td className="px-4 py-3 font-medium text-white">{a.name}</td>
+                <td className="px-4 py-3 text-[var(--muted)]">{a.category}</td>
+                <td className="px-4 py-3 text-[var(--muted)]">{fmtDate(a.purchaseDate)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-white">{money(a.purchaseValue)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-[var(--muted)]">({money(a.depreciated)})</td>
+                <td className="px-4 py-3 text-right tabular-nums text-white">{money(a.current)}</td>
+                <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${a.status === 'In Use' ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300' : a.status === 'Idle' ? 'border-amber-500/30 bg-amber-500/15 text-amber-300' : 'border-white/10 bg-white/5 text-[var(--muted)]'}`}>{a.status}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Reports ──────────────────────────────────────────────────────────────────
+function Reports({ d }: { d: ErpData }) {
+  const maxM = Math.max(1, ...d.monthly.map((m) => Math.max(m.revenue, m.expenses)));
+  // Stock by category
+  const catMap: Record<string, number> = {};
+  d.items.forEach((it) => { catMap[it.category] = (catMap[it.category] || 0) + it.stock * it.cost; });
+  const cats = Object.entries(catMap).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 6);
+  const maxCat = Math.max(1, ...cats.map((c) => c.value));
+  // Sales by customer
+  const custMap: Record<string, number> = {};
+  const custName = Object.fromEntries(d.customers.map((c) => [c.id, c.name]));
+  d.salesOrders.forEach((o) => { custMap[o.customerId] = (custMap[o.customerId] || 0) + orderTotal(o.lines); });
+  const topCust = Object.entries(custMap).map(([id, value]) => ({ label: custName[id] ?? '—', value })).sort((a, b) => b.value - a.value).slice(0, 6);
+  const maxCust = Math.max(1, ...topCust.map((c) => c.value));
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <div className={`${card} p-6`}>
+        <h3 className="font-display text-lg text-white">Revenue vs expenses (6mo)</h3>
+        <div className="mt-6 flex h-44 gap-4">
+          {d.monthly.map((m) => (
+            <div key={m.label} className="flex flex-1 flex-col items-center gap-2">
+              <div className="flex w-full flex-1 items-end justify-center gap-1">
+                <div className="w-1/2 rounded-t bg-[var(--brand-bright)]" style={{ height: `${(m.revenue / maxM) * 100}%` }} />
+                <div className="w-1/2 rounded-t bg-white/25" style={{ height: `${(m.expenses / maxM) * 100}%` }} />
+              </div>
+              <div className="text-xs text-[var(--muted)]">{m.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={`${card} p-6`}>
+        <h3 className="font-display text-lg text-white">Stock value by category</h3>
+        <div className="mt-4 space-y-2">
+          {cats.map((c) => (
+            <div key={c.label}>
+              <div className="flex justify-between text-sm"><span className="capitalize text-[var(--muted)]">{c.label}</span><span className="text-white">{money(c.value)}</span></div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${(c.value / maxCat) * 100}%` }} /></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={`${card} p-6`}>
+        <h3 className="font-display text-lg text-white">Top customers by order value</h3>
+        <div className="mt-4 space-y-2">
+          {topCust.map((c) => (
+            <div key={c.label}>
+              <div className="flex justify-between text-sm"><span className="truncate text-[var(--muted)]">{c.label}</span><span className="text-white">{money(c.value)}</span></div>
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${(c.value / maxCust) * 100}%` }} /></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={`${card} p-6`}>
+        <h3 className="font-display text-lg text-white">Order pipeline</h3>
+        <div className="mt-4 space-y-3">
+          {(['Draft', 'To Deliver', 'To Bill', 'Completed'] as SOStatus[]).map((st) => {
+            const n = d.salesOrders.filter((o) => o.status === st).length;
+            return (
+              <div key={st} className="flex items-center gap-3">
+                <span className="w-24 shrink-0 text-xs text-[var(--muted)]">{st}</span>
+                <div className="h-7 flex-1 overflow-hidden rounded-lg bg-white/5">
+                  <div className="flex h-full items-center justify-end rounded-lg bg-[var(--brand-bright)] px-2 text-[11px] font-medium text-[#0b0d10]" style={{ width: `${Math.max((n / Math.max(1, d.salesOrders.length)) * 100, 8)}%` }}>{n}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Settings ─────────────────────────────────────────────────────────────────
+function SettingsView({ d }: { d: ErpData }) {
+  const modules = NAV.filter((n) => n.id !== 'dashboard' && n.id !== 'settings');
+  return (
+    <div className="space-y-6">
+      <div className={`${card} p-6`}>
+        <h3 className="font-display text-lg text-white">Company</h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {[
+            ['Legal name', 'Andrew Trading (Pty) Ltd'],
+            ['Base currency', 'USD ($)'],
+            ['Fiscal year', 'Jan – Dec'],
+            ['Country', 'South Africa'],
+            ['Time zone', 'Africa/Johannesburg'],
+            ['Chart of accounts', 'Standard'],
+          ].map(([k, v]) => (
+            <div key={k} className="rounded-xl bg-[var(--bg-soft)] px-4 py-3"><div className="text-xs text-[var(--muted)]">{k}</div><div className="text-sm text-white">{v}</div></div>
+          ))}
+        </div>
+      </div>
+      <div className={`${card} p-6`}>
+        <h3 className="font-display text-lg text-white">Enabled modules</h3>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {modules.map((m) => (
+            <span key={m.id} className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-xs text-[var(--text)]"><m.icon size={13} className="text-[var(--brand-bright)]" /> {m.label}</span>
+          ))}
+        </div>
+      </div>
+      <ApiCredit d={d} />
+    </div>
+  );
+}
+
+// ── Shared ───────────────────────────────────────────────────────────────────
+function Kpi({ label, value }: { label: string; value: string }) {
+  return <div className={`${card} p-4`}><div className="font-display text-xl text-white">{value}</div><div className="text-xs text-[var(--muted)]">{label}</div></div>;
+}
+function ApiCredit({ d }: { d: ErpData }) {
+  return (
+    <div className={`${card} bg-gradient-to-br from-[var(--surface)] to-transparent p-6`}>
+      <h3 className="flex items-center gap-2 font-display text-lg text-white"><Database size={18} className="text-[var(--brand-bright)]" /> Data &amp; APIs</h3>
+      <p className="mt-2 text-sm text-[var(--muted)]">
+        Inventory items were loaded from <span className="text-white">{d.productsSource === 'DummyJSON' ? 'the DummyJSON API (live)' : 'a built-in fallback set'}</span> and employees from <span className="text-white">{d.peopleSource === 'randomuser.me' ? 'randomuser.me (live)' : 'a built-in fallback set'}</span>. Customers, suppliers, orders, work orders, projects, assets, accounts and journal entries are generated on top with a seeded random generator, so the dataset stays small and reproducible.
+      </p>
+      <ul className="mt-3 space-y-1.5 text-sm text-[var(--muted)]">
+        <li>• <span className="text-white">DummyJSON</span> — real product names, prices, stock levels, categories, and images for inventory.</li>
+        <li>• <span className="text-white">randomuser.me</span> — names, emails, and photos for the HR module.</li>
+        <li>• <span className="text-white">DiceBear</span> — generated company logos and avatar fallbacks.</li>
+      </ul>
+      <p className="mt-3 text-xs text-[var(--muted)]/70">Front-end demo — everything you change lives in your browser only. A Supabase-backed version (persisted records) is the next step, matching the booking demo.</p>
+    </div>
+  );
+}

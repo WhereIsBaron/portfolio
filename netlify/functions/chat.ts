@@ -176,7 +176,7 @@ ${refs}
 # About this website
 - A single-page React + TypeScript app (Vite), styled with Tailwind, deployed on Netlify. Main sections: About, Skills, Projects, Education, Contact.
 - The hero has a live "Age, live" orbit animation counting ${profile.shortName}'s age in real time.
-- Projects appear as cards; several open image galleries. Two open interactive in-app demos: the Universal Booking System (at /booking) and a full-featured CRM System (at /crm) with twelve modules — dashboard, contacts, companies, deal pipeline, tasks, calendar, an email inbox with templates, invoicing, marketing campaigns, workflow automations, reports, and settings — populated with sample data from public APIs (randomuser.me for people, DiceBear for avatars).
+- Projects appear as cards; several open image galleries. Three open interactive in-app demos: the Universal Booking System (at /booking); a full-featured CRM System (at /crm) with twelve modules — dashboard, contacts, companies, deal pipeline, tasks, calendar, an email inbox with templates, invoicing, marketing campaigns, workflow automations, reports, and settings; and a full ERP System (at /erp) modelled on systems like ERPNext, with eleven modules — dashboard, accounting (chart of accounts, P&L, journal), inventory with warehouses and stock valuation, sales and purchase order flows, manufacturing work orders, HR, projects, a fixed-asset register with depreciation, reports, and settings. Sample data comes from public APIs (DummyJSON for products, randomuser.me for people, DiceBear for avatars and logos).
 - You — this chat assistant — are powered by a secure serverless function with two AI providers (Gemini and Groq) and per-visitor rate limiting.
 
 # Rules
