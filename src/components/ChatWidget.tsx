@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 
 type Role = 'user' | 'assistant';
@@ -312,6 +313,12 @@ export default function ChatWidget() {
                 <Send size={16} />
               </button>
             </div>
+            <p className="mt-2 text-center text-[10px] leading-tight text-[var(--muted)]/70">
+              Messages are sent to an AI provider to generate replies.{' '}
+              <Link to="/privacy" className="underline underline-offset-2 hover:text-[var(--muted)]">
+                Privacy
+              </Link>
+            </p>
           </div>
         </div>
       )}

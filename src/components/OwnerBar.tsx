@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Lock, LogOut, Pencil, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLayout } from '@/context/LayoutContext';
+import VisitorInsights from '@/components/VisitorInsights';
 
 export default function OwnerBar() {
   const { user, configured, signIn, signOut } = useAuth();
@@ -52,6 +53,7 @@ export default function OwnerBar() {
             <span className="hidden max-w-[160px] truncate text-xs text-[var(--muted)] sm:inline">
               {user.email}
             </span>
+            <VisitorInsights />
             <button
               onClick={() => signOut()}
               className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-sm text-[var(--muted)] transition-colors hover:bg-white/10 hover:text-white"
