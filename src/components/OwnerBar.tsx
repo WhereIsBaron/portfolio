@@ -1,8 +1,15 @@
-import { useState, FormEvent } from 'react';
-import { Lock, LogOut, Pencil, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useState, useEffect, FormEvent } from 'react';
+import { Lock, LogOut, Pencil, X, Loader2, CheckCircle2, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLayout } from '@/context/LayoutContext';
 import VisitorInsights from '@/components/VisitorInsights';
+import {
+  lockRemainingMs,
+  throttleDelayMs,
+  recordFailure,
+  recordSuccess,
+  formatRemaining,
+} from '@/lib/loginGuard';
 
 export default function OwnerBar() {
   const { user, configured, signIn, signOut } = useAuth();
@@ -12,19 +19,48 @@ export default function OwnerBar() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [lockMs, setLockMs] = useState(0);
+
+  // Tick down the lockout countdown while the login form is open and locked.
+  useEffect(() => {
+    if (!open) return;
+    setLockMs(lockRemainingMs());
+    const id = setInterval(() => setLockMs(lockRemainingMs()), 1000);
+    return () => clearInterval(id);
+  }, [open]);
 
   if (!configured) return null;
 
+  const locked = lockMs > 0;
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (lockRemainingMs() > 0) return; // still locked out
     setBusy(true);
     setError(null);
+
+    // Progressive slow-down: the more recent failures, the longer the wait
+    // before the attempt is even sent. Deters scripted guessing.
+    const delay = throttleDelayMs();
+    if (delay > 0) await new Promise((r) => setTimeout(r, delay));
+
     const { error } = await signIn(email.trim(), password);
     setBusy(false);
+
     if (error) {
-      setError(error);
+      const nowLocked = recordFailure();
+      setLockMs(nowLocked);
+      setError(
+        nowLocked > 0
+          ? 'Too many failed attempts. Login temporarily locked.'
+          : error
+      );
+      setPassword('');
       return;
     }
+
+    recordSuccess();
+    setLockMs(0);
     setOpen(false);
     setPassword('');
   };
@@ -124,20 +160,30 @@ export default function OwnerBar() {
                 />
               </div>
 
-              {error && (
-                <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                  {error}
+              {locked ? (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+                  <ShieldAlert size={16} className="mt-0.5 shrink-0" />
+                  <span>
+                    Too many failed attempts. Try again in{' '}
+                    <span className="font-medium tabular-nums">{formatRemaining(lockMs)}</span>.
+                  </span>
                 </div>
+              ) : (
+                error && (
+                  <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                    <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                    {error}
+                  </div>
+                )
               )}
 
               <button
                 type="submit"
-                disabled={busy}
+                disabled={busy || locked}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-bright)] py-2.5 font-medium text-[#0b0d10] transition-colors hover:bg-white disabled:opacity-60"
               >
                 {busy ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-                {busy ? 'Signing in...' : 'Sign in'}
+                {busy ? 'Signing in...' : locked ? 'Locked' : 'Sign in'}
               </button>
             </form>
           </div>
