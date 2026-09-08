@@ -88,3 +88,15 @@
     transform: translateY(0);
   }
 }
+
+/* Entrance for live-simulation toast notifications (CRM demo). */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft, LayoutDashboard, Users, Building2, KanbanSquare, CheckSquare,
   Calendar, Inbox, FileText, Megaphone, Zap, BarChart3, Settings as SettingsIcon,
   Search, Plus, X, Check, Phone, Mail, StickyNote, ChevronRight, Database,
   Clock, TrendingUp, Target, DollarSign, AlertTriangle, Send, Menu,
-  UserPlus, LifeBuoy, ArrowRightLeft, Flame,
+  UserPlus, LifeBuoy, ArrowRightLeft, Flame, Sparkles, Radio,
 } from 'lucide-react';
 import {
   fetchCrmData, avatarFor, money, invoiceTotal,
@@ -113,6 +113,78 @@ const card = 'rounded-2xl border border-white/10 bg-[var(--surface)]';
 const field =
   'w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--brand-bright)]';
 
+// ── Live simulation layer ────────────────────────────────────────────────────
+// This is a demo, but it behaves like a real CRM: your actions trigger reactions
+// (activities logged, follow-up tasks created, simulated buyer replies) and the
+// workspace ticks along on its own so it feels live. Nothing leaves the browser.
+type Toast = { id: number; text: string; tone: 'info' | 'success' | 'warn' | 'coach' };
+type Warmth = 'warm' | 'neutral' | 'cool';
+
+// Fast quick-reply presets in the inbox — clicking one SENDS immediately, so you
+// can feel how different responses land. {{first}} is filled with the contact.
+const QUICK_REPLIES: { label: string; body: string }[] = [
+  { label: '👍 Acknowledge', body: 'Hi {{first}}, thanks for getting back to me — noted on all of this and much appreciated.' },
+  { label: '📅 Offer a call', body: 'Hi {{first}}, would a quick 20-minute call this week help? Happy to walk you through it — what time suits you?' },
+  { label: '💰 Send pricing', body: 'Hi {{first}}, sending pricing across now — the annual plan gives the best value. Shall I put a formal quote together?' },
+  { label: '🔧 Loop in support', body: 'Hi {{first}}, I’ve looped in our support team and someone will follow up with you shortly. Anything else I can chase in the meantime?' },
+  { label: '🙏 Thank & confirm', body: 'Thank you, {{first}}! I’ll get everything confirmed and send a calendar invite over. Speak soon.' },
+];
+
+// Score an outgoing reply the way a sales coach would, so the user can reflect on
+// HOW they responded — did they personalise, propose a next step, invite a reply?
+function coachReply(body: string, firstName: string) {
+  const b = body.trim();
+  const personalized = firstName ? b.toLowerCase().includes(firstName.toLowerCase()) : false;
+  const nextStep = /\b(call|meet(ing)?|demo|schedul|calendar|book|zoom|time|walkthrough|invite)\b/i.test(b);
+  const question = b.includes('?');
+  const tooShort = b.length < 15;
+  let score = (personalized ? 1 : 0) + (nextStep ? 1 : 0) + (question ? 1 : 0);
+  if (tooShort) score = Math.max(0, score - 1);
+  const tips: string[] = [];
+  if (!personalized) tips.push(`Use ${firstName || 'their'} name to personalise it`);
+  if (!nextStep) tips.push('Propose a clear next step — a call or a demo');
+  if (!question && !tooShort) tips.push('End on a question to keep the thread moving');
+  if (tooShort) tips.push('A one-liner reads as curt — add a little context');
+  const warmth: Warmth = score >= 2 ? 'warm' : score === 1 ? 'neutral' : 'cool';
+  return { score, tips: tips.slice(0, 2), warmth };
+}
+
+// The buyer's simulated reply — reacts to BOTH intent (what you offered) and
+// quality (how warmly you wrote it), so good replies earn enthusiastic ones.
+function inboundReaction(body: string, firstName: string): { body: string; warmth: Warmth } {
+  const { warmth } = coachReply(body, firstName);
+  const b = body.toLowerCase();
+  let base: string;
+  if (/\b(pric|quote|cost|discount|budget|plan)\b/.test(b)) base = 'Thanks for the numbers — can you put together a formal quote I can take to my finance team?';
+  else if (/\b(call|meet|demo|schedul|calendar|book|zoom|time|invite)\b/.test(b)) base = "Sounds good — I'm free Thursday afternoon. Send the invite and I'll be there.";
+  else if (/\b(sorry|apolog|delay|late)\b/.test(b)) base = 'No problem at all — I appreciate you keeping me in the loop.';
+  else if (/\b(thank|thanks|appreciate|welcome)\b/.test(b)) base = 'Likewise — really looking forward to working together on this.';
+  else if (/\b(support|help|issue|fix|team)\b/.test(b)) base = 'Great, thanks for chasing that up. I’ll keep an eye out for their message.';
+  else base = 'Got it, thanks. Let me run this past the team and come back to you.';
+  const opener = warmth === 'warm' ? 'This is really helpful — ' : warmth === 'cool' ? 'Okay. ' : '';
+  return { body: opener + base, warmth };
+}
+
+// Toast stack (bottom-right). Each is dismissed on a timer by the caller.
+function Toasts({ items, onDismiss }: { items: Toast[]; onDismiss: (id: number) => void }) {
+  const dot: Record<Toast['tone'], string> = {
+    info: 'bg-sky-400', success: 'bg-emerald-400', warn: 'bg-amber-400', coach: 'bg-[var(--brand-bright)]',
+  };
+  return (
+    <div className="pointer-events-none fixed bottom-24 right-4 z-[80] flex w-[min(92vw,340px)] flex-col gap-2">
+      {items.map((t) => (
+        <div key={t.id} className="pointer-events-auto flex items-start gap-2.5 rounded-xl border border-white/10 bg-[var(--surface)]/95 px-3.5 py-2.5 text-sm text-[var(--text)] shadow-xl backdrop-blur animate-[slideIn_.25s_ease]">
+          {t.tone === 'coach'
+            ? <Sparkles size={15} className="mt-0.5 shrink-0 text-[var(--brand-bright)]" />
+            : <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot[t.tone]}`} />}
+          <span className="min-w-0 flex-1">{t.text}</span>
+          <button onClick={() => onDismiss(t.id)} className="shrink-0 text-[var(--muted)] hover:text-white"><X size={13} /></button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function CrmPage() {
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState('');
@@ -135,6 +207,24 @@ export default function CrmPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [losingId, setLosingId] = useState<string | null>(null);
+
+  // Live-simulation state: toast notifications, inbox "typing…", and a running
+  // count of ambient events so the header can show the workspace is alive.
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [typingId, setTypingId] = useState<string | null>(null);
+  const [liveCount, setLiveCount] = useState(0);
+  const [lastSync, setLastSync] = useState(Date.now());
+  const toastSeq = useRef(0);
+
+  const dismissToast = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
+  const notify = useCallback((text: string, tone: Toast['tone'] = 'info') => {
+    const id = ++toastSeq.current;
+    setToasts((t) => [...t.slice(-3), { id, text, tone }]);
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === 'coach' ? 6500 : 5200);
+  }, []);
+  // Append an activity (append-only, always safe) — the currency of "reactions".
+  const pushActivity = useCallback((contactId: string, type: ActivityType, subject: string) =>
+    setActivities((as) => [{ id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, type, contactId, subject, at: Date.now(), done: true, owner: OWNERS[0] }, ...as].slice(0, 250)), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -161,30 +251,109 @@ export default function CrmPage() {
 
   const byId = useMemo(() => Object.fromEntries(contacts.map((c) => [c.id, c])), [contacts]);
 
+  // Latest data for the ambient engine, without re-arming the interval on every
+  // state change.
+  const simRef = useRef({ contacts, deals, invoices, cases, campaigns, byId });
+  simRef.current = { contacts, deals, invoices, cases, campaigns, byId };
+
+  // ── Ambient "real-time" engine ──────────────────────────────────────────────
+  // Every few seconds the workspace does something on its own — an email opens,
+  // a teammate leaves a note, a payment lands — so the demo feels live. Paused
+  // when the tab is hidden. Everything stays in the browser.
+  useEffect(() => {
+    if (loading) return;
+    const pickR = <T,>(arr: T[]): T | undefined => arr[Math.floor(Math.random() * arr.length)];
+    const tick = () => {
+      if (document.hidden) return;
+      const { contacts: cs, deals: ds, invoices: iv, cases: cases_, campaigns: cps, byId: bid } = simRef.current;
+      if (!cs.length) return;
+      const c = pickR(cs)!;
+      const first = c.name.split(' ')[0];
+      const mate = pickR(OWNERS.filter((o) => o !== OWNERS[0])) ?? OWNERS[1];
+      const roll = Math.random();
+
+      if (roll < 0.22) {
+        notify(`${c.name} opened your email`, 'info');
+        pushActivity(c.id, 'Email', 'Opened your last email');
+      } else if (roll < 0.4 && cps.length) {
+        notify(`${first} clicked a link in “${pickR(cps)!.name}”`, 'info');
+        pushActivity(c.id, 'Email', 'Clicked a campaign link');
+      } else if (roll < 0.56) {
+        notify(`${mate} left a note on ${c.name}`, 'info');
+        pushActivity(c.id, 'Note', `Note from ${mate}`);
+      } else if (roll < 0.72) {
+        notify(`New lead captured from ${pickR(LEAD_SOURCES)}`, 'success');
+      } else if (roll < 0.86) {
+        const openCase = cases_.find((x) => x.status === 'Open' || x.status === 'Pending');
+        if (openCase) notify(`SLA reminder: a support case is awaiting your reply`, 'warn');
+        else { notify(`${c.name} viewed your proposal`, 'info'); pushActivity(c.id, 'Note', 'Viewed your proposal'); }
+      } else {
+        const unpaid = iv.find((x) => x.status !== 'Paid');
+        if (unpaid) {
+          setInvoices((list) => list.map((x) => (x.id === unpaid.id ? { ...x, status: 'Paid' } : x)));
+          const payer = bid[unpaid.contactId];
+          notify(`Payment received${payer ? ` from ${payer.name}` : ''} — invoice marked paid`, 'success');
+          if (payer) pushActivity(payer.id, 'Note', 'Invoice paid');
+        } else {
+          notify(`${c.name} booked a meeting`, 'success');
+          pushActivity(c.id, 'Meeting', 'Booked a meeting');
+        }
+      }
+      setLiveCount((n) => n + 1);
+      setLastSync(Date.now());
+    };
+    const iv = window.setInterval(tick, 7000);
+    return () => window.clearInterval(iv);
+  }, [loading, notify, pushActivity]);
+
   // ── Mutations ─────────────────────────────────────────────────────────────
-  const advanceDeal = (id: string) =>
-    setDeals((ds) => ds.map((d) => {
-      if (d.id !== id) return d;
-      const order: Stage[] = ['Lead In', 'Contacted', 'Proposal', 'Negotiation', 'Won'];
-      const idx = order.indexOf(d.stage);
-      const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : d.stage;
-      return { ...d, stage: next, probability: STAGE_PROB[next] };
-    }));
+  const advanceDeal = (id: string) => {
+    const d = deals.find((x) => x.id === id);
+    if (!d) return;
+    const order: Stage[] = ['Lead In', 'Contacted', 'Proposal', 'Negotiation', 'Won'];
+    const idx = order.indexOf(d.stage);
+    if (idx < 0 || idx >= order.length - 1) { notify(`${d.title} is already at the final stage`, 'info'); return; }
+    const next = order[idx + 1];
+    setDeals((ds) => ds.map((x) => (x.id === id ? { ...x, stage: next, probability: STAGE_PROB[next] } : x)));
+    const c = byId[d.contactId];
+    // Reaction 1: log the stage change on the timeline.
+    notify(next === 'Won' ? `🎉 ${d.title} marked Won — ${money(d.value)}` : `${d.title} advanced to ${next} · win probability now ${STAGE_PROB[next]}%`, next === 'Won' ? 'success' : 'info');
+    pushActivity(d.contactId, 'Note', `Deal moved to ${next}`);
+    // Reaction 2: advancing an open deal spins up a follow-up task automatically.
+    if (next !== 'Won') {
+      setTasks((ts) => [{ id: `t-${Date.now()}`, contactId: d.contactId, title: `Follow up on “${d.title}” (${next})`, priority: next === 'Negotiation' ? 'High' : 'Medium', dueAt: Date.now() + 2 * 86_400_000, done: false, owner: OWNERS[0] }, ...ts]);
+    }
+    // Reaction 3: at proposal/negotiation the buyer reacts a couple of seconds later.
+    if (next === 'Proposal' || next === 'Negotiation') {
+      window.setTimeout(() => {
+        notify(`${c?.name ?? 'The buyer'} reviewed the ${next.toLowerCase()} and has a question`, 'info');
+        pushActivity(d.contactId, 'Email', `Question on the ${next.toLowerCase()}`);
+      }, 2400);
+    }
+  };
   const loseDeal = (id: string, reason: string, competitor: string) => {
-    setDeals((ds) => ds.map((d) => (d.id === id ? { ...d, stage: 'Lost', probability: 0, lostReason: reason, competitor } : d)));
+    const d = deals.find((x) => x.id === id);
+    setDeals((ds) => ds.map((x) => (x.id === id ? { ...x, stage: 'Lost', probability: 0, lostReason: reason, competitor } : x)));
     setLosingId(null);
+    if (d) { notify(`${d.title} marked Lost — ${reason}`, 'warn'); pushActivity(d.contactId, 'Note', `Deal lost to ${competitor} (${reason})`); }
   };
 
   // Lead qualification & conversion (ERPNext lead → opportunity / EspoCRM convert).
-  const advanceLead = (id: string) =>
-    setLeads((ls) => ls.map((l) => {
-      if (l.id !== id || l.status === 'Converted' || l.status === 'Unqualified') return l;
-      const order: LeadStatus[] = ['New', 'Contacted', 'Qualified'];
-      const idx = order.indexOf(l.status);
-      return idx >= 0 && idx < order.length - 1 ? { ...l, status: order[idx + 1] } : l;
-    }));
-  const disqualifyLead = (id: string) =>
-    setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status: 'Unqualified' } : l)));
+  const advanceLead = (id: string) => {
+    const l = leads.find((x) => x.id === id);
+    if (!l || l.status === 'Converted' || l.status === 'Unqualified') return;
+    const order: LeadStatus[] = ['New', 'Contacted', 'Qualified'];
+    const idx = order.indexOf(l.status);
+    if (idx < 0 || idx >= order.length - 1) return;
+    const next = order[idx + 1];
+    setLeads((ls) => ls.map((x) => (x.id === id ? { ...x, status: next } : x)));
+    notify(next === 'Qualified' ? `${l.name} is now Qualified — ready to convert` : `${l.name} moved to ${next}`, next === 'Qualified' ? 'success' : 'info');
+  };
+  const disqualifyLead = (id: string) => {
+    const l = leads.find((x) => x.id === id);
+    setLeads((ls) => ls.map((x) => (x.id === id ? { ...x, status: 'Unqualified' } : x)));
+    if (l) notify(`${l.name} marked Unqualified`, 'warn');
+  };
   const convertLead = (id: string) => {
     const lead = leads.find((l) => l.id === id);
     if (!lead || lead.status === 'Converted') return;
@@ -214,6 +383,8 @@ export default function CrmPage() {
     ]);
     // 4) Lead is marked Converted and linked to the new records.
     setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status: 'Converted', convertedContactId: contactId, convertedDealId: dealId } : l)));
+    pushActivity(contactId, 'Note', `Lead converted — contact, company & opportunity created`);
+    notify(`${lead.name} converted → contact, company & a ${money(lead.estValue)} opportunity created`, 'success');
     setSelectedId(contactId);
     setTab('contacts');
   };
@@ -230,8 +401,11 @@ export default function CrmPage() {
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
   const toggleAutomation = (id: string) =>
     setAutomations((as) => as.map((a) => (a.id === id ? { ...a, enabled: !a.enabled } : a)));
-  const markPaid = (id: string) =>
+  const markPaid = (id: string) => {
+    const inv = invoices.find((i) => i.id === id);
     setInvoices((iv) => iv.map((i) => (i.id === id ? { ...i, status: 'Paid' } : i)));
+    if (inv) { notify(`Invoice marked paid — ${money(invoiceTotal(inv))} received`, 'success'); pushActivity(inv.contactId, 'Note', 'Payment received — invoice paid'); }
+  };
   const logActivity = (contactId: string, type: ActivityType, subject: string) =>
     setActivities((as) => [
       { id: `a-${Date.now()}`, type, contactId, subject, at: Date.now(), done: false, owner: OWNERS[0] },
@@ -242,9 +416,23 @@ export default function CrmPage() {
       { id: `t-${Date.now()}`, contactId, title, priority, dueAt, done: false, owner: OWNERS[0] },
       ...ts,
     ]);
-  const replyThread = (id: string, body: string) =>
+  const replyThread = (id: string, body: string) => {
+    // Your message goes out immediately…
     setThreads((th) => th.map((t) =>
       t.id === id ? { ...t, unread: false, messages: [...t.messages, { from: 'me', at: Date.now(), body }] } : t));
+    const thread = threads.find((t) => t.id === id);
+    const c = thread ? byId[thread.contactId] : null;
+    const first = c?.name.split(' ')[0] ?? '';
+    const { body: reply } = inboundReaction(body, first);
+    // …then the buyer starts "typing" and replies a moment later — the reaction.
+    setTypingId(id);
+    window.setTimeout(() => {
+      setThreads((th) => th.map((t) =>
+        t.id === id ? { ...t, messages: [...t.messages, { from: 'them', at: Date.now(), body: reply }] } : t));
+      setTypingId((cur) => (cur === id ? null : cur));
+      if (thread) { notify(`${c?.name ?? 'The contact'} replied to your message`, 'info'); pushActivity(thread.contactId, 'Email', 'Replied to your message'); }
+    }, 1700);
+  };
   const markThreadRead = (id: string) =>
     setThreads((th) => th.map((t) => (t.id === id ? { ...t, unread: false } : t)));
 
@@ -282,8 +470,9 @@ export default function CrmPage() {
             <Link to="/" className="font-display text-lg font-semibold tracking-tight text-white">
               Andrew<span className="text-[var(--brand-bright)]">.</span>CRM
             </Link>
-            <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-[var(--muted)] sm:inline-flex">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--brand-bright)]" /> Live demo
+            <span className="hidden items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[11px] text-emerald-300 sm:inline-flex" title={`${liveCount} live update${liveCount === 1 ? '' : 's'} this session · synced ${relTime(lastSync)}`}>
+              <Radio size={11} className="animate-pulse" /> Live
+              <span className="text-emerald-300/60">· synced {relTime(lastSync)}</span>
             </span>
           </div>
           <Link to="/#work" className="inline-flex items-center gap-2 text-sm text-[var(--muted)] transition-colors hover:text-white">
@@ -346,7 +535,7 @@ export default function CrmPage() {
               {tab === 'tasks' && <Tasks tasks={tasks} byId={byId} contacts={contacts} onToggle={toggleTask} onAdd={addTask} />}
               {tab === 'calendar' && <CalendarView meetings={meetings} byId={byId} />}
               {tab === 'inbox' && (
-                <InboxView threads={threads} byId={byId} templates={templates} onReply={replyThread} onRead={markThreadRead} />
+                <InboxView threads={threads} byId={byId} templates={templates} onReply={replyThread} onRead={markThreadRead} typingId={typingId} />
               )}
               {tab === 'cases' && <CasesView cases={cases} byId={byId} onAdvance={advanceCase} />}
               {tab === 'invoices' && <Invoices invoices={invoices} byId={byId} onPaid={markPaid} />}
@@ -370,6 +559,7 @@ export default function CrmPage() {
         />
       )}
       {addOpen && <AddContactModal onClose={() => setAddOpen(false)} onAdd={addContact} />}
+      <Toasts items={toasts} onDismiss={dismissToast} />
       {losingId && (
         <LostDealModal
           deal={deals.find((d) => d.id === losingId)!}
@@ -993,23 +1183,40 @@ function CalendarView({ meetings, byId }: { meetings: Meeting[]; byId: Record<st
 
 // ── Inbox ────────────────────────────────────────────────────────────────────
 function InboxView({
-  threads, byId, templates, onReply, onRead,
+  threads, byId, templates, onReply, onRead, typingId,
 }: {
   threads: EmailThread[]; byId: Record<string, Contact>; templates: EmailTemplate[];
-  onReply: (id: string, body: string) => void; onRead: (id: string) => void;
+  onReply: (id: string, body: string) => void; onRead: (id: string) => void; typingId: string | null;
 }) {
   const [openId, setOpenId] = useState<string | null>(threads[0]?.id ?? null);
   const [draft, setDraft] = useState('');
+  const [coach, setCoach] = useState<{ warmth: Warmth; tips: string[] } | null>(null);
   const active = threads.find((t) => t.id === openId);
   const contact = active ? byId[active.contactId] : null;
+  const first = contact?.name.split(' ')[0] ?? '';
+  const isTyping = !!active && typingId === active.id;
+  const endRef = useRef<HTMLDivElement>(null);
 
   const fill = (body: string) =>
-    contact ? body.replace(/{{first}}/g, contact.name.split(' ')[0]).replace(/{{company}}/g, contact.company) : body;
+    contact ? body.replace(/{{first}}/g, first).replace(/{{company}}/g, contact.company) : body;
 
-  const send = () => {
-    if (!active || !draft.trim()) return;
-    onReply(active.id, draft.trim());
+  // Reset the coaching note when you switch conversations.
+  useEffect(() => setCoach(null), [openId]);
+  // Keep the newest message (and the typing bubble) in view.
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [active?.messages.length, isTyping]);
+
+  const send = (raw?: string) => {
+    const body = (raw ?? draft).trim();
+    if (!active || !body) return;
+    setCoach({ ...coachReply(body, first) }); // reflect on how the reply reads
+    onReply(active.id, body);
     setDraft('');
+  };
+
+  const warmthUi: Record<Warmth, { label: string; cls: string }> = {
+    warm: { label: 'Warm, well-pitched reply 👍', cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' },
+    neutral: { label: 'Decent — room to warm it up', cls: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
+    cool: { label: 'A bit flat — see the tips', cls: 'border-rose-500/30 bg-rose-500/10 text-rose-300' },
   };
 
   return (
@@ -1056,16 +1263,42 @@ function InboxView({
                   <div className={`mt-1 text-[10px] ${m.from === 'me' ? 'text-[#0b0d10]/60' : 'text-[var(--muted)]'}`}>{fmtDate(m.at)} · {fmtTime(m.at)}</div>
                 </div>
               ))}
+              {isTyping && (
+                <div className="flex max-w-[80%] items-center gap-1 rounded-2xl bg-[var(--bg-soft)] px-4 py-3">
+                  <span className="text-xs text-[var(--muted)]">{first} is typing</span>
+                  <span className="ml-1 flex gap-1">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--muted)] [animation-delay:-0.3s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--muted)] [animation-delay:-0.15s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--muted)]" />
+                  </span>
+                </div>
+              )}
+              <div ref={endRef} />
             </div>
             <div className="border-t border-white/10 p-3">
+              {coach && (
+                <div className={`mb-2 rounded-xl border px-3 py-2 text-[11px] ${warmthUi[coach.warmth].cls}`}>
+                  <div className="flex items-center gap-1.5 font-medium"><Sparkles size={12} /> {warmthUi[coach.warmth].label}</div>
+                  {coach.tips.length > 0 && <ul className="mt-1 list-disc pl-4 opacity-90">{coach.tips.map((t, i) => <li key={i}>{t}</li>)}</ul>}
+                </div>
+              )}
+              {/* Fast quick-replies — click to send instantly and watch the reaction. */}
+              <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-[var(--muted)]"><Zap size={11} /> Quick replies</div>
               <div className="mb-2 flex flex-wrap gap-1.5">
-                {templates.map((tpl) => (
-                  <button key={tpl.id} onClick={() => setDraft(fill(tpl.body))} className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-[var(--muted)] transition-colors hover:text-white">{tpl.name}</button>
+                {QUICK_REPLIES.map((q) => (
+                  <button key={q.label} onClick={() => send(fill(q.body))} disabled={isTyping} className="rounded-full border border-[var(--brand-bright)]/25 bg-[var(--brand-bright)]/5 px-2.5 py-1 text-[11px] text-[var(--brand-bright)] transition-colors hover:bg-[var(--brand-bright)]/15 disabled:opacity-40">{q.label}</button>
                 ))}
               </div>
+              {templates.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {templates.map((tpl) => (
+                    <button key={tpl.id} onClick={() => setDraft(fill(tpl.body))} className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-[var(--muted)] transition-colors hover:text-white">{tpl.name}</button>
+                  ))}
+                </div>
+              )}
               <div className="flex items-end gap-2">
-                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} placeholder="Write a reply… (or pick a template)" className="flex-1 resize-none rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none placeholder:text-[var(--muted)]" />
-                <button onClick={send} className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--brand-bright)] px-3 py-2.5 text-sm font-medium text-[#0b0d10] hover:bg-white"><Send size={15} /></button>
+                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} rows={2} placeholder="Write a reply… (Enter to send, or pick a quick reply)" className="flex-1 resize-none rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none placeholder:text-[var(--muted)]" />
+                <button onClick={() => send()} className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--brand-bright)] px-3 py-2.5 text-sm font-medium text-[#0b0d10] hover:bg-white"><Send size={15} /></button>
               </div>
             </div>
           </>
