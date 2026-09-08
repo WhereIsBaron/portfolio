@@ -52,7 +52,19 @@ export const PO_FLOW: POStatus[] = ['Draft', 'To Receive', 'To Bill', 'Completed
 export type PurchaseOrder = { id: string; number: string; supplierId: string; date: number; lines: OrderLine[]; status: POStatus };
 
 export type WOStatus = 'Not Started' | 'In Process' | 'Completed';
-export type WorkOrder = { id: string; number: string; itemId: string; qty: number; produced: number; status: WOStatus; due: number };
+// A Bill of Materials line: how much of a raw-material item is consumed per
+// unit of the finished good (ERPNext BOM → Work Order → Stock Entry).
+export type BomLine = { itemId: string; qtyPerUnit: number };
+export type WorkOrder = { id: string; number: string; itemId: string; qty: number; produced: number; status: WOStatus; due: number; bom: BomLine[] };
+
+// Quotation → Sales Order (ERPNext selling flow).
+export type QuoteStatus = 'Draft' | 'Submitted' | 'Ordered' | 'Lost';
+export type Quotation = { id: string; number: string; customerId: string; date: number; validTill: number; lines: OrderLine[]; status: QuoteStatus; salesOrderId?: string };
+
+// Material Request → Purchase Order (ERPNext stock → buying flow). Raised when
+// an item drops to/below its reorder level.
+export type MRStatus = 'Requested' | 'Ordered';
+export type MaterialRequest = { id: string; number: string; itemId: string; qty: number; date: number; status: MRStatus; purchaseOrderId?: string };
 
 export type Employee = {
   id: string; name: string; avatar: string; department: string; designation: string;
@@ -78,7 +90,9 @@ export type ErpData = {
   warehouses: string[];
   customers: Customer[];
   suppliers: Supplier[];
+  quotations: Quotation[];
   salesOrders: SalesOrder[];
+  materialRequests: MaterialRequest[];
   purchaseOrders: PurchaseOrder[];
   workOrders: WorkOrder[];
   employees: Employee[];
@@ -249,6 +263,9 @@ function buildErpData(
     const qty = rint(rng, 20, 200);
     const status = woStatuses[i % woStatuses.length];
     const produced = status === 'Completed' ? qty : status === 'In Process' ? Math.round(qty * (0.2 + rng() * 0.5)) : 0;
+    // A small BOM: 2–3 other items consumed per finished unit.
+    const bom: BomLine[] = pickN(rng, items.filter((x) => x.id !== it.id), rint(rng, 2, 3))
+      .map((c) => ({ itemId: c.id, qtyPerUnit: rint(rng, 1, 4) }));
     return {
       id: `wo${i + 1}`,
       number: `MFG-WO-${4000 + i}`,
@@ -257,8 +274,35 @@ function buildErpData(
       produced,
       status,
       due: now + (rint(rng, 0, 40) - 10) * day,
+      bom,
     };
   });
+
+  // Quotations — some still open, some already turned into sales orders.
+  const quoteStatuses: QuoteStatus[] = ['Draft', 'Submitted', 'Submitted', 'Ordered', 'Lost'];
+  const quotations: Quotation[] = Array.from({ length: 8 }, (_, i) => {
+    const date = now - rint(rng, 0, 60) * day;
+    return {
+      id: `qt${i + 1}`,
+      number: `SAL-QTN-${5000 + i}`,
+      customerId: pick(rng, customers).id,
+      date,
+      validTill: date + 30 * day,
+      lines: mkLines(rint(rng, 1, 3)),
+      status: quoteStatuses[i % quoteStatuses.length],
+    };
+  });
+
+  // Material requests — auto-raised for items at/below reorder level.
+  const lowItems = items.filter((it) => it.stock <= it.reorder).slice(0, 8);
+  const materialRequests: MaterialRequest[] = lowItems.map((it, i) => ({
+    id: `mr${i + 1}`,
+    number: `MAT-MR-${6000 + i}`,
+    itemId: it.id,
+    qty: Math.max(it.reorder * 3 - it.stock, it.reorder),
+    date: now - rint(rng, 0, 14) * day,
+    status: 'Requested',
+  }));
 
   const employees: Employee[] = rawPeople.map((p, i) => {
     const department = DEPARTMENTS[i % DEPARTMENTS.length];
@@ -355,9 +399,9 @@ function buildErpData(
   }).sort((a, b) => b.date - a.date);
 
   return {
-    items, warehouses: WAREHOUSES, customers, suppliers, salesOrders, purchaseOrders,
-    workOrders, employees, departments: DEPARTMENTS, projects, assets, accounts, journal,
-    monthly, productsSource, peopleSource,
+    items, warehouses: WAREHOUSES, customers, suppliers, quotations, salesOrders,
+    materialRequests, purchaseOrders, workOrders, employees, departments: DEPARTMENTS,
+    projects, assets, accounts, journal, monthly, productsSource, peopleSource,
   };
 }
 

@@ -4,14 +4,14 @@ import {
   ArrowLeft, LayoutDashboard, Wallet, Boxes, ShoppingCart, Truck, Factory,
   UsersRound, FolderKanban, Landmark, BarChart3, Settings as SettingsIcon,
   Search, ChevronRight, Menu, Database, AlertTriangle, TrendingUp, TrendingDown,
-  Package, DollarSign, ClipboardList, Building2,
+  Package, DollarSign, ClipboardList, Building2, FileText, PackagePlus,
 } from 'lucide-react';
 import {
   fetchErpData, money, avatarFor, orderTotal,
   WAREHOUSES, DEPARTMENTS, SO_FLOW, PO_FLOW,
-  type ErpData, type Item, type Customer, type Supplier, type SalesOrder, type PurchaseOrder,
-  type WorkOrder, type Employee, type Project, type Asset, type Account, type JournalEntry,
+  type ErpData, type SalesOrder, type PurchaseOrder,
   type SOStatus, type POStatus, type WOStatus, type AcctType,
+  type Quotation, type MaterialRequest, type QuoteStatus,
 } from '@/data/erpSeed';
 
 type Tab =
@@ -49,6 +49,12 @@ const WO_STYLE: Record<WOStatus, string> = {
   'Not Started': 'bg-white/5 text-[var(--muted)] border-white/10',
   'In Process': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   Completed: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+};
+const QUOTE_STYLE: Record<QuoteStatus, string> = {
+  Draft: 'bg-white/5 text-[var(--muted)] border-white/10',
+  Submitted: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  Ordered: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  Lost: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
 };
 const ACCT_ORDER: AcctType[] = ['Asset', 'Liability', 'Equity', 'Income', 'Expense'];
 
@@ -95,14 +101,56 @@ export default function ErpPage() {
     if (o.id !== id) return o; const i = PO_FLOW.indexOf(o.status);
     return i >= 0 && i < PO_FLOW.length - 1 ? { ...o, status: PO_FLOW[i + 1] } : o;
   }) }));
-  const produceWO = (id: string) => setD((s) => !s ? s : ({ ...s, workOrders: s.workOrders.map((w) => {
-    if (w.id !== id) return w;
-    const produced = Math.min(w.qty, w.produced + Math.ceil(w.qty * 0.25));
+  // Produce a batch: consume BOM components from stock, add finished goods
+  // (ERPNext BOM → Work Order → Stock Entry).
+  const produceWO = (id: string) => setD((s) => {
+    if (!s) return s;
+    const w = s.workOrders.find((x) => x.id === id);
+    if (!w || w.status === 'Completed') return s;
+    const batch = Math.min(w.qty - w.produced, Math.ceil(w.qty * 0.25));
+    if (batch <= 0) return s;
+    const items = s.items.map((it) => {
+      if (it.id === w.itemId) return { ...it, stock: it.stock + batch };
+      const line = w.bom.find((b) => b.itemId === it.id);
+      return line ? { ...it, stock: Math.max(0, it.stock - line.qtyPerUnit * batch) } : it;
+    });
+    const produced = w.produced + batch;
     const status: WOStatus = produced >= w.qty ? 'Completed' : 'In Process';
-    return { ...w, produced, status };
-  }) }));
+    const workOrders = s.workOrders.map((x) => (x.id === id ? { ...x, produced, status } : x));
+    return { ...s, items, workOrders };
+  });
   const restock = (id: string) => setD((s) => !s ? s : ({ ...s, items: s.items.map((it) =>
     it.id === id ? { ...it, stock: it.reorder * 3 } : it) }));
+
+  // Quotation → Sales Order.
+  const convertQuote = (id: string) => setD((s) => {
+    if (!s) return s;
+    const q = s.quotations.find((x) => x.id === id);
+    if (!q || q.status === 'Ordered' || q.status === 'Lost') return s;
+    const soId = `so-${Date.now()}`;
+    const so: SalesOrder = { id: soId, number: `SAL-ORD-${2000 + s.salesOrders.length}`, customerId: q.customerId, date: Date.now(), lines: q.lines, status: 'Draft' };
+    return {
+      ...s,
+      salesOrders: [so, ...s.salesOrders],
+      quotations: s.quotations.map((x) => (x.id === id ? { ...x, status: 'Ordered', salesOrderId: soId } : x)),
+    };
+  });
+
+  // Material Request → Purchase Order.
+  const convertMR = (id: string) => setD((s) => {
+    if (!s) return s;
+    const mr = s.materialRequests.find((x) => x.id === id);
+    if (!mr || mr.status === 'Ordered') return s;
+    const it = s.items.find((x) => x.id === mr.itemId);
+    const supplier = s.suppliers[s.purchaseOrders.length % s.suppliers.length];
+    const poId = `po-${Date.now()}`;
+    const po: PurchaseOrder = { id: poId, number: `PUR-ORD-${3000 + s.purchaseOrders.length}`, supplierId: supplier.id, date: Date.now(), lines: [{ itemId: mr.itemId, qty: mr.qty, rate: it?.cost ?? 0 }], status: 'Draft' };
+    return {
+      ...s,
+      purchaseOrders: [po, ...s.purchaseOrders],
+      materialRequests: s.materialRequests.map((x) => (x.id === id ? { ...x, status: 'Ordered', purchaseOrderId: poId } : x)),
+    };
+  });
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
@@ -137,8 +185,8 @@ export default function ErpPage() {
               {tab === 'dashboard' && <Dashboard d={d} go={go} />}
               {tab === 'accounting' && <Accounting d={d} />}
               {tab === 'inventory' && <Inventory d={d} onRestock={restock} />}
-              {tab === 'sales' && <Sales d={d} onAdvance={advanceSO} />}
-              {tab === 'buying' && <Buying d={d} onAdvance={advancePO} />}
+              {tab === 'sales' && <Sales d={d} onAdvance={advanceSO} onConvertQuote={convertQuote} />}
+              {tab === 'buying' && <Buying d={d} onAdvance={advancePO} onConvertMR={convertMR} />}
               {tab === 'manufacturing' && <Manufacturing d={d} onProduce={produceWO} />}
               {tab === 'hr' && <HR d={d} />}
               {tab === 'projects' && <Projects d={d} />}
@@ -373,19 +421,47 @@ function Inventory({ d, onRestock }: { d: ErpData; onRestock: (id: string) => vo
 }
 
 // ── Sales ────────────────────────────────────────────────────────────────────
-function Sales({ d, onAdvance }: { d: ErpData; onAdvance: (id: string) => void }) {
+function Sales({ d, onAdvance, onConvertQuote }: { d: ErpData; onAdvance: (id: string) => void; onConvertQuote: (id: string) => void }) {
   const cust = Object.fromEntries(d.customers.map((c) => [c.id, c]));
   const total = d.salesOrders.reduce((s, o) => s + orderTotal(o.lines), 0);
   const open = d.salesOrders.filter((o) => o.status !== 'Completed' && o.status !== 'Cancelled');
+  const openQuotes = d.quotations.filter((q) => q.status === 'Draft' || q.status === 'Submitted');
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Open quotations" value={openQuotes.length.toString()} />
         <Kpi label="Orders" value={d.salesOrders.length.toString()} />
-        <Kpi label="Open" value={open.length.toString()} />
+        <Kpi label="Open orders" value={open.length.toString()} />
         <Kpi label="Order value" value={money(total)} />
-        <Kpi label="Customers" value={d.customers.length.toString()} />
       </div>
+
       <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <div className="flex items-center gap-2 border-b border-white/10 bg-[var(--surface)] px-4 py-3">
+          <FileText size={15} className="text-[var(--brand-bright)]" />
+          <h3 className="text-sm font-medium text-white">Quotations</h3>
+          <span className="text-xs text-[var(--muted)]">— submit a quote, then turn it into a sales order</span>
+        </div>
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+            <tr><th className="px-4 py-3 font-medium">Quotation</th><th className="px-4 py-3 font-medium">Customer</th><th className="px-4 py-3 font-medium">Valid till</th><th className="px-4 py-3 text-right font-medium">Amount</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
+          </thead>
+          <tbody>
+            {d.quotations.map((q) => (
+              <tr key={q.id} className="border-t border-white/5">
+                <td className="px-4 py-3 font-medium text-white">{q.number}</td>
+                <td className="px-4 py-3 text-[var(--muted)]">{cust[q.customerId]?.name ?? '—'}</td>
+                <td className="px-4 py-3 text-[var(--muted)]">{fmtDate(q.validTill)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-white">{money(orderTotal(q.lines))}</td>
+                <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${QUOTE_STYLE[q.status]}`}>{q.status}</span></td>
+                <td className="px-4 py-3 text-right">{(q.status === 'Draft' || q.status === 'Submitted') && <button onClick={() => onConvertQuote(q.id)} className="rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white">Create order</button>}{q.status === 'Ordered' && <span className="text-xs text-[var(--muted)]">→ order created</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <div className="border-b border-white/10 bg-[var(--surface)] px-4 py-3"><h3 className="text-sm font-medium text-white">Sales orders</h3></div>
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
             <tr><th className="px-4 py-3 font-medium">Order</th><th className="px-4 py-3 font-medium">Customer</th><th className="px-4 py-3 font-medium">Date</th><th className="px-4 py-3 text-right font-medium">Amount</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
@@ -413,17 +489,45 @@ function Sales({ d, onAdvance }: { d: ErpData; onAdvance: (id: string) => void }
 }
 
 // ── Buying ───────────────────────────────────────────────────────────────────
-function Buying({ d, onAdvance }: { d: ErpData; onAdvance: (id: string) => void }) {
+function Buying({ d, onAdvance, onConvertMR }: { d: ErpData; onAdvance: (id: string) => void; onConvertMR: (id: string) => void }) {
   const sup = Object.fromEntries(d.suppliers.map((s) => [s.id, s]));
+  const item = Object.fromEntries(d.items.map((i) => [i.id, i]));
   const payable = d.suppliers.reduce((s, x) => s + x.outstanding, 0);
+  const openMR = d.materialRequests.filter((m) => m.status === 'Requested');
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Material requests" value={openMR.length.toString()} />
         <Kpi label="Purchase orders" value={d.purchaseOrders.length.toString()} />
-        <Kpi label="To receive" value={d.purchaseOrders.filter((o) => o.status === 'To Receive').length.toString()} />
         <Kpi label="Payables" value={money(payable)} />
         <Kpi label="Suppliers" value={d.suppliers.length.toString()} />
       </div>
+
+      {d.materialRequests.length > 0 && (
+        <div className="overflow-x-auto rounded-2xl border border-white/10">
+          <div className="flex items-center gap-2 border-b border-white/10 bg-[var(--surface)] px-4 py-3">
+            <PackagePlus size={15} className="text-[var(--brand-bright)]" />
+            <h3 className="text-sm font-medium text-white">Material requests</h3>
+            <span className="text-xs text-[var(--muted)]">— auto-raised from low stock; convert to a purchase order</span>
+          </div>
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+              <tr><th className="px-4 py-3 font-medium">Request</th><th className="px-4 py-3 font-medium">Item</th><th className="px-4 py-3 text-right font-medium">Qty</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
+            </thead>
+            <tbody>
+              {d.materialRequests.map((m) => (
+                <tr key={m.id} className="border-t border-white/5">
+                  <td className="px-4 py-3 font-medium text-white">{m.number}</td>
+                  <td className="px-4 py-3 text-[var(--muted)]">{item[m.itemId]?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-white">{m.qty}</td>
+                  <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${m.status === 'Requested' ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'}`}>{m.status}</span></td>
+                  <td className="px-4 py-3 text-right">{m.status === 'Requested' ? <button onClick={() => onConvertMR(m.id)} className="rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white">Create PO</button> : <span className="text-xs text-[var(--muted)]">→ PO created</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="overflow-x-auto rounded-2xl border border-white/10">
@@ -486,9 +590,21 @@ function Manufacturing({ d, onProduce }: { d: ErpData; onProduce: (id: string) =
               <div className="flex justify-between text-sm"><span className="text-[var(--muted)]">Produced</span><span className="text-white">{w.produced} / {w.qty}</span></div>
               <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${pct}%` }} /></div>
             </div>
+            <div className="mt-4 rounded-xl bg-[var(--bg-soft)] p-3">
+              <div className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Bill of materials · per unit</div>
+              <div className="mt-1.5 space-y-1">
+                {w.bom.map((b) => (
+                  <div key={b.itemId} className="flex justify-between text-xs">
+                    <span className="truncate text-[var(--text)]">{item[b.itemId]?.name ?? '—'}</span>
+                    <span className="shrink-0 text-[var(--muted)]">×{b.qtyPerUnit}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
             {w.status !== 'Completed' && (
               <button onClick={() => onProduce(w.id)} className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-bright)] py-2 text-sm font-medium text-[#0b0d10] transition-colors hover:bg-white"><Factory size={14} /> Produce batch</button>
             )}
+            <p className="mt-2 text-center text-[10px] text-[var(--muted)]/60">Producing consumes components &amp; adds finished stock</p>
           </div>
         );
       })}

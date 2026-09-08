@@ -180,12 +180,12 @@ export const projects: Project[] = [
     name: 'CRM System',
     category: 'Product',
     description:
-      'A full-fledged customer-relationship platform simulated end to end: contacts and companies, a deal pipeline, tasks, a calendar, an email inbox with templates, invoicing, marketing campaigns, workflow automations, and a reporting suite — all driven by a live dashboard. Sample identities are pulled from a public API so the whole thing feels real.',
+      'A full-fledged customer-relationship platform simulated end to end, with workflows modelled on EspoCRM and ERPNext: lead capture and one-click conversion, contacts and companies, a deal pipeline with lost-reason tracking, support cases, tasks, a calendar, an email inbox with templates, invoicing, marketing campaigns, workflow automations, and a reporting suite — all driven by a live dashboard. Sample identities are pulled from a public API so the whole thing feels real.',
     year: '2026 - Present',
     tags: ['React', 'TypeScript', 'Public APIs', 'Supabase (next)'],
     highlights: [
-      'Twelve interactive modules: dashboard, contacts, companies, pipeline, tasks, calendar, inbox, invoices, campaigns, automations, reports, and settings.',
-      'Everything is clickable — advance deals, log activities, send replies from templates, mark invoices paid, toggle automations, and watch the reports update.',
+      'Fourteen interactive modules including a lead pipeline that converts a qualified lead into a contact, company, and opportunity in one click (the core EspoCRM/ERPNext flow), plus a support-case desk.',
+      'Everything is clickable — qualify and convert leads, advance deals, mark a deal lost with a reason and competitor, resolve support cases, send replies from templates, mark invoices paid, and watch the reports update.',
       'Sample data populated live from randomuser.me with DiceBear avatars and a seeded generator; a Supabase-backed version with persisted records is next.',
     ],
     route: '/crm',
@@ -199,8 +199,8 @@ export const projects: Project[] = [
     year: '2026 - Present',
     tags: ['React', 'TypeScript', 'Public APIs', 'Supabase (next)'],
     highlights: [
-      'Eleven interactive modules: dashboard, accounting, inventory, sales, buying, manufacturing, HR, projects, assets, reports, and settings.',
-      'Real order flows: advance and bill sales orders, receive purchase orders, run manufacturing batches, and restock low inventory — the accounts and reports update as you go.',
+      'Eleven interactive modules covering the real ERPNext document chains: quotation → sales order → delivery, material request → purchase order, and BOM → work order → stock movement.',
+      'Everything runs: convert a quotation to an order, raise a purchase order from a low-stock material request, produce a manufacturing batch that consumes its bill of materials and adds finished stock — accounts and reports update as you go.',
       'Inventory items come live from DummyJSON and staff from randomuser.me, layered on a seeded generator; a Supabase-backed version with persisted records is next.',
     ],
     route: '/erp',

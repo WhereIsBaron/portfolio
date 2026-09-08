@@ -5,33 +5,53 @@ import {
   Calendar, Inbox, FileText, Megaphone, Zap, BarChart3, Settings as SettingsIcon,
   Search, Plus, X, Check, Phone, Mail, StickyNote, ChevronRight, Database,
   Clock, TrendingUp, Target, DollarSign, AlertTriangle, Send, Menu,
+  UserPlus, LifeBuoy, ArrowRightLeft, Flame,
 } from 'lucide-react';
 import {
   fetchCrmData, avatarFor, money, invoiceTotal,
   STAGES, OPEN_STAGES, STAGE_PROB, STATUSES, ACTIVITY_TYPES, PRIORITIES, LEAD_SOURCES, OWNERS,
+  LOST_REASONS, COMPETITORS, CASE_STATUSES,
   type Contact, type Company, type Deal, type Activity, type Task, type Meeting,
   type EmailThread, type EmailTemplate, type Invoice, type Campaign, type Automation,
+  type Lead, type SupportCase, type LeadStatus, type CaseStatus,
   type Stage, type Status, type ActivityType, type Priority, type InvoiceStatus,
 } from '@/data/crmSeed';
 
 type Tab =
-  | 'dashboard' | 'contacts' | 'companies' | 'pipeline' | 'tasks' | 'calendar'
-  | 'inbox' | 'invoices' | 'campaigns' | 'automations' | 'reports' | 'settings';
+  | 'dashboard' | 'contacts' | 'leads' | 'companies' | 'pipeline' | 'tasks' | 'calendar'
+  | 'inbox' | 'cases' | 'invoices' | 'campaigns' | 'automations' | 'reports' | 'settings';
 
 const NAV: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'leads', label: 'Leads', icon: UserPlus },
   { id: 'contacts', label: 'Contacts', icon: Users },
   { id: 'companies', label: 'Companies', icon: Building2 },
   { id: 'pipeline', label: 'Pipeline', icon: KanbanSquare },
   { id: 'tasks', label: 'Tasks', icon: CheckSquare },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
   { id: 'inbox', label: 'Inbox', icon: Inbox },
+  { id: 'cases', label: 'Cases', icon: LifeBuoy },
   { id: 'invoices', label: 'Invoices', icon: FileText },
   { id: 'campaigns', label: 'Campaigns', icon: Megaphone },
   { id: 'automations', label: 'Automations', icon: Zap },
   { id: 'reports', label: 'Reports', icon: BarChart3 },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
+
+const LEAD_STATUS_STYLE: Record<LeadStatus, string> = {
+  New: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  Contacted: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  Qualified: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  Unqualified: 'bg-white/5 text-[var(--muted)] border-white/10',
+  Converted: 'bg-[var(--brand-bright)]/15 text-[var(--brand-bright)] border-[var(--brand-bright)]/30',
+};
+const CASE_STATUS_STYLE: Record<CaseStatus, string> = {
+  Open: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  Pending: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  Replied: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  Resolved: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  Closed: 'bg-white/5 text-[var(--muted)] border-white/10',
+};
 
 const STATUS_STYLE: Record<Status, string> = {
   Lead: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
@@ -84,6 +104,8 @@ export default function CrmPage() {
   const [source, setSource] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [cases, setCases] = useState<SupportCase[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -98,6 +120,7 @@ export default function CrmPage() {
   const [navOpen, setNavOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [losingId, setLosingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,6 +128,8 @@ export default function CrmPage() {
       if (cancelled) return;
       setContacts(d.contacts);
       setCompanies(d.companies);
+      setLeads(d.leads);
+      setCases(d.cases);
       setDeals(d.deals);
       setActivities(d.activities);
       setTasks(d.tasks);
@@ -131,8 +156,62 @@ export default function CrmPage() {
       const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : d.stage;
       return { ...d, stage: next, probability: STAGE_PROB[next] };
     }));
-  const loseDeal = (id: string) =>
-    setDeals((ds) => ds.map((d) => (d.id === id ? { ...d, stage: 'Lost', probability: 0 } : d)));
+  const loseDeal = (id: string, reason: string, competitor: string) => {
+    setDeals((ds) => ds.map((d) => (d.id === id ? { ...d, stage: 'Lost', probability: 0, lostReason: reason, competitor } : d)));
+    setLosingId(null);
+  };
+
+  // Lead qualification & conversion (ERPNext lead → opportunity / EspoCRM convert).
+  const advanceLead = (id: string) =>
+    setLeads((ls) => ls.map((l) => {
+      if (l.id !== id || l.status === 'Converted' || l.status === 'Unqualified') return l;
+      const order: LeadStatus[] = ['New', 'Contacted', 'Qualified'];
+      const idx = order.indexOf(l.status);
+      return idx >= 0 && idx < order.length - 1 ? { ...l, status: order[idx + 1] } : l;
+    }));
+  const disqualifyLead = (id: string) =>
+    setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status: 'Unqualified' } : l)));
+  const convertLead = (id: string) => {
+    const lead = leads.find((l) => l.id === id);
+    if (!lead || lead.status === 'Converted') return;
+    const contactId = `c-${Date.now()}`;
+    const dealId = `d-${Date.now()}`;
+    // 1) Lead becomes a Contact (a Customer/Prospect).
+    setContacts((cs) => [
+      {
+        id: contactId, name: lead.name, email: lead.email, phone: lead.phone, avatar: lead.avatar,
+        company: lead.company, title: lead.title, location: '—', status: 'Prospect',
+        owner: lead.owner, source: lead.source, tags: ['Converted'], createdAt: Date.now(),
+      },
+      ...cs,
+    ]);
+    // 2) Company is created if it doesn't already exist.
+    setCompanies((co) =>
+      co.some((x) => x.name === lead.company)
+        ? co.map((x) => (x.name === lead.company ? { ...x, contactIds: [...x.contactIds, contactId] } : x))
+        : [...co, { id: `co-${Date.now()}`, name: lead.company, industry: '—', size: '—', website: `www.${lead.company.toLowerCase().replace(/[^a-z]+/g, '')}.com`, contactIds: [contactId] }]);
+    // 3) An Opportunity (deal) is opened in the pipeline.
+    setDeals((ds) => [
+      {
+        id: dealId, title: `New opportunity — ${lead.company}`, contactId, value: lead.estValue,
+        stage: 'Contacted', probability: STAGE_PROB.Contacted, expectedClose: Date.now() + 45 * 86_400_000, owner: lead.owner,
+      },
+      ...ds,
+    ]);
+    // 4) Lead is marked Converted and linked to the new records.
+    setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status: 'Converted', convertedContactId: contactId, convertedDealId: dealId } : l)));
+    setSelectedId(contactId);
+    setTab('contacts');
+  };
+
+  const advanceCase = (id: string) =>
+    setCases((cs) => cs.map((c) => {
+      if (c.id !== id) return c;
+      const order: CaseStatus[] = ['Open', 'Pending', 'Replied', 'Resolved', 'Closed'];
+      const idx = order.indexOf(c.status);
+      const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : c.status;
+      return { ...c, status: next, updatedAt: Date.now() };
+    }));
   const toggleTask = (id: string) =>
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
   const toggleAutomation = (id: string) =>
@@ -242,16 +321,20 @@ export default function CrmPage() {
               {tab === 'dashboard' && (
                 <Dashboard {...{ contacts, deals, activities, tasks, meetings, invoices, byId, source, go }} />
               )}
+              {tab === 'leads' && (
+                <LeadsView leads={leads} onAdvance={advanceLead} onDisqualify={disqualifyLead} onConvert={convertLead} />
+              )}
               {tab === 'contacts' && (
                 <Contacts contacts={contacts} onOpen={setSelectedId} dealsFor={(id) => deals.filter((d) => d.contactId === id)} />
               )}
               {tab === 'companies' && <Companies companies={companies} contacts={contacts} deals={deals} onOpen={setSelectedId} />}
-              {tab === 'pipeline' && <Pipeline deals={deals} byId={byId} onAdvance={advanceDeal} onLose={loseDeal} />}
+              {tab === 'pipeline' && <Pipeline deals={deals} byId={byId} onAdvance={advanceDeal} onLose={(id) => setLosingId(id)} />}
               {tab === 'tasks' && <Tasks tasks={tasks} byId={byId} contacts={contacts} onToggle={toggleTask} onAdd={addTask} />}
               {tab === 'calendar' && <CalendarView meetings={meetings} byId={byId} />}
               {tab === 'inbox' && (
                 <InboxView threads={threads} byId={byId} templates={templates} onReply={replyThread} onRead={markThreadRead} />
               )}
+              {tab === 'cases' && <CasesView cases={cases} byId={byId} onAdvance={advanceCase} />}
               {tab === 'invoices' && <Invoices invoices={invoices} byId={byId} onPaid={markPaid} />}
               {tab === 'campaigns' && <Campaigns campaigns={campaigns} />}
               {tab === 'automations' && <Automations automations={automations} onToggle={toggleAutomation} />}
@@ -273,6 +356,13 @@ export default function CrmPage() {
         />
       )}
       {addOpen && <AddContactModal onClose={() => setAddOpen(false)} onAdd={addContact} />}
+      {losingId && (
+        <LostDealModal
+          deal={deals.find((d) => d.id === losingId)!}
+          onClose={() => setLosingId(null)}
+          onConfirm={(reason, competitor) => loseDeal(losingId, reason, competitor)}
+        />
+      )}
     </div>
   );
 }
@@ -502,6 +592,179 @@ function Companies({
 }
 
 // ── Pipeline ─────────────────────────────────────────────────────────────────
+// ── Leads ────────────────────────────────────────────────────────────────────
+function LeadsView({
+  leads, onAdvance, onDisqualify, onConvert,
+}: {
+  leads: Lead[]; onAdvance: (id: string) => void; onDisqualify: (id: string) => void; onConvert: (id: string) => void;
+}) {
+  const [filter, setFilter] = useState<'active' | 'all' | LeadStatus>('active');
+  const shown = leads.filter((l) => {
+    if (filter === 'active') return l.status !== 'Converted' && l.status !== 'Unqualified';
+    if (filter === 'all') return true;
+    return l.status === filter;
+  });
+  const kpi = [
+    ['New', leads.filter((l) => l.status === 'New').length],
+    ['Qualified', leads.filter((l) => l.status === 'Qualified').length],
+    ['Converted', leads.filter((l) => l.status === 'Converted').length],
+    ['Avg. score', leads.length ? Math.round(leads.reduce((s, l) => s + l.score, 0) / leads.length) : 0],
+  ] as const;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {kpi.map(([label, value]) => (
+          <div key={label} className={`${card} p-4`}><div className="font-display text-xl text-white">{value}</div><div className="text-xs text-[var(--muted)]">{label}</div></div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {(['active', 'New', 'Contacted', 'Qualified', 'Unqualified', 'Converted', 'all'] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)} className={`rounded-full px-3 py-1.5 text-xs capitalize transition-colors ${filter === f ? 'bg-[var(--brand-bright)] text-[#0b0d10]' : 'border border-white/10 text-[var(--muted)] hover:text-white'}`}>{f}</button>
+        ))}
+      </div>
+      <div className={`${card} p-3 text-xs text-[var(--muted)]`}>
+        <span className="text-white">Web-to-Lead:</span> new leads flow in from the website form and cold outreach, get scored and qualified, then <span className="text-[var(--brand-bright)]">convert</span> into a contact, a company, and an opportunity in one click.
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <table className="w-full min-w-[760px] text-left text-sm">
+          <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+            <tr><th className="px-4 py-3 font-medium">Lead</th><th className="px-4 py-3 font-medium">Source</th><th className="px-4 py-3 font-medium">Score</th><th className="px-4 py-3 text-right font-medium">Est. value</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
+          </thead>
+          <tbody>
+            {shown.map((l) => (
+              <tr key={l.id} className="border-t border-white/5">
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar src={l.avatar} name={l.name} size={34} />
+                    <div className="min-w-0"><div className="truncate font-medium text-white">{l.name}</div><div className="truncate text-xs text-[var(--muted)]">{l.title} · {l.company}</div></div>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-[var(--muted)]">{l.source}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    {l.score >= 70 && <Flame size={13} className="text-rose-300" />}
+                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${l.score}%` }} /></div>
+                    <span className="text-xs text-[var(--muted)]">{l.score}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums text-white">{money(l.estValue)}</td>
+                <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${LEAD_STATUS_STYLE[l.status]}`}>{l.status}</span></td>
+                <td className="px-4 py-3">
+                  {l.status === 'Converted' ? (
+                    <span className="text-xs text-[var(--muted)]">→ contact + opportunity</span>
+                  ) : l.status === 'Unqualified' ? (
+                    <span className="text-xs text-[var(--muted)]/60">closed</span>
+                  ) : (
+                    <div className="flex justify-end gap-1.5">
+                      {l.status !== 'Qualified' && <button onClick={() => onAdvance(l.id)} className="rounded-lg border border-white/10 px-2.5 py-1 text-xs text-[var(--muted)] transition-colors hover:text-white">Advance</button>}
+                      <button onClick={() => onConvert(l.id)} className="inline-flex items-center gap-1 rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white"><ArrowRightLeft size={12} /> Convert</button>
+                      <button onClick={() => onDisqualify(l.id)} className="rounded-lg border border-white/10 px-2.5 py-1 text-xs text-[var(--muted)] transition-colors hover:text-rose-300">Disqualify</button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {shown.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-[var(--muted)]">No leads in this view.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Cases (support) ──────────────────────────────────────────────────────────
+function CasesView({
+  cases, byId, onAdvance,
+}: { cases: SupportCase[]; byId: Record<string, Contact>; onAdvance: (id: string) => void }) {
+  const [filter, setFilter] = useState<'open' | 'all' | CaseStatus>('open');
+  const shown = cases.filter((c) => {
+    if (filter === 'open') return c.status !== 'Resolved' && c.status !== 'Closed';
+    if (filter === 'all') return true;
+    return c.status === filter;
+  }).sort((a, b) => b.updatedAt - a.updatedAt);
+  const kpi = [
+    ['Open', cases.filter((c) => c.status === 'Open').length],
+    ['Awaiting reply', cases.filter((c) => c.status === 'Pending').length],
+    ['Resolved', cases.filter((c) => c.status === 'Resolved').length],
+    ['Total', cases.length],
+  ] as const;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {kpi.map(([label, value]) => (
+          <div key={label} className={`${card} p-4`}><div className="font-display text-xl text-white">{value}</div><div className="text-xs text-[var(--muted)]">{label}</div></div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {(['open', ...CASE_STATUSES, 'all'] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)} className={`rounded-full px-3 py-1.5 text-xs capitalize transition-colors ${filter === f ? 'bg-[var(--brand-bright)] text-[#0b0d10]' : 'border border-white/10 text-[var(--muted)] hover:text-white'}`}>{f}</button>
+        ))}
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <table className="w-full min-w-[760px] text-left text-sm">
+          <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+            <tr><th className="px-4 py-3 font-medium">Case</th><th className="px-4 py-3 font-medium">Contact</th><th className="px-4 py-3 font-medium">Type</th><th className="px-4 py-3 font-medium">Priority</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
+          </thead>
+          <tbody>
+            {shown.map((c) => {
+              const ct = byId[c.contactId];
+              const canAdvance = c.status !== 'Closed';
+              const nextLabel = c.status === 'Open' ? 'Take' : c.status === 'Pending' ? 'Reply' : c.status === 'Replied' ? 'Resolve' : c.status === 'Resolved' ? 'Close' : '';
+              return (
+                <tr key={c.id} className="border-t border-white/5">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-white">{c.subject}</div>
+                    <div className="text-xs text-[var(--muted)]">{c.number} · {fmtDate(c.createdAt)}</div>
+                  </td>
+                  <td className="px-4 py-3 text-[var(--muted)]">{ct?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-[var(--muted)]">{c.type}</td>
+                  <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${PRIO_STYLE[c.priority]}`}>{c.priority}</span></td>
+                  <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${CASE_STATUS_STYLE[c.status]}`}>{c.status}</span></td>
+                  <td className="px-4 py-3 text-right">{canAdvance && nextLabel && <button onClick={() => onAdvance(c.id)} className="rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white">{nextLabel}</button>}</td>
+                </tr>
+              );
+            })}
+            {shown.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-[var(--muted)]">No cases in this view.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Lost-deal modal (reason + competitor) ─────────────────────────────────────
+function LostDealModal({
+  deal, onClose, onConfirm,
+}: { deal: Deal; onClose: () => void; onConfirm: (reason: string, competitor: string) => void }) {
+  const [reason, setReason] = useState(LOST_REASONS[0]);
+  const [competitor, setCompetitor] = useState(COMPETITORS[0]);
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className={`${card} w-full max-w-md p-6`} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-display text-lg text-white">Mark deal as lost</h3>
+          <button onClick={onClose} className="text-[var(--muted)] hover:text-white"><X size={18} /></button>
+        </div>
+        <p className="mt-1 text-sm text-[var(--muted)]">{money(deal.value)} · {deal.title}</p>
+        <label className="mt-4 block text-xs uppercase tracking-wide text-[var(--muted)]">Lost reason</label>
+        <select value={reason} onChange={(e) => setReason(e.target.value)} className={`mt-1 ${field}`}>
+          {LOST_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <label className="mt-4 block text-xs uppercase tracking-wide text-[var(--muted)]">Lost to competitor</label>
+        <select value={competitor} onChange={(e) => setCompetitor(e.target.value)} className={`mt-1 ${field}`}>
+          {COMPETITORS.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <div className="mt-6 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-[var(--muted)] hover:text-white">Cancel</button>
+          <button onClick={() => onConfirm(reason, competitor)} className="rounded-xl bg-rose-500/90 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500">Mark lost</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Pipeline({
   deals, byId, onAdvance, onLose,
 }: { deals: Deal[]; byId: Record<string, Contact>; onAdvance: (id: string) => void; onLose: (id: string) => void }) {
@@ -524,6 +787,9 @@ function Pipeline({
                     <div className="mt-0.5 line-clamp-2 text-xs text-[var(--muted)]">{d.title}</div>
                     {c && <div className="mt-2 flex items-center gap-2"><Avatar src={c.avatar} name={c.name} size={20} /><span className="truncate text-xs text-[var(--muted)]">{c.name}</span></div>}
                     <div className="mt-1 text-[10px] text-[var(--muted)]/70">{d.probability}% · {d.owner}</div>
+                    {d.stage === 'Lost' && d.lostReason && (
+                      <div className="mt-1.5 rounded-md bg-rose-500/10 px-1.5 py-1 text-[10px] text-rose-300/90">{d.lostReason}{d.competitor && d.competitor !== 'None' ? ` · ${d.competitor}` : ''}</div>
+                    )}
                     {canAdvance && (
                       <div className="mt-2 flex gap-1.5">
                         <button onClick={() => onAdvance(d.id)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-[var(--brand-bright)] px-2 py-1 text-[11px] font-medium text-[#0b0d10] transition-colors hover:bg-white">Advance <ChevronRight size={12} /></button>

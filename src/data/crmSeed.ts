@@ -36,6 +36,20 @@ export const PRIORITIES: Priority[] = ['Low', 'Medium', 'High'];
 
 export const LEAD_SOURCES = ['Website', 'Referral', 'LinkedIn', 'Cold outreach', 'Event', 'Inbound call'];
 
+// Lead qualification (ERPNext lead / EspoCRM lead): a lead is captured, worked,
+// and then CONVERTED into a contact + company + opportunity.
+export type LeadStatus = 'New' | 'Contacted' | 'Qualified' | 'Unqualified' | 'Converted';
+export const LEAD_STATUSES: LeadStatus[] = ['New', 'Contacted', 'Qualified', 'Unqualified', 'Converted'];
+
+// Why a deal was lost + who we lost to (ERPNext opportunity_lost_reason / competitor).
+export const LOST_REASONS = ['Price too high', 'Chose a competitor', 'No budget', 'Lost to status quo', 'Timing / postponed', 'Missing feature'];
+export const COMPETITORS = ['Salesforce', 'HubSpot', 'Zoho', 'Pipedrive', 'In-house build', 'None'];
+
+// Support cases (EspoCRM Cases / ERPNext Support Issue).
+export type CaseStatus = 'Open' | 'Pending' | 'Replied' | 'Resolved' | 'Closed';
+export const CASE_STATUSES: CaseStatus[] = ['Open', 'Pending', 'Replied', 'Resolved', 'Closed'];
+export const CASE_TYPES = ['Question', 'Problem', 'Feature Request', 'Incident'] as const;
+
 export type Contact = {
   id: string;
   name: string;
@@ -70,6 +84,38 @@ export type Deal = {
   probability: number;
   expectedClose: number;
   owner: string;
+  lostReason?: string;
+  competitor?: string;
+};
+
+export type Lead = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  avatar: string;
+  company: string;
+  title: string;
+  source: string;
+  status: LeadStatus;
+  score: number; // 0–100 qualification rating
+  estValue: number; // potential opportunity value
+  owner: string;
+  createdAt: number;
+  convertedContactId?: string;
+  convertedDealId?: string;
+};
+
+export type SupportCase = {
+  id: string;
+  number: string;
+  subject: string;
+  contactId: string;
+  priority: Priority;
+  status: CaseStatus;
+  type: (typeof CASE_TYPES)[number];
+  createdAt: number;
+  updatedAt: number;
 };
 
 export type Activity = {
@@ -159,6 +205,8 @@ export type Automation = {
 export type CrmData = {
   contacts: Contact[];
   companies: Company[];
+  leads: Lead[];
+  cases: SupportCase[];
   deals: Deal[];
   activities: Activity[];
   tasks: Task[];
@@ -452,8 +500,58 @@ function buildCrmData(people: Person[], source: CrmData['source']): CrmData {
     { id: 'au6', name: 'Renewal 30-day', trigger: 'Customer renewal in 30 days', action: 'Send renewal reminder', enabled: false, runs: rint(rng, 1, 5) },
   ];
 
+  // Unconverted leads — raw prospects that haven't become contacts yet.
+  // Names are drawn from a small pool so they feel distinct from contacts.
+  const LEAD_NAMES = [
+    ['Grace', 'Mokoena'], ['Daniel', 'Reyes'], ['Aisha', 'Karim'], ['Tom', 'Fletcher'],
+    ['Lindiwe', 'Naidoo'], ['Marco', 'Bianchi'], ['Yuki', 'Tanaka'], ['Sarah', 'O’Brien'],
+  ];
+  const LEAD_STATE: LeadStatus[] = ['New', 'New', 'Contacted', 'Contacted', 'Qualified', 'Qualified', 'Unqualified'];
+  const leads: Lead[] = LEAD_NAMES.slice(0, 7).map(([first, last], i) => {
+    const company = pick(rng, COMPANIES);
+    const status = LEAD_STATE[i];
+    return {
+      id: `l${i + 1}`,
+      name: `${first} ${last}`,
+      email: `${first.toLowerCase()}.${last.toLowerCase().replace(/[^a-z]/g, '')}@${company.toLowerCase().replace(/[^a-z]+/g, '')}.com`,
+      phone: '+27 82 000 ' + rint(rng, 1000, 9999),
+      avatar: avatarFor(first + last),
+      company,
+      title: pick(rng, TITLES),
+      source: pick(rng, LEAD_SOURCES),
+      status,
+      score: status === 'Qualified' ? rint(rng, 70, 95) : status === 'Contacted' ? rint(rng, 40, 70) : status === 'Unqualified' ? rint(rng, 5, 25) : rint(rng, 20, 60),
+      estValue: pick(rng, DEAL_VALUES),
+      owner: pick(rng, OWNERS),
+      createdAt: now - rint(rng, 1, 40) * day,
+    };
+  });
+
+  // Support cases (tickets) tied to existing customer contacts.
+  const CASE_SUBJECTS = [
+    'Login issue after password reset', 'Export to CSV is failing', 'Request: bulk import of contacts',
+    'Invoice PDF shows wrong logo', 'API rate limit questions', 'Onboarding — SSO setup help',
+    'Report totals look incorrect', 'Mobile app crashes on upload',
+  ];
+  const CASE_STATE: CaseStatus[] = ['Open', 'Open', 'Pending', 'Replied', 'Replied', 'Resolved', 'Resolved', 'Closed'];
+  const cases: SupportCase[] = CASE_SUBJECTS.map((subject, i) => {
+    const c = pick(rng, contacts);
+    const createdAt = now - rint(rng, 0, 25) * day;
+    return {
+      id: `case${i + 1}`,
+      number: `CASE-${1000 + i}`,
+      subject,
+      contactId: c.id,
+      priority: pick(rng, PRIORITIES),
+      status: CASE_STATE[i],
+      type: pick(rng, CASE_TYPES as unknown as string[]) as SupportCase['type'],
+      createdAt,
+      updatedAt: createdAt + rint(rng, 0, 5) * day,
+    };
+  });
+
   return {
-    contacts, companies, deals, activities, tasks, meetings,
+    contacts, companies, leads, cases, deals, activities, tasks, meetings,
     threads, templates, invoices, campaigns, automations, source,
   };
 }
