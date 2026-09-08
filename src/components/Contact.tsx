@@ -117,7 +117,7 @@ export default function Contact() {
       label: 'Email',
       value: profile.email,
       href: `mailto:${profile.email}`,
-      valueClass: 'whitespace-nowrap text-sm lg:text-base',
+      valueClass: 'break-all text-sm lg:text-base',
     },
     {
       icon: <Phone size={22} className="text-[var(--brand-bright)]" />,
@@ -147,8 +147,8 @@ export default function Contact() {
           <span className="text-[var(--brand-bright)]">that works.</span>
         </h2>
         <p className="reveal mt-6 max-w-xl text-lg leading-relaxed text-[var(--muted)]">
-          Have a role or project in mind? Email is the quickest way to reach me, and I reply within
-          two business days.
+          Have a role or project in mind? WhatsApp is the quickest way to reach me, and I reply
+          within two business days.
         </p>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-[1.1fr_1fr]">
