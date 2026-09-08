@@ -7,11 +7,12 @@ import {
   Package, DollarSign, ClipboardList, Building2, FileText, PackagePlus,
 } from 'lucide-react';
 import {
-  fetchErpData, money, avatarFor, orderTotal,
+  fetchErpData, money, avatarFor, orderTotal, accountBalances,
   WAREHOUSES, DEPARTMENTS, SO_FLOW, PO_FLOW,
   type ErpData, type SalesOrder, type PurchaseOrder,
   type SOStatus, type POStatus, type WOStatus, type AcctType,
   type Quotation, type MaterialRequest, type QuoteStatus,
+  type GLEntry, type GLLine, type StockEntry, type DocStamp, type OrderLine,
 } from '@/data/erpSeed';
 
 type Tab =
@@ -36,6 +37,7 @@ const SO_STYLE: Record<SOStatus, string> = {
   Draft: 'bg-white/5 text-[var(--muted)] border-white/10',
   'To Deliver': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   'To Bill': 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  'To Pay': 'bg-violet-500/15 text-violet-300 border-violet-500/30',
   Completed: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   Cancelled: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
 };
@@ -43,8 +45,12 @@ const PO_STYLE: Record<POStatus, string> = {
   Draft: 'bg-white/5 text-[var(--muted)] border-white/10',
   'To Receive': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
   'To Bill': 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  'To Pay': 'bg-violet-500/15 text-violet-300 border-violet-500/30',
   Completed: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
 };
+// The action that advances an order out of each status, and the document it creates.
+const SO_ACTION: Partial<Record<SOStatus, string>> = { Draft: 'Submit', 'To Deliver': 'Deliver', 'To Bill': 'Create invoice', 'To Pay': 'Receive payment' };
+const PO_ACTION: Partial<Record<POStatus, string>> = { Draft: 'Submit', 'To Receive': 'Receive', 'To Bill': 'Create bill', 'To Pay': 'Pay supplier' };
 const WO_STYLE: Record<WOStatus, string> = {
   'Not Started': 'bg-white/5 text-[var(--muted)] border-white/10',
   'In Process': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
@@ -60,6 +66,16 @@ const ACCT_ORDER: AcctType[] = ['Asset', 'Liability', 'Equity', 'Income', 'Expen
 
 const fmtDate = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
 const card = 'rounded-2xl border border-white/10 bg-[var(--surface)]';
+
+// ── Posting helpers (build ledger + stock movements for the document chains) ──
+let _seq = 0;
+const seq = () => `${Date.now().toString(36)}-${_seq++}`;
+const stamp = (prefix: string, n: number): DocStamp => ({ number: `${prefix}-${String(n).padStart(4, '0')}`, date: Date.now() });
+const glEntry = (voucherType: string, voucherNo: string, party: string | undefined, lines: GLLine[]): GLEntry =>
+  ({ id: `gl-${seq()}`, date: Date.now(), voucherType, voucherNo, party, lines });
+const stockMove = (itemId: string, qty: number, rate: number, voucherType: string, voucherNo: string, warehouse: string): StockEntry =>
+  ({ id: `sl-${seq()}`, date: Date.now(), itemId, qty, rate, voucherType, voucherNo, warehouse });
+const lineCost = (lines: OrderLine[], costOf: (id: string) => number) => lines.reduce((t, l) => t + costOf(l.itemId) * l.qty, 0);
 
 function Thumb({ src, name, size = 40 }: { src: string; name: string; size?: number }) {
   const [err, setErr] = useState(false);
@@ -93,14 +109,107 @@ export default function ErpPage() {
   const go = (t: Tab) => { setTab(t); setNavOpen(false); };
 
   // Mutations
-  const advanceSO = (id: string) => setD((s) => !s ? s : ({ ...s, salesOrders: s.salesOrders.map((o) => {
-    if (o.id !== id) return o; const i = SO_FLOW.indexOf(o.status as any);
-    return i >= 0 && i < SO_FLOW.length - 1 ? { ...o, status: SO_FLOW[i + 1] } : o;
-  }) }));
-  const advancePO = (id: string) => setD((s) => !s ? s : ({ ...s, purchaseOrders: s.purchaseOrders.map((o) => {
-    if (o.id !== id) return o; const i = PO_FLOW.indexOf(o.status);
-    return i >= 0 && i < PO_FLOW.length - 1 ? { ...o, status: PO_FLOW[i + 1] } : o;
-  }) }));
+  // Advance a sales order through its order-to-cash lifecycle. Each step creates
+  // the linked document and posts balanced entries to the general ledger; the
+  // delivery step also moves stock (perpetual inventory).
+  const advanceSO = (id: string) => setD((s) => {
+    if (!s) return s;
+    const o = s.salesOrders.find((x) => x.id === id);
+    if (!o) return s;
+    const i = SO_FLOW.indexOf(o.status as SOStatus);
+    if (i < 0 || i >= SO_FLOW.length - 1) return s;
+    const next = SO_FLOW[i + 1];
+    const itemById = Object.fromEntries(s.items.map((it) => [it.id, it]));
+    const costOf = (iid: string) => itemById[iid]?.cost ?? 0;
+    const amount = orderTotal(o.lines);
+    const party = s.customers.find((c) => c.id === o.customerId)?.name;
+    let items = s.items, gl = s.gl, stockLedger = s.stockLedger;
+    let patch: Partial<SalesOrder> = {};
+
+    if (o.status === 'To Deliver') {
+      const dn = stamp('DN', 7000 + s.salesOrders.filter((x) => x.deliveryNote).length + 1);
+      const cost = lineCost(o.lines, costOf);
+      items = s.items.map((it) => {
+        const line = o.lines.find((l) => l.itemId === it.id);
+        return line ? { ...it, stock: Math.max(0, it.stock - line.qty) } : it;
+      });
+      stockLedger = [
+        ...o.lines.map((l) => stockMove(l.itemId, -l.qty, costOf(l.itemId), 'Delivery Note', dn.number, itemById[l.itemId]?.warehouse ?? 'Main Store')),
+        ...s.stockLedger,
+      ];
+      gl = [glEntry('Delivery Note', dn.number, party, [
+        { account: 'Cost of Goods Sold', debit: cost, credit: 0 },
+        { account: 'Inventory', debit: 0, credit: cost },
+      ]), ...s.gl];
+      patch = { deliveryNote: dn };
+    } else if (o.status === 'To Bill') {
+      const si = stamp('SINV', 8000 + s.salesOrders.filter((x) => x.salesInvoice).length + 1);
+      gl = [glEntry('Sales Invoice', si.number, party, [
+        { account: 'Accounts Receivable', debit: amount, credit: 0 },
+        { account: 'Sales Revenue', debit: 0, credit: amount },
+      ]), ...s.gl];
+      patch = { salesInvoice: si };
+    } else if (o.status === 'To Pay') {
+      const pe = stamp('PE', 9000 + s.salesOrders.filter((x) => x.payment).length + 1);
+      gl = [glEntry('Payment Entry', pe.number, party, [
+        { account: 'Bank', debit: amount, credit: 0 },
+        { account: 'Accounts Receivable', debit: 0, credit: amount },
+      ]), ...s.gl];
+      patch = { payment: pe };
+    }
+    const salesOrders = s.salesOrders.map((x) => (x.id === id ? { ...x, status: next, ...patch } : x));
+    return { ...s, salesOrders, items, gl, stockLedger };
+  });
+
+  // Advance a purchase order through procure-to-pay. Receipt moves stock and
+  // recognises the liability via a "Stock Received Not Billed" clearing account
+  // (perpetual inventory, as ERPNext does); billing moves it to Accounts Payable.
+  const advancePO = (id: string) => setD((s) => {
+    if (!s) return s;
+    const o = s.purchaseOrders.find((x) => x.id === id);
+    if (!o) return s;
+    const i = PO_FLOW.indexOf(o.status);
+    if (i < 0 || i >= PO_FLOW.length - 1) return s;
+    const next = PO_FLOW[i + 1];
+    const itemById = Object.fromEntries(s.items.map((it) => [it.id, it]));
+    const amount = orderTotal(o.lines);
+    const party = s.suppliers.find((c) => c.id === o.supplierId)?.name;
+    let items = s.items, gl = s.gl, stockLedger = s.stockLedger;
+    let patch: Partial<PurchaseOrder> = {};
+
+    if (o.status === 'To Receive') {
+      const pr = stamp('PR', 7500 + s.purchaseOrders.filter((x) => x.receipt).length + 1);
+      items = s.items.map((it) => {
+        const line = o.lines.find((l) => l.itemId === it.id);
+        return line ? { ...it, stock: it.stock + line.qty } : it;
+      });
+      stockLedger = [
+        ...o.lines.map((l) => stockMove(l.itemId, l.qty, l.rate, 'Purchase Receipt', pr.number, itemById[l.itemId]?.warehouse ?? 'Main Store')),
+        ...s.stockLedger,
+      ];
+      gl = [glEntry('Purchase Receipt', pr.number, party, [
+        { account: 'Inventory', debit: amount, credit: 0 },
+        { account: 'Stock Received Not Billed', debit: 0, credit: amount },
+      ]), ...s.gl];
+      patch = { receipt: pr };
+    } else if (o.status === 'To Bill') {
+      const bill = stamp('PINV', 8500 + s.purchaseOrders.filter((x) => x.bill).length + 1);
+      gl = [glEntry('Purchase Invoice', bill.number, party, [
+        { account: 'Stock Received Not Billed', debit: amount, credit: 0 },
+        { account: 'Accounts Payable', debit: 0, credit: amount },
+      ]), ...s.gl];
+      patch = { bill };
+    } else if (o.status === 'To Pay') {
+      const pe = stamp('PE', 9500 + s.purchaseOrders.filter((x) => x.payment).length + 1);
+      gl = [glEntry('Payment Entry', pe.number, party, [
+        { account: 'Accounts Payable', debit: amount, credit: 0 },
+        { account: 'Bank', debit: 0, credit: amount },
+      ]), ...s.gl];
+      patch = { payment: pe };
+    }
+    const purchaseOrders = s.purchaseOrders.map((x) => (x.id === id ? { ...x, status: next, ...patch } : x));
+    return { ...s, purchaseOrders, items, gl, stockLedger };
+  });
   // Produce a batch: consume BOM components from stock, add finished goods
   // (ERPNext BOM → Work Order → Stock Entry).
   const produceWO = (id: string) => setD((s) => {
@@ -283,15 +392,31 @@ function Dashboard({ d, go }: { d: ErpData; go: (t: Tab) => void }) {
 
 // ── Accounting ───────────────────────────────────────────────────────────────
 function Accounting({ d }: { d: ErpData }) {
-  const income = d.accounts.filter((a) => a.type === 'Income').reduce((s, a) => s + a.balance, 0);
-  const expense = d.accounts.filter((a) => a.type === 'Expense').reduce((s, a) => s + a.balance, 0);
+  // Every balance is derived live from opening balances + the general ledger.
+  const bal = useMemo(() => accountBalances(d.accounts, d.gl), [d.accounts, d.gl]);
+  const sumType = (t: AcctType) => d.accounts.filter((a) => a.type === t).reduce((s, a) => s + (bal[a.name] ?? 0), 0);
+  const income = sumType('Income');
+  const expense = sumType('Expense');
   const profit = income - expense;
+  const assets = sumType('Asset');
+  const liabilities = sumType('Liability');
+  const equityBooked = sumType('Equity');
+  // Balance the sheet: Assets = Liabilities + Equity + current-year earnings.
+  const retained = assets - liabilities - equityBooked - profit;
+  const equityTotal = equityBooked + profit + retained;
   const byType = (t: AcctType) => d.accounts.filter((a) => a.type === t);
+
+  // Flatten live GL postings into ledger rows (newest first), then history.
+  const glRows = d.gl.flatMap((e) => e.lines.map((l, k) => ({ key: `${e.id}-${k}`, live: true, date: e.date, voucher: e.voucherType, ref: e.voucherNo, account: l.account, debit: l.debit, credit: l.credit })));
+  const histRows = d.journal.map((j) => ({ key: j.id, live: false, date: j.date, voucher: j.voucher, ref: '', account: j.account, debit: j.debit, credit: j.credit }));
+  const totalDr = glRows.reduce((s, r) => s + r.debit, 0);
+  const totalCr = glRows.reduce((s, r) => s + r.credit, 0);
+  const sheetBalanced = Math.abs(assets - (liabilities + equityTotal)) < 1;
 
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className={`${card} p-6 lg:col-span-1`}>
+        <div className={`${card} p-6`}>
           <h3 className="font-display text-lg text-white">Profit &amp; Loss</h3>
           <div className="mt-4 space-y-2 text-sm">
             <Line label="Income" value={money(income)} />
@@ -305,15 +430,30 @@ function Accounting({ d }: { d: ErpData }) {
           </div>
         </div>
 
-        <div className={`${card} p-6 lg:col-span-2`}>
+        <div className={`${card} p-6`}>
+          <div className="flex items-center justify-between">
+            <h3 className="font-display text-lg text-white">Balance sheet</h3>
+            <span className={`rounded-full border px-2 py-0.5 text-[11px] ${sheetBalanced ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300' : 'border-rose-500/30 bg-rose-500/15 text-rose-300'}`}>{sheetBalanced ? 'In balance ✓' : 'Out of balance'}</span>
+          </div>
+          <div className="mt-4 space-y-2 text-sm">
+            <Line label="Total assets" value={money(assets)} />
+            <div className="my-2 border-t border-white/10" />
+            <Line label="Liabilities" value={money(liabilities)} muted />
+            <Line label="Equity + earnings" value={money(equityTotal)} muted />
+            <div className="my-2 border-t border-white/10" />
+            <div className="flex justify-between font-medium"><span className="text-white">Liabilities + equity</span><span className="text-white tabular-nums">{money(liabilities + equityTotal)}</span></div>
+          </div>
+        </div>
+
+        <div className={`${card} p-6`}>
           <h3 className="font-display text-lg text-white">Chart of accounts</h3>
-          <div className="mt-3 space-y-4">
+          <div className="mt-3 max-h-72 space-y-4 overflow-y-auto pr-1">
             {ACCT_ORDER.map((t) => (
               <div key={t}>
                 <div className="text-xs uppercase tracking-wide text-[var(--muted)]">{t}</div>
                 <div className="mt-1 divide-y divide-white/5">
                   {byType(t).map((a) => (
-                    <div key={a.name} className="flex justify-between py-1.5 text-sm"><span className="text-[var(--text)]">{a.name}</span><span className="text-white tabular-nums">{money(a.balance)}</span></div>
+                    <div key={a.name} className="flex justify-between py-1.5 text-sm"><span className="text-[var(--text)]">{a.name}</span><span className="text-white tabular-nums">{money(bal[a.name] ?? 0)}</span></div>
                   ))}
                 </div>
               </div>
@@ -323,20 +463,31 @@ function Accounting({ d }: { d: ErpData }) {
       </div>
 
       <div className={`${card} overflow-hidden`}>
-        <div className="border-b border-white/10 p-4"><h3 className="font-display text-lg text-white">Recent journal entries</h3></div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 p-4">
+          <h3 className="font-display text-lg text-white">General ledger</h3>
+          {glRows.length > 0 ? (
+            <span className="inline-flex items-center gap-2 text-xs text-[var(--muted)]">
+              <span className="rounded-full border border-[var(--brand-bright)]/30 bg-[var(--brand-bright)]/10 px-2 py-0.5 text-[var(--brand-bright)]">{d.gl.length} posted this session</span>
+              Dr {money(totalDr)} = Cr {money(totalCr)} {totalDr === totalCr ? '✓' : '⚠'}
+            </span>
+          ) : (
+            <span className="text-xs text-[var(--muted)]">Advance a sales or purchase order to post live entries →</span>
+          )}
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-[var(--bg-soft)] text-xs uppercase tracking-wide text-[var(--muted)]">
-              <tr><th className="px-4 py-3 font-medium">Date</th><th className="px-4 py-3 font-medium">Voucher</th><th className="px-4 py-3 font-medium">Account</th><th className="px-4 py-3 text-right font-medium">Debit</th><th className="px-4 py-3 text-right font-medium">Credit</th></tr>
+              <tr><th className="px-4 py-3 font-medium">Date</th><th className="px-4 py-3 font-medium">Voucher</th><th className="px-4 py-3 font-medium">Reference</th><th className="px-4 py-3 font-medium">Account</th><th className="px-4 py-3 text-right font-medium">Debit</th><th className="px-4 py-3 text-right font-medium">Credit</th></tr>
             </thead>
             <tbody>
-              {d.journal.map((j) => (
-                <tr key={j.id} className="border-t border-white/5">
-                  <td className="px-4 py-2.5 text-[var(--muted)]">{fmtDate(j.date)}</td>
-                  <td className="px-4 py-2.5 text-[var(--text)]">{j.voucher}</td>
-                  <td className="px-4 py-2.5 text-[var(--text)]">{j.account}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-white">{j.debit ? money(j.debit) : '—'}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-white">{j.credit ? money(j.credit) : '—'}</td>
+              {[...glRows, ...histRows].slice(0, 40).map((r) => (
+                <tr key={r.key} className={`border-t border-white/5 ${r.live ? 'bg-[var(--brand-bright)]/[0.04]' : ''}`}>
+                  <td className="px-4 py-2.5 text-[var(--muted)]">{fmtDate(r.date)}</td>
+                  <td className="px-4 py-2.5 text-[var(--text)]">{r.voucher}</td>
+                  <td className="px-4 py-2.5 text-xs text-[var(--muted)]">{r.ref || '—'}</td>
+                  <td className="px-4 py-2.5 text-[var(--text)]">{r.account}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-white">{r.debit ? money(r.debit) : '—'}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-white">{r.credit ? money(r.credit) : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -348,6 +499,26 @@ function Accounting({ d }: { d: ErpData }) {
 }
 function Line({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return <div className="flex justify-between"><span className="text-[var(--muted)]">{label}</span><span className={muted ? 'text-[var(--muted)] tabular-nums' : 'text-white tabular-nums'}>{value}</span></div>;
+}
+
+// The linked-document trail on an order: a filled chip once each document exists.
+function DocTrail({ stamps }: { stamps: [string, DocStamp | undefined][] }) {
+  if (!stamps.some(([, s]) => s)) return <span className="text-xs text-[var(--muted)]">—</span>;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {stamps.map(([label, s], i) => (
+        <span key={label} className="inline-flex items-center gap-1">
+          {i > 0 && <ChevronRight size={11} className="text-[var(--muted)]/50" />}
+          <span
+            className={`rounded border px-1.5 py-0.5 text-[10px] ${s ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-white/10 text-[var(--muted)]/60'}`}
+            title={s ? s.number : `${label} — not yet created`}
+          >
+            {s ? s.number : label}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 // ── Inventory ────────────────────────────────────────────────────────────────
@@ -461,23 +632,25 @@ function Sales({ d, onAdvance, onConvertQuote }: { d: ErpData; onAdvance: (id: s
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-white/10">
-        <div className="border-b border-white/10 bg-[var(--surface)] px-4 py-3"><h3 className="text-sm font-medium text-white">Sales orders</h3></div>
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <div className="flex items-center gap-2 border-b border-white/10 bg-[var(--surface)] px-4 py-3">
+          <h3 className="text-sm font-medium text-white">Sales orders</h3>
+          <span className="text-xs text-[var(--muted)]">— walk one through Deliver → Invoice → Payment; each step posts to the ledger</span>
+        </div>
+        <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
-            <tr><th className="px-4 py-3 font-medium">Order</th><th className="px-4 py-3 font-medium">Customer</th><th className="px-4 py-3 font-medium">Date</th><th className="px-4 py-3 text-right font-medium">Amount</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
+            <tr><th className="px-4 py-3 font-medium">Order</th><th className="px-4 py-3 font-medium">Customer</th><th className="px-4 py-3 font-medium">Documents</th><th className="px-4 py-3 text-right font-medium">Amount</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
           </thead>
           <tbody>
             {d.salesOrders.map((o) => {
-              const canAdvance = o.status !== 'Completed' && o.status !== 'Cancelled';
-              const nextLabel = o.status === 'Draft' ? 'Submit' : o.status === 'To Deliver' ? 'Deliver' : o.status === 'To Bill' ? 'Bill' : '';
+              const label = SO_ACTION[o.status];
               return (
                 <tr key={o.id} className="border-t border-white/5">
-                  <td className="px-4 py-3 font-medium text-white">{o.number}</td>
+                  <td className="px-4 py-3"><div className="font-medium text-white">{o.number}</div><div className="text-xs text-[var(--muted)]">{fmtDate(o.date)}</div></td>
                   <td className="px-4 py-3 text-[var(--muted)]">{cust[o.customerId]?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-[var(--muted)]">{fmtDate(o.date)}</td>
+                  <td className="px-4 py-3"><DocTrail stamps={[['DN', o.deliveryNote], ['Inv', o.salesInvoice], ['Pay', o.payment]]} /></td>
                   <td className="px-4 py-3 text-right tabular-nums text-white">{money(orderTotal(o.lines))}</td>
                   <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${SO_STYLE[o.status]}`}>{o.status}</span></td>
-                  <td className="px-4 py-3 text-right">{canAdvance && nextLabel && <button onClick={() => onAdvance(o.id)} className="rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white">{nextLabel}</button>}</td>
+                  <td className="px-4 py-3 text-right">{label && <button onClick={() => onAdvance(o.id)} className="whitespace-nowrap rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white">{label}</button>}</td>
                 </tr>
               );
             })}
@@ -531,21 +704,25 @@ function Buying({ d, onAdvance, onConvertMR }: { d: ErpData; onAdvance: (id: str
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="overflow-x-auto rounded-2xl border border-white/10">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <div className="flex items-center gap-2 border-b border-white/10 bg-[var(--surface)] px-4 py-3">
+            <h3 className="text-sm font-medium text-white">Purchase orders</h3>
+            <span className="text-xs text-[var(--muted)]">— Receive → Bill → Pay; receipt moves stock &amp; posts the ledger</span>
+          </div>
+          <table className="w-full min-w-[620px] text-left text-sm">
             <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
-              <tr><th className="px-4 py-3 font-medium">Order</th><th className="px-4 py-3 font-medium">Supplier</th><th className="px-4 py-3 text-right font-medium">Amount</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
+              <tr><th className="px-4 py-3 font-medium">Order</th><th className="px-4 py-3 font-medium">Supplier</th><th className="px-4 py-3 font-medium">Documents</th><th className="px-4 py-3 text-right font-medium">Amount</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
             </thead>
             <tbody>
               {d.purchaseOrders.map((o) => {
-                const canAdvance = o.status !== 'Completed';
-                const nextLabel = o.status === 'Draft' ? 'Submit' : o.status === 'To Receive' ? 'Receive' : o.status === 'To Bill' ? 'Bill' : '';
+                const label = PO_ACTION[o.status];
                 return (
                   <tr key={o.id} className="border-t border-white/5">
                     <td className="px-4 py-3 font-medium text-white">{o.number}</td>
                     <td className="px-4 py-3 text-[var(--muted)]">{sup[o.supplierId]?.name ?? '—'}</td>
+                    <td className="px-4 py-3"><DocTrail stamps={[['PR', o.receipt], ['Bill', o.bill], ['Pay', o.payment]]} /></td>
                     <td className="px-4 py-3 text-right tabular-nums text-white">{money(orderTotal(o.lines))}</td>
                     <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${PO_STYLE[o.status]}`}>{o.status}</span></td>
-                    <td className="px-4 py-3 text-right">{canAdvance && nextLabel && <button onClick={() => onAdvance(o.id)} className="rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white">{nextLabel}</button>}</td>
+                    <td className="px-4 py-3 text-right">{label && <button onClick={() => onAdvance(o.id)} className="whitespace-nowrap rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white">{label}</button>}</td>
                   </tr>
                 );
               })}

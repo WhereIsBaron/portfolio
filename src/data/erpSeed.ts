@@ -43,13 +43,23 @@ export type Customer = { id: string; name: string; group: string; outstanding: n
 export type Supplier = { id: string; name: string; category: string; outstanding: number; logo: string };
 
 export type OrderLine = { itemId: string; qty: number; rate: number };
-export type SOStatus = 'Draft' | 'To Deliver' | 'To Bill' | 'Completed' | 'Cancelled';
-export const SO_FLOW: SOStatus[] = ['Draft', 'To Deliver', 'To Bill', 'Completed'];
-export type SalesOrder = { id: string; number: string; customerId: string; date: number; lines: OrderLine[]; status: SOStatus };
 
-export type POStatus = 'Draft' | 'To Receive' | 'To Bill' | 'Completed';
-export const PO_FLOW: POStatus[] = ['Draft', 'To Receive', 'To Bill', 'Completed'];
-export type PurchaseOrder = { id: string; number: string; supplierId: string; date: number; lines: OrderLine[]; status: POStatus };
+// A document stamp left on an order as its lifecycle advances — the number and
+// date of the Delivery Note / Sales Invoice / Payment Entry it generated. This
+// is how ERPNext threads one transaction through several linked documents.
+export type DocStamp = { number: string; date: number };
+
+// Full order-to-cash lifecycle: Sales Order → Delivery Note → Sales Invoice →
+// Payment Entry. Each step posts to the general ledger (and delivery moves stock).
+export type SOStatus = 'Draft' | 'To Deliver' | 'To Bill' | 'To Pay' | 'Completed' | 'Cancelled';
+export const SO_FLOW: SOStatus[] = ['Draft', 'To Deliver', 'To Bill', 'To Pay', 'Completed'];
+export type SalesOrder = { id: string; number: string; customerId: string; date: number; lines: OrderLine[]; status: SOStatus; deliveryNote?: DocStamp; salesInvoice?: DocStamp; payment?: DocStamp };
+
+// Full procure-to-pay lifecycle: Purchase Order → Purchase Receipt → Purchase
+// Invoice → Payment Entry. Receipt moves stock; each step posts to the ledger.
+export type POStatus = 'Draft' | 'To Receive' | 'To Bill' | 'To Pay' | 'Completed';
+export const PO_FLOW: POStatus[] = ['Draft', 'To Receive', 'To Bill', 'To Pay', 'Completed'];
+export type PurchaseOrder = { id: string; number: string; supplierId: string; date: number; lines: OrderLine[]; status: POStatus; receipt?: DocStamp; bill?: DocStamp; payment?: DocStamp };
 
 export type WOStatus = 'Not Started' | 'In Process' | 'Completed';
 // A Bill of Materials line: how much of a raw-material item is consumed per
@@ -82,8 +92,40 @@ export type Asset = {
 };
 
 export type AcctType = 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense';
+// `balance` here is the OPENING balance (all history before the session). Live
+// postings are held in the general ledger and layered on top — see accountBalances.
 export type Account = { name: string; type: AcctType; balance: number };
 export type JournalEntry = { id: string; date: number; voucher: string; account: string; debit: number; credit: number };
+
+// ── General ledger ───────────────────────────────────────────────────────────
+// Every posting is a balanced set of lines (total debits === total credits).
+// This is the single source of truth the financial statements are derived from.
+export type GLLine = { account: string; debit: number; credit: number };
+export type GLEntry = { id: string; date: number; voucherType: string; voucherNo: string; party?: string; lines: GLLine[] };
+
+// Debit-normal account types carry their balance on the debit side.
+const DEBIT_NORMAL = new Set<AcctType>(['Asset', 'Expense']);
+
+export const accountTypes = (accounts: Account[]): Record<string, AcctType> =>
+  Object.fromEntries(accounts.map((a) => [a.name, a.type]));
+
+// Live balance for every account: opening balance + the effect of all GL
+// postings. Debit-normal accounts move up on debits, credit-normal on credits.
+export function accountBalances(accounts: Account[], gl: GLEntry[]): Record<string, number> {
+  const type = accountTypes(accounts);
+  const bal: Record<string, number> = {};
+  for (const a of accounts) bal[a.name] = a.balance;
+  for (const e of gl)
+    for (const l of e.lines) {
+      const debitNormal = DEBIT_NORMAL.has(type[l.account] ?? 'Asset');
+      bal[l.account] = (bal[l.account] ?? 0) + (debitNormal ? l.debit - l.credit : l.credit - l.debit);
+    }
+  return bal;
+}
+
+// A stock-ledger entry: one movement of one item, valued. Item on-hand stock and
+// inventory valuation are both derived from the running stock ledger (ERPNext).
+export type StockEntry = { id: string; date: number; itemId: string; qty: number; rate: number; voucherType: string; voucherNo: string; warehouse: string };
 
 export type ErpData = {
   items: Item[];
@@ -101,6 +143,8 @@ export type ErpData = {
   assets: Asset[];
   accounts: Account[];
   journal: JournalEntry[];
+  gl: GLEntry[];
+  stockLedger: StockEntry[];
   monthly: { label: string; revenue: number; expenses: number }[];
   productsSource: 'DummyJSON' | 'fallback';
   peopleSource: 'randomuser.me' | 'fallback';
@@ -371,6 +415,7 @@ function buildErpData(
     { name: 'Inventory', type: 'Asset', balance: stockValue },
     { name: 'Fixed Assets', type: 'Asset', balance: assets.reduce((s, a) => s + a.purchaseValue, 0) },
     { name: 'Accounts Payable', type: 'Liability', balance: payable },
+    { name: 'Stock Received Not Billed', type: 'Liability', balance: 0 },
     { name: 'Loans', type: 'Liability', balance: rint(rng, 50, 200) * 1000 },
     { name: 'Share Capital', type: 'Equity', balance: rint(rng, 200, 400) * 1000 },
     { name: 'Retained Earnings', type: 'Equity', balance: netProfit },
@@ -401,7 +446,8 @@ function buildErpData(
   return {
     items, warehouses: WAREHOUSES, customers, suppliers, quotations, salesOrders,
     materialRequests, purchaseOrders, workOrders, employees, departments: DEPARTMENTS,
-    projects, assets, accounts, journal, monthly, productsSource, peopleSource,
+    projects, assets, accounts, journal, gl: [], stockLedger: [], monthly,
+    productsSource, peopleSource,
   };
 }
 
