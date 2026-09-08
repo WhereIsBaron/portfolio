@@ -26,6 +26,19 @@ const setFlag = (k: string) => {
   }
 };
 
+// The campaign/referral tag that brought this visit — so the owner can tell
+// which job application or posting was actually opened. Reads ?ref= first, then
+// the standard utm_source / utm_campaign. Trimmed and length-capped; '' when none.
+function campaignTag(): string {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const tag = q.get('ref') || q.get('utm_source') || q.get('utm_campaign') || '';
+    return tag.trim().slice(0, 80);
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Returns the global site-visit total, or null while loading / if it can't be
  * fetched. On the first load of a browser session it POSTs to the `track`
@@ -80,6 +93,7 @@ export function useVisitCount(): number | null {
           body: JSON.stringify({
             referrer: document.referrer || '',
             path: window.location.pathname || '/',
+            campaign: campaignTag(),
           }),
         });
         const data = await res.json();

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   BarChart3, X, Loader2, RefreshCw, Users, Radio, Globe, TrendingUp,
-  ArrowUpRight, ArrowDownRight, Minus,
+  ArrowUpRight, ArrowDownRight, Minus, Tag,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -14,6 +14,7 @@ type VisitEvent = {
   referrer: string | null;
   path: string | null;
   country: string | null;
+  campaign: string | null;
 };
 
 const DAY = 86_400_000;
@@ -262,7 +263,7 @@ export default function VisitorInsights() {
     const cutoff = new Date(Date.now() - 90 * DAY).toISOString();
     const { data, error } = await supabase
       .from('visit_events')
-      .select('ts,ip,user_agent,referrer,path,country')
+      .select('ts,ip,user_agent,referrer,path,country,campaign')
       .gte('ts', cutoff)
       .order('ts', { ascending: false })
       .limit(10000);
@@ -338,6 +339,22 @@ export default function VisitorInsights() {
     ).size;
     const perDay = days.length ? Math.round((inRange.length / days.length) * 10) / 10 : 0;
 
+    // Campaign / referral tags — which shared link actually got opened. One row
+    // per tag: visits, unique visitors, and when it was last seen.
+    const campMap = new Map<string, { visits: number; ips: Set<string>; last: number }>();
+    for (const r of inRange) {
+      const tag = (r.campaign || '').trim();
+      if (!tag) continue;
+      const e = campMap.get(tag) ?? { visits: 0, ips: new Set<string>(), last: 0 };
+      e.visits += 1;
+      e.ips.add(r.ip ?? 'unknown');
+      e.last = Math.max(e.last, new Date(r.ts).getTime());
+      campMap.set(tag, e);
+    }
+    const campaigns = [...campMap.entries()]
+      .map(([tag, e]) => ({ tag, visits: e.visits, uniques: e.ips.size, last: e.last }))
+      .sort((a, b) => b.last - a.last);
+
     return {
       days,
       total: inRange.length,
@@ -356,6 +373,7 @@ export default function VisitorInsights() {
       devices: topCounts(inRange, (r) => deviceOf(r.user_agent), 3),
       browsers: topCounts(inRange, (r) => browserOf(r.user_agent), 5),
       countries: topCounts(inRange, (r) => r.country || 'Unknown', 6, (k) => flag(k === 'Unknown' ? null : k)),
+      campaigns,
       recent: inRange.slice(0, 12),
     };
   }, [rows, range]);
@@ -448,6 +466,36 @@ export default function VisitorInsights() {
                       )}
                     </div>
                     <TrendChart series={stats.days} />
+                  </div>
+
+                  {/* Campaign tags — which shared link actually got opened */}
+                  <div className="rounded-xl border border-white/10 p-4">
+                    <div className="mb-1 flex items-center justify-between">
+                      <h3 className="flex items-center gap-1.5 text-sm font-medium text-white">
+                        <Tag size={14} /> Visits by campaign
+                      </h3>
+                      <span className="text-xs text-[var(--muted)]">Tag a link with <code className="text-[var(--brand-bright)]">?ref=name</code></span>
+                    </div>
+                    {stats.campaigns.length === 0 ? (
+                      <p className="py-4 text-center text-xs text-[var(--muted)]">
+                        No tagged links opened yet. Share <code className="text-[var(--brand-bright)]">?ref=acme</code> on an application to see it here.
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-white/5">
+                        {stats.campaigns.map((c) => (
+                          <div key={c.tag} className="flex items-center justify-between gap-3 py-2">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="rounded-md bg-[var(--brand-bright)]/12 px-2 py-0.5 font-mono text-xs text-[var(--brand-bright)]">{c.tag}</span>
+                            </span>
+                            <span className="flex shrink-0 items-center gap-3 text-xs text-[var(--muted)]">
+                              <span className="tabular-nums text-[var(--text)]">{c.visits} visit{c.visits === 1 ? '' : 's'}</span>
+                              <span className="tabular-nums">{c.uniques} unique</span>
+                              <span className="hidden sm:inline">last {when(new Date(c.last).toISOString())}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Breakdowns */}

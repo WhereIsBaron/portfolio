@@ -96,6 +96,7 @@ export default async (req: Request, context: any): Promise<Response> => {
   const referrer = typeof body.referrer === 'string' ? body.referrer.slice(0, 500) : '';
   const path = typeof body.path === 'string' ? body.path.slice(0, 300) : '';
   const country = clientCountry(req, context).slice(0, 4);
+  const campaign = typeof body.campaign === 'string' ? body.campaign.slice(0, 80) : '';
 
   // Excluded visitor (owner/teammate/bot/cloud browser) → don't record, but still
   // return the current total so the footer counter shows a number.
@@ -111,7 +112,7 @@ export default async (req: Request, context: any): Promise<Response> => {
         Authorization: `Bearer ${key}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ client_ip: ip, ua, referrer, path, country }),
+      body: JSON.stringify({ client_ip: ip, ua, referrer, path, country, campaign }),
     });
     if (!res.ok) return json(200, { total: null });
     const total = await res.json();
