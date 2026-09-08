@@ -62,9 +62,11 @@ export default function PrivacyPolicy() {
           <ul className="list-disc space-y-2 pl-5">
             <li>
               <strong className="text-white">Visit statistics.</strong> When you open the site, it
-              records your IP address, your browser type (user agent), the page you landed on, and
-              the site you came from (referrer). This is used to understand how many people visit and
-              where they come from. A small running total of visits is shown in the footer.
+              records your IP address, your browser type (user agent), the page you landed on, the
+              site you came from (referrer), and an approximate country derived from your IP. This is
+              used to understand how many people visit and where they come from, shown only to the
+              site owner in a private dashboard. A small running total of visits is shown in the
+              footer. There are no third-party analytics — the data stays in the site&apos;s own database.
             </li>
             <li>
               <strong className="text-white">Chat assistant.</strong> If you use the chat assistant,

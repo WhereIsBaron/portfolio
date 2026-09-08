@@ -25,7 +25,25 @@ const json = (status: number, body: unknown) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
-export default async (req: Request): Promise<Response> => {
+// Netlify injects visitor geo on the function context (context.geo.country.code)
+// with no third party or extra request. Fall back to the x-nf-geo header (JSON)
+// or x-country. Returns '' when geo isn't available.
+function clientCountry(req: Request, context: any): string {
+  const code = context?.geo?.country?.code;
+  if (typeof code === 'string' && code) return code;
+  try {
+    const raw = req.headers.get('x-nf-geo');
+    if (raw) {
+      const geo = JSON.parse(raw);
+      if (geo?.country?.code) return String(geo.country.code);
+    }
+  } catch {
+    /* header absent or not JSON */
+  }
+  return (req.headers.get('x-country') || '').trim();
+}
+
+export default async (req: Request, context: any): Promise<Response> => {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
 
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -43,6 +61,7 @@ export default async (req: Request): Promise<Response> => {
   const ua = (req.headers.get('user-agent') || '').slice(0, 500);
   const referrer = typeof body.referrer === 'string' ? body.referrer.slice(0, 500) : '';
   const path = typeof body.path === 'string' ? body.path.slice(0, 300) : '';
+  const country = clientCountry(req, context).slice(0, 4);
 
   try {
     const res = await fetch(`${url}/rest/v1/rpc/record_visit`, {
@@ -52,7 +71,7 @@ export default async (req: Request): Promise<Response> => {
         Authorization: `Bearer ${key}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ client_ip: ip, ua, referrer, path }),
+      body: JSON.stringify({ client_ip: ip, ua, referrer, path, country }),
     });
     if (!res.ok) return json(200, { total: null });
     const total = await res.json();
