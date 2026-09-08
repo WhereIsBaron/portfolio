@@ -197,12 +197,12 @@ export const projects: Project[] = [
     name: 'ERP System',
     category: 'Product',
     description:
-      'A full enterprise resource-planning suite simulated end to end, modelled on systems like ERPNext: double-entry accounting with a chart of accounts and journal, inventory with warehouses and stock valuation, sales and purchase order flows, manufacturing work orders, HR and payroll, project tracking, and a fixed-asset register with depreciation — all feeding a live financial dashboard. Real products and people are pulled from public APIs so the data feels genuine.',
+      'A full enterprise resource-planning suite simulated end to end, modelled on systems like ERPNext: a live double-entry general ledger that derives the P&L and balance sheet, cascading sales/purchase document chains with VAT, a perpetual stock ledger, manufacturing with routings and built-up valuation, payroll runs, HR, projects, and a depreciating fixed-asset register — all feeding a live financial dashboard. Real products and people are pulled from public APIs so the data feels genuine.',
     year: '2026 - Present',
     tags: ['React', 'TypeScript', 'Public APIs', 'Supabase (next)'],
     highlights: [
-      'Eleven interactive modules covering the real ERPNext document chains: quotation → sales order → delivery, material request → purchase order, and BOM → work order → stock movement.',
-      'Everything runs: convert a quotation to an order, raise a purchase order from a low-stock material request, produce a manufacturing batch that consumes its bill of materials and adds finished stock — accounts and reports update as you go.',
+      'A real double-entry general ledger: every action — deliver, invoice, receive, pay, manufacture, run payroll — posts balanced entries, and the P&L, balance sheet and chart of accounts are derived live from them (the sheet stays in balance as you go).',
+      'Full document chains with VAT: sales order → delivery note → tax invoice → payment (and PO → receipt → bill → payment), plus a manufacturing routing that consumes a BOM, applies workstation labour/overhead, and values the finished good at material + operating cost — all traced through a perpetual stock ledger.',
       'Inventory items come live from DummyJSON and staff from randomuser.me, layered on a seeded generator; a Supabase-backed version with persisted records is next.',
     ],
     route: '/erp',

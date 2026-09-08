@@ -65,7 +65,14 @@ export type WOStatus = 'Not Started' | 'In Process' | 'Completed';
 // A Bill of Materials line: how much of a raw-material item is consumed per
 // unit of the finished good (ERPNext BOM → Work Order → Stock Entry).
 export type BomLine = { itemId: string; qtyPerUnit: number };
-export type WorkOrder = { id: string; number: string; itemId: string; qty: number; produced: number; status: WOStatus; due: number; bom: BomLine[] };
+// A routing operation: labour/overhead applied on a workstation. Its cost is
+// capitalised into the finished good's valuation (ERPNext operating cost).
+export type WorkOrderOperation = { operation: string; workstation: string; hoursPerUnit: number; hourlyRate: number };
+export type WorkOrder = { id: string; number: string; itemId: string; qty: number; produced: number; status: WOStatus; due: number; bom: BomLine[]; operations: WorkOrderOperation[] };
+// Standard SA VAT rate, applied on sales & purchase invoices.
+export const VAT_RATE = 0.15;
+// Operating (labour + overhead) cost to make one finished unit.
+export const opCostPerUnit = (ops: WorkOrderOperation[]) => ops.reduce((t, o) => t + o.hoursPerUnit * o.hourlyRate, 0);
 
 // Quotation → Sales Order (ERPNext selling flow).
 export type QuoteStatus = 'Draft' | 'Submitted' | 'Ordered' | 'Lost';
@@ -90,6 +97,10 @@ export type Asset = {
   id: string; name: string; category: string; purchaseValue: number; purchaseDate: number;
   life: number; status: 'In Use' | 'Idle' | 'Scrapped';
 };
+
+// A payroll run: one salary slip per employee, posted to the ledger as a batch.
+export type SalarySlip = { employeeId: string; name: string; gross: number; paye: number; uif: number; net: number };
+export type PayrollRun = { id: string; number: string; period: string; date: number; slips: SalarySlip[] };
 
 export type AcctType = 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense';
 // `balance` here is the OPENING balance (all history before the session). Live
@@ -145,6 +156,7 @@ export type ErpData = {
   journal: JournalEntry[];
   gl: GLEntry[];
   stockLedger: StockEntry[];
+  payrollRuns: PayrollRun[];
   monthly: { label: string; revenue: number; expenses: number }[];
   productsSource: 'DummyJSON' | 'fallback';
   peopleSource: 'randomuser.me' | 'fallback';
@@ -170,6 +182,17 @@ const SUPPLIER_NAMES = [
   'EverGreen Materials', 'TechParts Distribution', 'Unity Freight', 'Delta Raw Goods',
 ];
 const SUPPLIER_CATS = ['Raw materials', 'Packaging', 'Components', 'Logistics', 'Services'];
+// Routing catalogue: [operation, workstation, hourly rate]. Work orders pick a
+// short routing from this; each operation's labour is capitalised into stock.
+const OPERATIONS: [string, string, number][] = [
+  ['Cutting', 'Cutting Station', 45],
+  ['Machining', 'CNC Cell', 65],
+  ['Assembly', 'Assembly Line 1', 35],
+  ['Welding', 'Weld Bay', 55],
+  ['Finishing', 'Finishing Booth', 30],
+  ['Quality Check', 'QA Bench', 40],
+  ['Packaging', 'Packing Line', 25],
+];
 const ASSET_NAMES = [
   ['Delivery Van', 'Vehicles', 45000, 6], ['Forklift', 'Machinery', 28000, 8],
   ['CNC Machine', 'Machinery', 120000, 10], ['Office Fit-out', 'Furniture', 18000, 7],
@@ -310,6 +333,12 @@ function buildErpData(
     // A small BOM: 2–3 other items consumed per finished unit.
     const bom: BomLine[] = pickN(rng, items.filter((x) => x.id !== it.id), rint(rng, 2, 3))
       .map((c) => ({ itemId: c.id, qtyPerUnit: rint(rng, 1, 4) }));
+    // A short routing: 2–3 sequential operations on their workstations.
+    const operations: WorkOrderOperation[] = pickN(rng, OPERATIONS, rint(rng, 2, 3))
+      .map(([operation, workstation, hourlyRate]) => ({
+        operation, workstation, hourlyRate,
+        hoursPerUnit: Math.round((0.1 + rng() * 0.4) * 100) / 100,
+      }));
     return {
       id: `wo${i + 1}`,
       number: `MFG-WO-${4000 + i}`,
@@ -319,6 +348,7 @@ function buildErpData(
       status,
       due: now + (rint(rng, 0, 40) - 10) * day,
       bom,
+      operations,
     };
   });
 
@@ -416,12 +446,15 @@ function buildErpData(
     { name: 'Fixed Assets', type: 'Asset', balance: assets.reduce((s, a) => s + a.purchaseValue, 0) },
     { name: 'Accounts Payable', type: 'Liability', balance: payable },
     { name: 'Stock Received Not Billed', type: 'Liability', balance: 0 },
+    { name: 'VAT Payable', type: 'Liability', balance: 0 },
+    { name: 'Payroll Payable', type: 'Liability', balance: 0 },
     { name: 'Loans', type: 'Liability', balance: rint(rng, 50, 200) * 1000 },
     { name: 'Share Capital', type: 'Equity', balance: rint(rng, 200, 400) * 1000 },
     { name: 'Retained Earnings', type: 'Equity', balance: netProfit },
     { name: 'Sales Revenue', type: 'Income', balance: revenueYTD },
     { name: 'Service Revenue', type: 'Income', balance: rint(rng, 40, 120) * 1000 },
     { name: 'Cost of Goods Sold', type: 'Expense', balance: cogs },
+    { name: 'Manufacturing Overhead Applied', type: 'Expense', balance: 0 },
     { name: 'Salaries', type: 'Expense', balance: salaries * 6 },
     { name: 'Rent', type: 'Expense', balance: rint(rng, 8, 20) * 1000 * 6 },
     { name: 'Marketing', type: 'Expense', balance: rint(rng, 5, 25) * 1000 },
@@ -446,7 +479,7 @@ function buildErpData(
   return {
     items, warehouses: WAREHOUSES, customers, suppliers, quotations, salesOrders,
     materialRequests, purchaseOrders, workOrders, employees, departments: DEPARTMENTS,
-    projects, assets, accounts, journal, gl: [], stockLedger: [], monthly,
+    projects, assets, accounts, journal, gl: [], stockLedger: [], payrollRuns: [], monthly,
     productsSource, peopleSource,
   };
 }

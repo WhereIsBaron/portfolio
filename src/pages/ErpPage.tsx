@@ -8,11 +8,12 @@ import {
 } from 'lucide-react';
 import {
   fetchErpData, money, avatarFor, orderTotal, accountBalances,
-  WAREHOUSES, DEPARTMENTS, SO_FLOW, PO_FLOW,
+  WAREHOUSES, DEPARTMENTS, SO_FLOW, PO_FLOW, VAT_RATE, opCostPerUnit,
   type ErpData, type SalesOrder, type PurchaseOrder,
   type SOStatus, type POStatus, type WOStatus, type AcctType,
   type Quotation, type MaterialRequest, type QuoteStatus,
   type GLEntry, type GLLine, type StockEntry, type DocStamp, type OrderLine,
+  type SalarySlip, type PayrollRun,
 } from '@/data/erpSeed';
 
 type Tab =
@@ -143,17 +144,21 @@ export default function ErpPage() {
       ]), ...s.gl];
       patch = { deliveryNote: dn };
     } else if (o.status === 'To Bill') {
+      // Output VAT: customer owes net goods + 15% VAT, collected on behalf of SARS.
       const si = stamp('SINV', 8000 + s.salesOrders.filter((x) => x.salesInvoice).length + 1);
+      const tax = Math.round(amount * VAT_RATE);
       gl = [glEntry('Sales Invoice', si.number, party, [
-        { account: 'Accounts Receivable', debit: amount, credit: 0 },
+        { account: 'Accounts Receivable', debit: amount + tax, credit: 0 },
         { account: 'Sales Revenue', debit: 0, credit: amount },
+        { account: 'VAT Payable', debit: 0, credit: tax },
       ]), ...s.gl];
       patch = { salesInvoice: si };
     } else if (o.status === 'To Pay') {
       const pe = stamp('PE', 9000 + s.salesOrders.filter((x) => x.payment).length + 1);
+      const gross = amount + Math.round(amount * VAT_RATE);
       gl = [glEntry('Payment Entry', pe.number, party, [
-        { account: 'Bank', debit: amount, credit: 0 },
-        { account: 'Accounts Receivable', debit: 0, credit: amount },
+        { account: 'Bank', debit: gross, credit: 0 },
+        { account: 'Accounts Receivable', debit: 0, credit: gross },
       ]), ...s.gl];
       patch = { payment: pe };
     }
@@ -193,40 +198,92 @@ export default function ErpPage() {
       ]), ...s.gl];
       patch = { receipt: pr };
     } else if (o.status === 'To Bill') {
+      // Input VAT: reclaimable, so it debits (reduces) the VAT Payable liability.
       const bill = stamp('PINV', 8500 + s.purchaseOrders.filter((x) => x.bill).length + 1);
+      const tax = Math.round(amount * VAT_RATE);
       gl = [glEntry('Purchase Invoice', bill.number, party, [
         { account: 'Stock Received Not Billed', debit: amount, credit: 0 },
-        { account: 'Accounts Payable', debit: 0, credit: amount },
+        { account: 'VAT Payable', debit: tax, credit: 0 },
+        { account: 'Accounts Payable', debit: 0, credit: amount + tax },
       ]), ...s.gl];
       patch = { bill };
     } else if (o.status === 'To Pay') {
       const pe = stamp('PE', 9500 + s.purchaseOrders.filter((x) => x.payment).length + 1);
+      const gross = amount + Math.round(amount * VAT_RATE);
       gl = [glEntry('Payment Entry', pe.number, party, [
-        { account: 'Accounts Payable', debit: amount, credit: 0 },
-        { account: 'Bank', debit: 0, credit: amount },
+        { account: 'Accounts Payable', debit: gross, credit: 0 },
+        { account: 'Bank', debit: 0, credit: gross },
       ]), ...s.gl];
       patch = { payment: pe };
     }
     const purchaseOrders = s.purchaseOrders.map((x) => (x.id === id ? { ...x, status: next, ...patch } : x));
     return { ...s, purchaseOrders, items, gl, stockLedger };
   });
-  // Produce a batch: consume BOM components from stock, add finished goods
-  // (ERPNext BOM → Work Order → Stock Entry).
+  // Produce a batch (ERPNext BOM + routing → Manufacture Stock Entry). Consumes
+  // BOM components at their valuation rate, applies routing labour/overhead, and
+  // receives the finished good valued at material + operating cost. Posts a
+  // balanced Manufacture entry and moves the stock ledger.
   const produceWO = (id: string) => setD((s) => {
     if (!s) return s;
     const w = s.workOrders.find((x) => x.id === id);
     if (!w || w.status === 'Completed') return s;
     const batch = Math.min(w.qty - w.produced, Math.ceil(w.qty * 0.25));
     if (batch <= 0) return s;
+    const itemById = Object.fromEntries(s.items.map((it) => [it.id, it]));
+    const fg = itemById[w.itemId];
+    const materialCost = Math.round(w.bom.reduce((t, b) => t + (itemById[b.itemId]?.cost ?? 0) * b.qtyPerUnit * batch, 0));
+    const opCost = Math.round(opCostPerUnit(w.operations) * batch);
+    const fgValue = materialCost + opCost;
+    const fgRate = fgValue / batch;
+
     const items = s.items.map((it) => {
       if (it.id === w.itemId) return { ...it, stock: it.stock + batch };
       const line = w.bom.find((b) => b.itemId === it.id);
       return line ? { ...it, stock: Math.max(0, it.stock - line.qtyPerUnit * batch) } : it;
     });
+    const ste = stamp('MFG-STE', 8800 + s.gl.filter((e) => e.voucherType === 'Manufacture').length + 1);
+    const stockLedger = [
+      stockMove(w.itemId, batch, fgRate, 'Manufacture', ste.number, fg?.warehouse ?? 'Main Store'),
+      ...w.bom.map((b) => stockMove(b.itemId, -b.qtyPerUnit * batch, itemById[b.itemId]?.cost ?? 0, 'Manufacture', ste.number, itemById[b.itemId]?.warehouse ?? 'Main Store')),
+      ...s.stockLedger,
+    ];
+    const gl = [glEntry('Manufacture', ste.number, w.number, [
+      { account: 'Inventory', debit: fgValue, credit: 0 },
+      { account: 'Inventory', debit: 0, credit: materialCost },
+      { account: 'Manufacturing Overhead Applied', debit: 0, credit: opCost },
+    ]), ...s.gl];
+
     const produced = w.produced + batch;
     const status: WOStatus = produced >= w.qty ? 'Completed' : 'In Process';
     const workOrders = s.workOrders.map((x) => (x.id === id ? { ...x, produced, status } : x));
-    return { ...s, items, workOrders };
+    return { ...s, items, workOrders, gl, stockLedger };
+  });
+
+  // Run monthly payroll: one salary slip per active employee (gross → PAYE + UIF
+  // → net), posted as one batched Journal-style entry to the ledger.
+  const runPayroll = () => setD((s) => {
+    if (!s) return s;
+    const active = s.employees.filter((e) => e.status === 'Active');
+    if (!active.length) return s;
+    const slips: SalarySlip[] = active.map((e) => {
+      const gross = Math.round(e.salary / 12);
+      const paye = Math.round(gross * 0.18);
+      const uif = Math.round(gross * 0.01);
+      return { employeeId: e.id, name: e.name, gross, paye, uif, net: gross - paye - uif };
+    });
+    const gross = slips.reduce((t, x) => t + x.gross, 0);
+    const paye = slips.reduce((t, x) => t + x.paye, 0);
+    const uif = slips.reduce((t, x) => t + x.uif, 0);
+    const net = slips.reduce((t, x) => t + x.net, 0);
+    const period = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const run: PayrollRun = { id: `pay-${Date.now()}`, number: `PAY-${5000 + s.payrollRuns.length + 1}`, period, date: Date.now(), slips };
+    // Dr Salaries (full cost); Cr Bank (net paid), Cr PAYE + UIF withheld (liabilities).
+    const gl = [glEntry('Payroll', run.number, period, [
+      { account: 'Salaries', debit: gross, credit: 0 },
+      { account: 'Bank', debit: 0, credit: net },
+      { account: 'Payroll Payable', debit: 0, credit: paye + uif },
+    ]), ...s.gl];
+    return { ...s, payrollRuns: [run, ...s.payrollRuns], gl };
   });
   const restock = (id: string) => setD((s) => !s ? s : ({ ...s, items: s.items.map((it) =>
     it.id === id ? { ...it, stock: it.reorder * 3 } : it) }));
@@ -297,7 +354,7 @@ export default function ErpPage() {
               {tab === 'sales' && <Sales d={d} onAdvance={advanceSO} onConvertQuote={convertQuote} />}
               {tab === 'buying' && <Buying d={d} onAdvance={advancePO} onConvertMR={convertMR} />}
               {tab === 'manufacturing' && <Manufacturing d={d} onProduce={produceWO} />}
-              {tab === 'hr' && <HR d={d} />}
+              {tab === 'hr' && <HR d={d} onRunPayroll={runPayroll} />}
               {tab === 'projects' && <Projects d={d} />}
               {tab === 'assets' && <Assets d={d} />}
               {tab === 'reports' && <Reports d={d} />}
@@ -526,6 +583,7 @@ function Inventory({ d, onRestock }: { d: ErpData; onRestock: (id: string) => vo
   const [search, setSearch] = useState('');
   const [wh, setWh] = useState('All');
   const [lowOnly, setLowOnly] = useState(false);
+  const [view, setView] = useState<'items' | 'ledger'>('items');
   const rows = d.items.filter((it) => {
     if (wh !== 'All' && it.warehouse !== wh) return false;
     if (lowOnly && it.stock > it.reorder) return false;
@@ -541,8 +599,18 @@ function Inventory({ d, onRestock }: { d: ErpData; onRestock: (id: string) => vo
         <Kpi label="SKUs" value={d.items.length.toString()} />
         <Kpi label="Stock value" value={money(totalVal)} />
         <Kpi label="Low stock" value={d.items.filter((it) => it.stock <= it.reorder).length.toString()} />
-        <Kpi label="Warehouses" value={WAREHOUSES.length.toString()} />
+        <Kpi label="Ledger moves" value={d.stockLedger.length.toString()} />
       </div>
+
+      <div className="flex gap-2">
+        {(['items', 'ledger'] as const).map((v) => (
+          <button key={v} onClick={() => setView(v)} className={`rounded-xl border px-4 py-2 text-sm capitalize transition-colors ${view === v ? 'border-[var(--brand-bright)] bg-[var(--brand-bright)]/10 text-[var(--brand-bright)]' : 'border-white/10 text-[var(--muted)] hover:text-white'}`}>
+            {v === 'items' ? 'Items' : 'Stock ledger'}
+          </button>
+        ))}
+      </div>
+
+      {view === 'ledger' ? <StockLedgerView d={d} /> : <>
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-[var(--surface)] px-3 py-2">
           <Search size={16} className="text-[var(--muted)]" />
@@ -587,6 +655,58 @@ function Inventory({ d, onRestock }: { d: ErpData; onRestock: (id: string) => vo
           </tbody>
         </table>
       </div>
+      </>}
+    </div>
+  );
+}
+
+// The running stock ledger — every valued movement, with a per-item running
+// on-hand balance. Perpetual inventory: on-hand and valuation are derived here.
+function StockLedgerView({ d }: { d: ErpData }) {
+  const item = Object.fromEntries(d.items.map((i) => [i.id, i]));
+  // Walk oldest→newest to compute the running balance after each movement.
+  const chron = [...d.stockLedger].reverse();
+  const running: Record<string, number> = {};
+  const withBal = chron.map((e) => {
+    running[e.itemId] = (running[e.itemId] ?? 0) + e.qty;
+    return { ...e, balance: running[e.itemId] };
+  }).reverse();
+  const moved = d.stockLedger.reduce((s, e) => s + Math.abs(e.qty * e.rate), 0);
+
+  if (!d.stockLedger.length) {
+    return (
+      <div className={`${card} p-10 text-center`}>
+        <Boxes size={28} className="mx-auto text-[var(--muted)]" />
+        <p className="mt-3 text-sm text-[var(--muted)]">No stock movements yet this session.</p>
+        <p className="mt-1 text-xs text-[var(--muted)]/70">Deliver a sales order, receive a purchase order, or produce a work order — each posts valued entries here.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-[var(--surface)] px-4 py-3">
+        <h3 className="text-sm font-medium text-white">Stock ledger</h3>
+        <span className="text-xs text-[var(--muted)]">{d.stockLedger.length} movements · {money(moved)} moved · valued at moving-average cost</span>
+      </div>
+      <table className="w-full min-w-[760px] text-left text-sm">
+        <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+          <tr><th className="px-4 py-3 font-medium">Date</th><th className="px-4 py-3 font-medium">Item</th><th className="px-4 py-3 font-medium">Voucher</th><th className="px-4 py-3 font-medium">Warehouse</th><th className="px-4 py-3 text-right font-medium">Qty</th><th className="px-4 py-3 text-right font-medium">Rate</th><th className="px-4 py-3 text-right font-medium">Value</th><th className="px-4 py-3 text-right font-medium">Balance</th></tr>
+        </thead>
+        <tbody>
+          {withBal.slice(0, 50).map((e) => (
+            <tr key={e.id} className="border-t border-white/5">
+              <td className="px-4 py-2.5 text-[var(--muted)]">{fmtDate(e.date)}</td>
+              <td className="px-4 py-2.5 text-[var(--text)]">{item[e.itemId]?.name ?? e.itemId}</td>
+              <td className="px-4 py-2.5"><span className="text-[var(--text)]">{e.voucherType}</span> <span className="text-xs text-[var(--muted)]">{e.voucherNo}</span></td>
+              <td className="px-4 py-2.5 text-[var(--muted)]">{e.warehouse}</td>
+              <td className={`px-4 py-2.5 text-right tabular-nums ${e.qty >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{e.qty >= 0 ? '+' : ''}{e.qty}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums text-[var(--muted)]">{money(e.rate)}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums text-white">{money(e.qty * e.rate)}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums text-[var(--muted)]">{e.balance}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -748,52 +868,95 @@ function Buying({ d, onAdvance, onConvertMR }: { d: ErpData; onAdvance: (id: str
 // ── Manufacturing ────────────────────────────────────────────────────────────
 function Manufacturing({ d, onProduce }: { d: ErpData; onProduce: (id: string) => void }) {
   const item = Object.fromEntries(d.items.map((i) => [i.id, i]));
+  const wos = d.workOrders;
+  const inProcess = wos.filter((w) => w.status === 'In Process').length;
+  const completed = wos.filter((w) => w.status === 'Completed').length;
+  const mfgPosted = d.gl.filter((e) => e.voucherType === 'Manufacture').length;
+
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {d.workOrders.map((w) => {
-        const it = item[w.itemId];
-        const pct = Math.round((w.produced / w.qty) * 100);
-        return (
-          <div key={w.id} className={`${card} p-5`}>
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-white">{w.number}</span>
-              <span className={`rounded-full border px-2.5 py-0.5 text-xs ${WO_STYLE[w.status]}`}>{w.status}</span>
-            </div>
-            <div className="mt-2 flex items-center gap-3">
-              <Thumb src={it?.thumbnail ?? ''} name={it?.name ?? ''} size={34} />
-              <div className="min-w-0"><div className="truncate text-sm text-white">{it?.name ?? '—'}</div><div className="text-xs text-[var(--muted)]">Due {fmtDate(w.due)}</div></div>
-            </div>
-            <div className="mt-4">
-              <div className="flex justify-between text-sm"><span className="text-[var(--muted)]">Produced</span><span className="text-white">{w.produced} / {w.qty}</span></div>
-              <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${pct}%` }} /></div>
-            </div>
-            <div className="mt-4 rounded-xl bg-[var(--bg-soft)] p-3">
-              <div className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Bill of materials · per unit</div>
-              <div className="mt-1.5 space-y-1">
-                {w.bom.map((b) => (
-                  <div key={b.itemId} className="flex justify-between text-xs">
-                    <span className="truncate text-[var(--text)]">{item[b.itemId]?.name ?? '—'}</span>
-                    <span className="shrink-0 text-[var(--muted)]">×{b.qtyPerUnit}</span>
-                  </div>
-                ))}
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Work orders" value={wos.length.toString()} />
+        <Kpi label="In process" value={inProcess.toString()} />
+        <Kpi label="Completed" value={completed.toString()} />
+        <Kpi label="Batches posted" value={mfgPosted.toString()} />
+      </div>
+      <p className="text-xs leading-relaxed text-[var(--muted)]">
+        Each work order carries a <span className="text-white">bill of materials</span> and a <span className="text-white">routing</span> of operations. Producing a batch consumes the components, applies each workstation’s labour &amp; overhead, and receives the finished good valued at <span className="text-white">material + operating cost</span> — posting a balanced <span className="text-white">Manufacture</span> entry to the general ledger.
+      </p>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {wos.map((w) => {
+          const it = item[w.itemId];
+          const pct = Math.round((w.produced / w.qty) * 100);
+          const matPerUnit = w.bom.reduce((t, b) => t + (item[b.itemId]?.cost ?? 0) * b.qtyPerUnit, 0);
+          const opPerUnit = opCostPerUnit(w.operations);
+          const fgPerUnit = matPerUnit + opPerUnit;
+          return (
+            <div key={w.id} className={`${card} flex flex-col p-5`}>
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-white">{w.number}</span>
+                <span className={`rounded-full border px-2.5 py-0.5 text-xs ${WO_STYLE[w.status]}`}>{w.status}</span>
               </div>
+              <div className="mt-2 flex items-center gap-3">
+                <Thumb src={it?.thumbnail ?? ''} name={it?.name ?? ''} size={34} />
+                <div className="min-w-0"><div className="truncate text-sm text-white">{it?.name ?? '—'}</div><div className="text-xs text-[var(--muted)]">Due {fmtDate(w.due)}</div></div>
+              </div>
+              <div className="mt-4">
+                <div className="flex justify-between text-sm"><span className="text-[var(--muted)]">Produced</span><span className="text-white">{w.produced} / {w.qty}</span></div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${pct}%` }} /></div>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-[var(--bg-soft)] p-3">
+                <div className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Bill of materials · per unit</div>
+                <div className="mt-1.5 space-y-1">
+                  {w.bom.map((b) => (
+                    <div key={b.itemId} className="flex justify-between text-xs">
+                      <span className="truncate text-[var(--text)]">{item[b.itemId]?.name ?? '—'} <span className="text-[var(--muted)]">×{b.qtyPerUnit}</span></span>
+                      <span className="shrink-0 text-[var(--muted)]">{money((item[b.itemId]?.cost ?? 0) * b.qtyPerUnit)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-2 rounded-xl bg-[var(--bg-soft)] p-3">
+                <div className="text-[11px] uppercase tracking-wide text-[var(--muted)]">Routing · operations</div>
+                <div className="mt-1.5 space-y-1">
+                  {w.operations.map((op) => (
+                    <div key={op.operation} className="flex justify-between text-xs">
+                      <span className="truncate text-[var(--text)]">{op.operation} <span className="text-[var(--muted)]">· {op.workstation}</span></span>
+                      <span className="shrink-0 text-[var(--muted)]">{op.hoursPerUnit}h × {money(op.hourlyRate)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-2 space-y-1 rounded-xl border border-white/10 p-3 text-xs">
+                <div className="flex justify-between"><span className="text-[var(--muted)]">Material / unit</span><span className="tabular-nums text-[var(--text)]">{money(matPerUnit)}</span></div>
+                <div className="flex justify-between"><span className="text-[var(--muted)]">Operating / unit</span><span className="tabular-nums text-[var(--text)]">{money(opPerUnit)}</span></div>
+                <div className="flex justify-between border-t border-white/10 pt-1 font-medium"><span className="text-white">Finished cost / unit</span><span className="tabular-nums text-[var(--brand-bright)]">{money(fgPerUnit)}</span></div>
+              </div>
+
+              {w.status !== 'Completed' ? (
+                <button onClick={() => onProduce(w.id)} className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-bright)] py-2 text-sm font-medium text-[#0b0d10] transition-colors hover:bg-white"><Factory size={14} /> Produce batch</button>
+              ) : (
+                <div className="mt-4 rounded-lg bg-emerald-500/10 py-2 text-center text-xs text-emerald-300">Fully produced ✓</div>
+              )}
+              <p className="mt-2 text-center text-[10px] text-[var(--muted)]/60">Producing posts a Manufacture entry &amp; moves the stock ledger</p>
             </div>
-            {w.status !== 'Completed' && (
-              <button onClick={() => onProduce(w.id)} className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-bright)] py-2 text-sm font-medium text-[#0b0d10] transition-colors hover:bg-white"><Factory size={14} /> Produce batch</button>
-            )}
-            <p className="mt-2 text-center text-[10px] text-[var(--muted)]/60">Producing consumes components &amp; adds finished stock</p>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 // ── HR ───────────────────────────────────────────────────────────────────────
-function HR({ d }: { d: ErpData }) {
+function HR({ d, onRunPayroll }: { d: ErpData; onRunPayroll: () => void }) {
   const [dept, setDept] = useState('All');
   const rows = d.employees.filter((e) => dept === 'All' || e.department === dept);
   const payroll = Math.round(d.employees.reduce((s, e) => s + e.salary, 0) / 12);
+  const lastRun = d.payrollRuns[0];
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -802,6 +965,43 @@ function HR({ d }: { d: ErpData }) {
         <Kpi label="Departments" value={DEPARTMENTS.length.toString()} />
         <Kpi label="Monthly payroll" value={money(payroll)} />
       </div>
+
+      <div className={`${card} flex flex-wrap items-center justify-between gap-3 p-4`}>
+        <div>
+          <h3 className="text-sm font-medium text-white">Payroll run</h3>
+          <p className="text-xs text-[var(--muted)]">One salary slip per active employee — gross → PAYE (18%) + UIF (1%) → net. Posts Dr Salaries, Cr Bank &amp; Cr Payroll Payable to the ledger.</p>
+        </div>
+        <button onClick={onRunPayroll} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-[var(--brand-bright)] px-4 py-2 text-sm font-medium text-[#0b0d10] transition-colors hover:bg-white"><Wallet size={15} /> Run payroll</button>
+      </div>
+
+      {lastRun && (
+        <div className="overflow-x-auto rounded-2xl border border-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-[var(--surface)] px-4 py-3">
+            <h3 className="text-sm font-medium text-white">{lastRun.number} · {lastRun.period}</h3>
+            <span className="text-xs text-[var(--muted)]">
+              {lastRun.slips.length} slips · Gross {money(lastRun.slips.reduce((s, x) => s + x.gross, 0))} · Net {money(lastRun.slips.reduce((s, x) => s + x.net, 0))}
+              {d.payrollRuns.length > 1 && <> · {d.payrollRuns.length} runs posted</>}
+            </span>
+          </div>
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+              <tr><th className="px-4 py-3 font-medium">Employee</th><th className="px-4 py-3 text-right font-medium">Gross</th><th className="px-4 py-3 text-right font-medium">PAYE</th><th className="px-4 py-3 text-right font-medium">UIF</th><th className="px-4 py-3 text-right font-medium">Net pay</th></tr>
+            </thead>
+            <tbody>
+              {lastRun.slips.map((sl) => (
+                <tr key={sl.employeeId} className="border-t border-white/5">
+                  <td className="px-4 py-2.5 text-white">{sl.name}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-[var(--text)]">{money(sl.gross)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-[var(--muted)]">({money(sl.paye)})</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-[var(--muted)]">({money(sl.uif)})</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-white">{money(sl.net)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {['All', ...DEPARTMENTS].map((dp) => (
           <button key={dp} onClick={() => setDept(dp)} className={`rounded-full px-3 py-1.5 text-xs transition-colors ${dept === dp ? 'bg-[var(--brand-bright)] text-[#0b0d10]' : 'border border-white/10 text-[var(--muted)] hover:text-white'}`}>{dp}</button>
