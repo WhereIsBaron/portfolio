@@ -10,10 +10,10 @@ import {
 import {
   fetchCrmData, avatarFor, money, invoiceTotal,
   STAGES, OPEN_STAGES, STAGE_PROB, STATUSES, ACTIVITY_TYPES, PRIORITIES, LEAD_SOURCES, OWNERS,
-  LOST_REASONS, COMPETITORS, CASE_STATUSES,
+  LOST_REASONS, COMPETITORS, CASE_STATUSES, SLA_HOURS, caseSla,
   type Contact, type Company, type Deal, type Activity, type Task, type Meeting,
   type EmailThread, type EmailTemplate, type Invoice, type Campaign, type Automation,
-  type Lead, type SupportCase, type LeadStatus, type CaseStatus,
+  type Lead, type SupportCase, type LeadStatus, type CaseStatus, type SlaState,
   type Stage, type Status, type ActivityType, type Priority, type InvoiceStatus,
 } from '@/data/crmSeed';
 
@@ -51,6 +51,20 @@ const CASE_STATUS_STYLE: Record<CaseStatus, string> = {
   Replied: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
   Resolved: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   Closed: 'bg-white/5 text-[var(--muted)] border-white/10',
+};
+const SLA_STYLE: Record<SlaState, string> = {
+  Met: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  'On track': 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  'Due soon': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  Breached: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+};
+// Short human countdown: "in 3h" when due ahead, "5h ago" when overdue.
+const relTime = (ms: number, now = Date.now()) => {
+  const diff = ms - now;
+  const abs = Math.abs(diff);
+  const h = abs / 3_600_000;
+  const unit = h >= 48 ? `${Math.round(h / 24)}d` : h >= 1 ? `${Math.round(h)}h` : `${Math.max(1, Math.round(abs / 60_000))}m`;
+  return diff >= 0 ? `in ${unit}` : `${unit} ago`;
 };
 
 const STATUS_STYLE: Record<Status, string> = {
@@ -678,15 +692,22 @@ function CasesView({
   cases, byId, onAdvance,
 }: { cases: SupportCase[]; byId: Record<string, Contact>; onAdvance: (id: string) => void }) {
   const [filter, setFilter] = useState<'open' | 'all' | CaseStatus>('open');
+  const now = Date.now();
+  const slaOf = (c: SupportCase) => caseSla(c, now);
+  const isBreached = (c: SupportCase) => {
+    const s = slaOf(c);
+    return s.responseState === 'Breached' || s.resolutionState === 'Breached';
+  };
   const shown = cases.filter((c) => {
     if (filter === 'open') return c.status !== 'Resolved' && c.status !== 'Closed';
     if (filter === 'all') return true;
     return c.status === filter;
   }).sort((a, b) => b.updatedAt - a.updatedAt);
+  const openCases = cases.filter((c) => c.status !== 'Resolved' && c.status !== 'Closed');
   const kpi = [
-    ['Open', cases.filter((c) => c.status === 'Open').length],
+    ['Open', openCases.length],
+    ['SLA breached', openCases.filter(isBreached).length],
     ['Awaiting reply', cases.filter((c) => c.status === 'Pending').length],
-    ['Resolved', cases.filter((c) => c.status === 'Resolved').length],
     ['Total', cases.length],
   ] as const;
 
@@ -694,42 +715,69 @@ function CasesView({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {kpi.map(([label, value]) => (
-          <div key={label} className={`${card} p-4`}><div className="font-display text-xl text-white">{value}</div><div className="text-xs text-[var(--muted)]">{label}</div></div>
+          <div key={label} className={`${card} p-4`}>
+            <div className={`font-display text-xl ${label === 'SLA breached' && value ? 'text-rose-300' : 'text-white'}`}>{value}</div>
+            <div className="text-xs text-[var(--muted)]">{label}</div>
+          </div>
         ))}
       </div>
+
+      <div className={`${card} flex flex-wrap items-center gap-x-5 gap-y-1 p-3 text-xs text-[var(--muted)]`}>
+        <span className="font-medium text-[var(--text)]">SLA policy</span>
+        {(['High', 'Medium', 'Low'] as Priority[]).map((p) => (
+          <span key={p}>
+            <span className={`mr-1 rounded-full border px-2 py-0.5 ${PRIO_STYLE[p]}`}>{p}</span>
+            respond {SLA_HOURS[p].response}h · resolve {SLA_HOURS[p].resolution}h
+          </span>
+        ))}
+      </div>
+
       <div className="flex flex-wrap gap-2">
         {(['open', ...CASE_STATUSES, 'all'] as const).map((f) => (
           <button key={f} onClick={() => setFilter(f)} className={`rounded-full px-3 py-1.5 text-xs capitalize transition-colors ${filter === f ? 'bg-[var(--brand-bright)] text-[#0b0d10]' : 'border border-white/10 text-[var(--muted)] hover:text-white'}`}>{f}</button>
         ))}
       </div>
       <div className="overflow-x-auto rounded-2xl border border-white/10">
-        <table className="w-full min-w-[760px] text-left text-sm">
+        <table className="w-full min-w-[900px] text-left text-sm">
           <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
-            <tr><th className="px-4 py-3 font-medium">Case</th><th className="px-4 py-3 font-medium">Contact</th><th className="px-4 py-3 font-medium">Type</th><th className="px-4 py-3 font-medium">Priority</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
+            <tr><th className="px-4 py-3 font-medium">Case</th><th className="px-4 py-3 font-medium">Contact</th><th className="px-4 py-3 font-medium">Priority</th><th className="px-4 py-3 font-medium">First response</th><th className="px-4 py-3 font-medium">Resolution</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
           </thead>
           <tbody>
             {shown.map((c) => {
               const ct = byId[c.contactId];
+              const sla = slaOf(c);
               const canAdvance = c.status !== 'Closed';
               const nextLabel = c.status === 'Open' ? 'Take' : c.status === 'Pending' ? 'Reply' : c.status === 'Replied' ? 'Resolve' : c.status === 'Resolved' ? 'Close' : '';
               return (
                 <tr key={c.id} className="border-t border-white/5">
                   <td className="px-4 py-3">
                     <div className="font-medium text-white">{c.subject}</div>
-                    <div className="text-xs text-[var(--muted)]">{c.number} · {fmtDate(c.createdAt)}</div>
+                    <div className="text-xs text-[var(--muted)]">{c.number} · {c.type} · opened {fmtDate(c.createdAt)}</div>
                   </td>
                   <td className="px-4 py-3 text-[var(--muted)]">{ct?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-[var(--muted)]">{c.type}</td>
                   <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${PRIO_STYLE[c.priority]}`}>{c.priority}</span></td>
+                  <td className="px-4 py-3"><SlaCell state={sla.responseState} dueAt={sla.responseDueAt} now={now} /></td>
+                  <td className="px-4 py-3"><SlaCell state={sla.resolutionState} dueAt={sla.resolutionDueAt} now={now} /></td>
                   <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${CASE_STATUS_STYLE[c.status]}`}>{c.status}</span></td>
                   <td className="px-4 py-3 text-right">{canAdvance && nextLabel && <button onClick={() => onAdvance(c.id)} className="rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white">{nextLabel}</button>}</td>
                 </tr>
               );
             })}
-            {shown.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-[var(--muted)]">No cases in this view.</td></tr>}
+            {shown.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-[var(--muted)]">No cases in this view.</td></tr>}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// One SLA target cell: a coloured state badge plus the due/overdue countdown
+// (hidden once the target is met).
+function SlaCell({ state, dueAt, now }: { state: SlaState; dueAt: number; now: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`rounded-full border px-2 py-0.5 text-[11px] ${SLA_STYLE[state]}`}>{state}</span>
+      {state !== 'Met' && <span className="text-[11px] text-[var(--muted)]">{relTime(dueAt, now)}</span>}
     </div>
   );
 }
@@ -768,8 +816,34 @@ function LostDealModal({
 function Pipeline({
   deals, byId, onAdvance, onLose,
 }: { deals: Deal[]; byId: Record<string, Contact>; onAdvance: (id: string) => void; onLose: (id: string) => void }) {
+  const open = deals.filter((d) => OPEN_STAGES.includes(d.stage));
+  const commit = deals.filter((d) => d.stage === 'Won').reduce((s, d) => s + d.value, 0);
+  const openValue = open.reduce((s, d) => s + d.value, 0);
+  const weighted = open.reduce((s, d) => s + (d.value * d.probability) / 100, 0);
+  const bestCase = commit + openValue;
+  const wonCount = deals.filter((d) => d.stage === 'Won').length;
+  const lostCount = deals.filter((d) => d.stage === 'Lost').length;
+  const winRate = wonCount + lostCount ? Math.round((wonCount / (wonCount + lostCount)) * 100) : 0;
+  const forecast = [
+    ['Committed (Won)', money(commit)],
+    ['Weighted forecast', money(commit + weighted)],
+    ['Best case', money(bestCase)],
+    ['Win rate', `${winRate}%`],
+  ] as const;
+
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {forecast.map(([label, value]) => (
+          <div key={label} className={`${card} p-4`}>
+            <div className="font-display text-xl text-white">{value}</div>
+            <div className="text-xs text-[var(--muted)]">{label}</div>
+          </div>
+        ))}
+      </div>
+      <div className="text-xs text-[var(--muted)]">Weighted forecast sums each open deal by its stage probability — the number a sales manager actually forecasts on.</div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
       {STAGES.map((stage) => {
         const col = deals.filter((d) => d.stage === stage);
         const total = col.reduce((s, d) => s + d.value, 0);
@@ -804,6 +878,7 @@ function Pipeline({
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

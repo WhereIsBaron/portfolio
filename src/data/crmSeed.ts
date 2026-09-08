@@ -50,6 +50,42 @@ export type CaseStatus = 'Open' | 'Pending' | 'Replied' | 'Resolved' | 'Closed';
 export const CASE_STATUSES: CaseStatus[] = ['Open', 'Pending', 'Replied', 'Resolved', 'Closed'];
 export const CASE_TYPES = ['Question', 'Problem', 'Feature Request', 'Incident'] as const;
 
+// Service-Level Agreement policy: first-response and resolution targets (hours)
+// by priority — the model EspoCRM/ERPNext use to hold support to a commitment.
+export const SLA_HOURS: Record<Priority, { response: number; resolution: number }> = {
+  High: { response: 1, resolution: 8 },
+  Medium: { response: 4, resolution: 24 },
+  Low: { response: 8, resolution: 72 },
+};
+export type SlaState = 'Met' | 'On track' | 'Due soon' | 'Breached';
+export type CaseSla = { responseDueAt: number; resolutionDueAt: number; responseState: SlaState; resolutionState: SlaState };
+
+const slaState = (dueAt: number, windowMs: number, met: boolean, now: number): SlaState => {
+  if (met) return 'Met';
+  const left = dueAt - now;
+  if (left <= 0) return 'Breached';
+  if (left <= windowMs * 0.25) return 'Due soon';
+  return 'On track';
+};
+
+// Live SLA status for a case: a first reply satisfies the response target once the
+// case leaves 'Open'; a Resolved/Closed case satisfies the resolution target.
+export function caseSla(c: { priority: Priority; status: CaseStatus; createdAt: number }, now: number = Date.now()): CaseSla {
+  const h = SLA_HOURS[c.priority];
+  const responseWin = h.response * 3_600_000;
+  const resolutionWin = h.resolution * 3_600_000;
+  const responseDueAt = c.createdAt + responseWin;
+  const resolutionDueAt = c.createdAt + resolutionWin;
+  const responded = c.status !== 'Open';
+  const resolved = c.status === 'Resolved' || c.status === 'Closed';
+  return {
+    responseDueAt,
+    resolutionDueAt,
+    responseState: slaState(responseDueAt, responseWin, responded, now),
+    resolutionState: slaState(resolutionDueAt, resolutionWin, resolved, now),
+  };
+}
+
 export type Contact = {
   id: string;
   name: string;
@@ -533,20 +569,33 @@ function buildCrmData(people: Person[], source: CrmData['source']): CrmData {
     'Invoice PDF shows wrong logo', 'API rate limit questions', 'Onboarding — SSO setup help',
     'Report totals look incorrect', 'Mobile app crashes on upload',
   ];
-  const CASE_STATE: CaseStatus[] = ['Open', 'Open', 'Pending', 'Replied', 'Replied', 'Resolved', 'Resolved', 'Closed'];
+  // Curated priority + age (hours) per case so the SLA board always shows a
+  // realistic mix — a couple breached, some due soon, the rest on track or met.
+  const hour = 3_600_000;
+  const CASE_ROWS: { status: CaseStatus; priority: Priority; ageH: number }[] = [
+    { status: 'Open', priority: 'High', ageH: 2 },      // resolution 8h → on track (response already breached)
+    { status: 'Open', priority: 'Medium', ageH: 21 },   // resolution 24h → due soon
+    { status: 'Pending', priority: 'High', ageH: 12 },  // High resolution 8h, past due → breached
+    { status: 'Replied', priority: 'Low', ageH: 30 },   // Low resolution 72h → on track
+    { status: 'Replied', priority: 'Medium', ageH: 40 }, // Medium resolution 24h, past → breached
+    { status: 'Resolved', priority: 'High', ageH: 100 }, // met
+    { status: 'Resolved', priority: 'Medium', ageH: 200 }, // met
+    { status: 'Closed', priority: 'Low', ageH: 400 },   // met
+  ];
   const cases: SupportCase[] = CASE_SUBJECTS.map((subject, i) => {
+    const row = CASE_ROWS[i];
     const c = pick(rng, contacts);
-    const createdAt = now - rint(rng, 0, 25) * day;
+    const createdAt = now - row.ageH * hour;
     return {
       id: `case${i + 1}`,
       number: `CASE-${1000 + i}`,
       subject,
       contactId: c.id,
-      priority: pick(rng, PRIORITIES),
-      status: CASE_STATE[i],
+      priority: row.priority,
+      status: row.status,
       type: pick(rng, CASE_TYPES as unknown as string[]) as SupportCase['type'],
       createdAt,
-      updatedAt: createdAt + rint(rng, 0, 5) * day,
+      updatedAt: createdAt + Math.round(row.ageH * 0.5) * hour,
     };
   });
 
