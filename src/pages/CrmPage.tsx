@@ -113,15 +113,19 @@ const card = 'rounded-2xl border border-white/10 bg-[var(--surface)]';
 const field =
   'w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--brand-bright)]';
 
+// One consistent pill for every quick reply — border matches the text colour, no emoji.
+const quickReplyPill =
+  'rounded-full border border-[var(--brand-bright)]/40 bg-[var(--brand-bright)]/5 px-2.5 py-1 text-[11px] text-[var(--brand-bright)] transition-colors hover:bg-[var(--brand-bright)]/15';
+
 // ── Live simulation layer ────────────────────────────────────────────────────
 // This is a demo, but it behaves like a real CRM: your actions trigger reactions
 // (activities logged, follow-up tasks created, simulated buyer replies) and the
 // workspace ticks along on its own so it feels live. Nothing leaves the browser.
-type Toast = { id: number; text: string; tone: 'info' | 'success' | 'warn' | 'coach' };
+type Toast = { id: number; text: string; tone: 'info' | 'success' | 'warn' | 'coach'; contactId?: string };
 type Warmth = 'warm' | 'neutral' | 'cool';
 
-// Fast quick-reply presets in the inbox — clicking one SENDS immediately, so you
-// can feel how different responses land. {{first}} is filled with the contact.
+// Quick-reply presets for the inbox — clicking one loads it into the reply box so
+// you can review or tweak before sending. {{first}} is filled with the contact.
 const QUICK_REPLIES: { label: string; body: string }[] = [
   { label: 'Acknowledge', body: 'Hi {{first}}, thanks for the update — noted, and I’ll follow up shortly.' },
   { label: 'Offer a call', body: 'Hi {{first}}, would a 20-minute call this week work? Let me know a time that suits and I’ll send an invite.' },
@@ -166,21 +170,30 @@ function inboundReaction(body: string, firstName: string): { body: string; warmt
 }
 
 // Toast stack (bottom-right). Each is dismissed on a timer by the caller.
-function Toasts({ items, onDismiss }: { items: Toast[]; onDismiss: (id: number) => void }) {
+function Toasts({ items, onDismiss, onOpen }: { items: Toast[]; onDismiss: (id: number) => void; onOpen: (id: string) => void }) {
   const dot: Record<Toast['tone'], string> = {
     info: 'bg-sky-400', success: 'bg-emerald-400', warn: 'bg-amber-400', coach: 'bg-[var(--brand-bright)]',
   };
   return (
     <div className="pointer-events-none fixed bottom-24 right-4 z-[80] flex w-[min(92vw,340px)] flex-col gap-2">
-      {items.map((t) => (
-        <div key={t.id} className="pointer-events-auto flex items-start gap-2.5 rounded-xl border border-white/10 bg-[var(--surface)]/95 px-3.5 py-2.5 text-sm text-[var(--text)] shadow-xl backdrop-blur animate-[slideIn_.25s_ease]">
+      {items.map((t) => {
+        const clickable = Boolean(t.contactId);
+        return (
+        <div key={t.id} className={`pointer-events-auto flex items-start gap-2.5 rounded-xl border border-white/10 bg-[var(--surface)]/95 px-3.5 py-2.5 text-sm text-[var(--text)] shadow-xl backdrop-blur animate-[slideIn_.25s_ease] ${clickable ? 'cursor-pointer transition-colors hover:border-[var(--brand-bright)]/40 hover:bg-[var(--surface)]' : ''}`}
+          onClick={clickable ? () => { onOpen(t.contactId!); onDismiss(t.id); } : undefined}
+          role={clickable ? 'button' : undefined}
+        >
           {t.tone === 'coach'
             ? <Sparkles size={15} className="mt-0.5 shrink-0 text-[var(--brand-bright)]" />
             : <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot[t.tone]}`} />}
-          <span className="min-w-0 flex-1">{t.text}</span>
-          <button onClick={() => onDismiss(t.id)} className="shrink-0 text-[var(--muted)] hover:text-white"><X size={13} /></button>
+          <span className="min-w-0 flex-1">
+            {t.text}
+            {clickable && <span className="mt-0.5 block text-[11px] text-[var(--brand-bright)]">View activity →</span>}
+          </span>
+          <button onClick={(e) => { e.stopPropagation(); onDismiss(t.id); }} className="shrink-0 text-[var(--muted)] hover:text-white"><X size={13} /></button>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -217,9 +230,9 @@ export default function CrmPage() {
   const toastSeq = useRef(0);
 
   const dismissToast = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
-  const notify = useCallback((text: string, tone: Toast['tone'] = 'info') => {
+  const notify = useCallback((text: string, tone: Toast['tone'] = 'info', contactId?: string) => {
     const id = ++toastSeq.current;
-    setToasts((t) => [...t.slice(-3), { id, text, tone }]);
+    setToasts((t) => [...t.slice(-3), { id, text, tone, contactId }]);
     window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === 'coach' ? 6500 : 5200);
   }, []);
   // Append an activity (append-only, always safe) — the currency of "reactions".
@@ -273,29 +286,29 @@ export default function CrmPage() {
       const roll = Math.random();
 
       if (roll < 0.22) {
-        notify(`${c.name} opened your email`, 'info');
+        notify(`${c.name} opened your email`, 'info', c.id);
         pushActivity(c.id, 'Email', 'Opened your last email');
       } else if (roll < 0.4 && cps.length) {
-        notify(`${first} clicked a link in “${pickR(cps)!.name}”`, 'info');
+        notify(`${first} clicked a link in “${pickR(cps)!.name}”`, 'info', c.id);
         pushActivity(c.id, 'Email', 'Clicked a campaign link');
       } else if (roll < 0.56) {
-        notify(`${mate} left a note on ${c.name}`, 'info');
+        notify(`${mate} left a note on ${c.name}`, 'info', c.id);
         pushActivity(c.id, 'Note', `Note from ${mate}`);
       } else if (roll < 0.72) {
         notify(`New lead captured from ${pickR(LEAD_SOURCES)}`, 'success');
       } else if (roll < 0.86) {
         const openCase = cases_.find((x) => x.status === 'Open' || x.status === 'Pending');
         if (openCase) notify(`SLA reminder: a support case is awaiting your reply`, 'warn');
-        else { notify(`${c.name} viewed your proposal`, 'info'); pushActivity(c.id, 'Note', 'Viewed your proposal'); }
+        else { notify(`${c.name} viewed your proposal`, 'info', c.id); pushActivity(c.id, 'Note', 'Viewed your proposal'); }
       } else {
         const unpaid = iv.find((x) => x.status !== 'Paid');
         if (unpaid) {
           setInvoices((list) => list.map((x) => (x.id === unpaid.id ? { ...x, status: 'Paid' } : x)));
           const payer = bid[unpaid.contactId];
-          notify(`Payment received${payer ? ` from ${payer.name}` : ''} — invoice marked paid`, 'success');
+          notify(`Payment received${payer ? ` from ${payer.name}` : ''} — invoice marked paid`, 'success', payer?.id);
           if (payer) pushActivity(payer.id, 'Note', 'Invoice paid');
         } else {
-          notify(`${c.name} booked a meeting`, 'success');
+          notify(`${c.name} booked a meeting`, 'success', c.id);
           pushActivity(c.id, 'Meeting', 'Booked a meeting');
         }
       }
@@ -559,7 +572,7 @@ export default function CrmPage() {
         />
       )}
       {addOpen && <AddContactModal onClose={() => setAddOpen(false)} onAdd={addContact} />}
-      <Toasts items={toasts} onDismiss={dismissToast} />
+      <Toasts items={toasts} onDismiss={dismissToast} onOpen={setSelectedId} />
       {losingId && (
         <LostDealModal
           deal={deals.find((d) => d.id === losingId)!}
@@ -1282,17 +1295,17 @@ function InboxView({
                   {coach.tips.length > 0 && <ul className="mt-1 list-disc pl-4 opacity-90">{coach.tips.map((t, i) => <li key={i}>{t}</li>)}</ul>}
                 </div>
               )}
-              {/* Fast quick-replies — click to send instantly and watch the reaction. */}
+              {/* Quick replies — click to load the text into the reply box, then send. */}
               <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-[var(--muted)]"><Zap size={11} /> Quick replies</div>
               <div className="mb-2 flex flex-wrap gap-1.5">
                 {QUICK_REPLIES.map((q) => (
-                  <button key={q.label} onClick={() => send(fill(q.body))} disabled={isTyping} className="rounded-full border border-[var(--brand-bright)]/25 bg-[var(--brand-bright)]/5 px-2.5 py-1 text-[11px] text-[var(--brand-bright)] transition-colors hover:bg-[var(--brand-bright)]/15 disabled:opacity-40">{q.label}</button>
+                  <button key={q.label} onClick={() => setDraft(fill(q.body))} className={quickReplyPill}>{q.label}</button>
                 ))}
               </div>
               {templates.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-1.5">
                   {templates.map((tpl) => (
-                    <button key={tpl.id} onClick={() => setDraft(fill(tpl.body))} className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-[var(--muted)] transition-colors hover:text-white">{tpl.name}</button>
+                    <button key={tpl.id} onClick={() => setDraft(fill(tpl.body))} className={quickReplyPill}>{tpl.name}</button>
                   ))}
                 </div>
               )}
