@@ -124,15 +124,90 @@ const quickReplyPill =
 type Toast = { id: number; text: string; tone: 'info' | 'success' | 'warn' | 'coach'; contactId?: string };
 type Warmth = 'warm' | 'neutral' | 'cool';
 
-// Quick-reply presets for the inbox — clicking one loads it into the reply box so
-// you can review or tweak before sending. {{first}} is filled with the contact.
-const QUICK_REPLIES: { label: string; body: string }[] = [
+// Contextual quick replies — the instant, rules-based half of the inbox: read the
+// contact's LAST message and offer matching responses (no network). Clicking one
+// loads it into the reply box to review or tweak. {{first}} fills with the contact.
+type QuickReply = { label: string; body: string };
+
+const BASE_REPLIES: QuickReply[] = [
   { label: 'Acknowledge', body: 'Hi {{first}}, thanks for the update — noted, and I’ll follow up shortly.' },
   { label: 'Offer a call', body: 'Hi {{first}}, would a 20-minute call this week work? Let me know a time that suits and I’ll send an invite.' },
-  { label: 'Send pricing', body: 'Hi {{first}}, I’ll send pricing over now. Let me know if you’d like a formal quote.' },
-  { label: 'Loop in support', body: 'Hi {{first}}, I’ve passed this to our support team and they’ll follow up shortly.' },
-  { label: 'Thank & confirm', body: 'Thanks, {{first}}. I’ll confirm the details and send a calendar invite.' },
+  { label: 'Send proposal', body: 'Hi {{first}}, I’ll put a short proposal together and send it over today.' },
 ];
+
+// Each intent is matched against the contact's latest message; first match wins.
+const REPLY_INTENTS: { test: RegExp; replies: QuickReply[] }[] = [
+  { test: /\b(pric|quote|cost|budget|discount|plan|afford|expensive)\b/i, replies: [
+    { label: 'Send pricing', body: 'Hi {{first}}, I’ll send pricing over now. Let me know if you’d like a formal quote for finance.' },
+    { label: 'Offer annual rate', body: 'Hi {{first}}, happy to share options — the annual plan works out best value if that helps the budget.' },
+    { label: 'Prepare quote', body: 'Hi {{first}}, I’ll prepare a formal quote you can take to your finance team and send it across.' },
+  ] },
+  { test: /\b(call|meet|demo|schedul|calendar|book|zoom|invite|available|thursday|friday|monday|tuesday|wednesday)\b/i, replies: [
+    { label: 'Propose times', body: 'Hi {{first}}, I’ve got Wednesday or Thursday afternoon free — would either suit for a quick call?' },
+    { label: 'Send invite', body: 'Hi {{first}}, great — I’ll send a calendar invite across now.' },
+    { label: 'Confirm the call', body: 'Hi {{first}}, that works for me. I’ll be there and will send an invite to confirm.' },
+  ] },
+  { test: /\b(onboard|get started|kick ?off|next step|timeline|implement|roll ?out)\b/i, replies: [
+    { label: 'Outline onboarding', body: 'Hi {{first}}, onboarding is quick — we set up your workspace, import your data, and run a short training session. I’ll share a timeline.' },
+    { label: 'Share timeline', body: 'Hi {{first}}, I’ll send a short timeline so your team knows what to expect and when.' },
+  ] },
+  { test: /\b(proposal|document|scope|spec|deck|send over|send me)\b/i, replies: [
+    { label: 'Send proposal', body: 'Hi {{first}}, I’ll send a tailored proposal over today — happy to walk through it live afterwards.' },
+    { label: 'Follow up', body: 'Hi {{first}}, just checking you received everything — any questions I can answer?' },
+  ] },
+  { test: /\b(support|issue|bug|problem|help|broke|error|not working|fix|down)\b/i, replies: [
+    { label: 'Reassure & ETA', body: 'Hi {{first}}, thanks for flagging this — I’m on it and will have an update for you shortly.' },
+    { label: 'Loop in support', body: 'Hi {{first}}, I’ve passed this to our support team and they’ll follow up with you directly.' },
+  ] },
+  { test: /\b(not sure|hesit|think about|competitor|already use|concern|risk|worried|too expensive|not convinced)\b/i, replies: [
+    { label: 'Handle objection', body: 'Hi {{first}}, that’s a fair point — happy to talk it through so you’ve got what you need to decide.' },
+    { label: 'Share case study', body: 'Hi {{first}}, I’ll send a short case study from a similar team — it might help put the concern to rest.' },
+  ] },
+  { test: /\b(thank|thanks|appreciate|great|perfect|sounds good|awesome|brilliant|excellent)\b/i, replies: [
+    { label: 'Acknowledge', body: 'Hi {{first}}, glad that helps — I’ll keep things moving on my side.' },
+    { label: 'Thank & confirm', body: 'Thanks, {{first}}. I’ll confirm the details and send a calendar invite.' },
+  ] },
+];
+
+// Suggestions for the contact's latest message, padded with one base option.
+function suggestReplies(lastInbound: string): QuickReply[] {
+  const matched = REPLY_INTENTS.find((i) => i.test.test(lastInbound || ''));
+  const picks = matched ? [...matched.replies] : [...BASE_REPLIES];
+  const extra = BASE_REPLIES.find((b) => !picks.some((p) => p.label === b.label));
+  if (extra && picks.length < 4) picks.push(extra);
+  return picks.slice(0, 4);
+}
+
+// The AI half of the hybrid inbox: ask the serverless role-play endpoint for a
+// reply that reads what you actually wrote. Returns null on any failure (offline,
+// rate-limited, no keys) so the caller falls back to the scripted reaction and the
+// demo never breaks. Times out fast so the "typing" beat never hangs.
+async function fetchAiReply(
+  contact: { name?: string; title?: string; company?: string } | null | undefined,
+  history: { from: 'me' | 'them'; body: string }[],
+): Promise<string | null> {
+  if (!contact?.name) return null;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 9000);
+    const res = await fetch('/.netlify/functions/crmReply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        contact: { name: contact.name, title: contact.title, company: contact.company },
+        history,
+      }),
+    });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const reply = data?.reply;
+    return typeof reply === 'string' && reply.trim() ? reply.trim() : null;
+  } catch {
+    return null;
+  }
+}
 
 // Score an outgoing reply the way a sales coach would, so the user can reflect on
 // HOW they responded — did they personalise, propose a next step, invite a reply?
@@ -431,20 +506,33 @@ export default function CrmPage() {
     ]);
   const replyThread = (id: string, body: string) => {
     // Your message goes out immediately…
-    setThreads((th) => th.map((t) =>
-      t.id === id ? { ...t, unread: false, messages: [...t.messages, { from: 'me', at: Date.now(), body }] } : t));
     const thread = threads.find((t) => t.id === id);
     const c = thread ? byId[thread.contactId] : null;
     const first = c?.name.split(' ')[0] ?? '';
-    const { body: reply } = inboundReaction(body, first);
-    // …then the buyer starts "typing" and replies a moment later — the reaction.
+    // Build the history the AI sees (prior turns + the message just sent).
+    const priorMsgs = thread ? thread.messages.map((m) => ({ from: m.from, body: m.body })) : [];
+    const history = [...priorMsgs, { from: 'me' as const, body }];
+
+    setThreads((th) => th.map((t) =>
+      t.id === id ? { ...t, unread: false, messages: [...t.messages, { from: 'me', at: Date.now(), body }] } : t));
     setTypingId(id);
-    window.setTimeout(() => {
-      setThreads((th) => th.map((t) =>
-        t.id === id ? { ...t, messages: [...t.messages, { from: 'them', at: Date.now(), body: reply }] } : t));
-      setTypingId((cur) => (cur === id ? null : cur));
-      if (thread) { notify(`${c?.name ?? 'The contact'} replied to your message`, 'info'); pushActivity(thread.contactId, 'Email', 'Replied to your message'); }
-    }, 1700);
+
+    // The buyer "types", then replies — an AI-generated response that actually reads
+    // what you said, with the scripted reaction as a graceful fallback.
+    const started = Date.now();
+    const deliver = (reply: string) => {
+      const wait = Math.max(0, 1400 - (Date.now() - started)); // keep the typing beat natural
+      window.setTimeout(() => {
+        setThreads((th) => th.map((t) =>
+          t.id === id ? { ...t, messages: [...t.messages, { from: 'them', at: Date.now(), body: reply }] } : t));
+        setTypingId((cur) => (cur === id ? null : cur));
+        if (thread) { notify(`${c?.name ?? 'The contact'} replied to your message`, 'info', thread.contactId); pushActivity(thread.contactId, 'Email', 'Replied to your message'); }
+      }, wait);
+    };
+
+    fetchAiReply(c, history)
+      .then((aiReply) => deliver(aiReply ?? inboundReaction(body, first).body))
+      .catch(() => deliver(inboundReaction(body, first).body));
   };
   const markThreadRead = (id: string) =>
     setThreads((th) => th.map((t) => (t.id === id ? { ...t, unread: false } : t)));
@@ -1210,6 +1298,13 @@ function InboxView({
   const isTyping = !!active && typingId === active.id;
   const endRef = useRef<HTMLDivElement>(null);
 
+  // Contextual quick replies — read the contact's LAST message and suggest matching
+  // responses, so the options change with the conversation instead of a fixed list.
+  const lastInbound = active
+    ? [...active.messages].reverse().find((m) => m.from === 'them')?.body ?? ''
+    : '';
+  const suggestions = useMemo(() => suggestReplies(lastInbound), [lastInbound]);
+
   const fill = (body: string) =>
     contact ? body.replace(/{{first}}/g, first).replace(/{{company}}/g, contact.company) : body;
 
@@ -1295,10 +1390,11 @@ function InboxView({
                   {coach.tips.length > 0 && <ul className="mt-1 list-disc pl-4 opacity-90">{coach.tips.map((t, i) => <li key={i}>{t}</li>)}</ul>}
                 </div>
               )}
-              {/* Quick replies — click to load the text into the reply box, then send. */}
-              <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-[var(--muted)]"><Zap size={11} /> Quick replies</div>
+              {/* Suggested replies — matched to the contact's last message; click to
+                  load the text into the reply box, review, then send. */}
+              <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-[var(--muted)]"><Zap size={11} /> Suggested replies</div>
               <div className="mb-2 flex flex-wrap gap-1.5">
-                {QUICK_REPLIES.map((q) => (
+                {suggestions.map((q) => (
                   <button key={q.label} onClick={() => setDraft(fill(q.body))} className={quickReplyPill}>{q.label}</button>
                 ))}
               </div>
