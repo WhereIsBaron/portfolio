@@ -25,6 +25,40 @@ const json = (status: number, body: unknown) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
+// Visits we never want in the stats: the owner's own devices, teammates, and
+// automated/cloud browsers (including Claude's during verification). Set the
+// TRACK_IGNORE_IPS env var to a comma/space-separated list of IPs; an entry
+// ending in '.' matches a whole prefix (e.g. "102.134.171." covers that range).
+function isIgnoredIp(ip: string): boolean {
+  if (!ip) return false;
+  const list = (process.env.TRACK_IGNORE_IPS || '')
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return list.some((entry) => (entry.endsWith('.') ? ip.startsWith(entry) : ip === entry));
+}
+
+// Obvious non-human agents — bots, crawlers, previewers, monitors.
+function isBotUa(ua: string): boolean {
+  return /bot|crawl|spider|slurp|headless|monitor|preview|lighthouse|pingdom|uptime|curl|wget|python-requests|axios|node-fetch|facebookexternalhit|embedly/i.test(ua);
+}
+
+// Read the current grand total (so the footer still shows a number when we skip).
+async function readTotal(url: string, key: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/get_site_visits`, {
+      method: 'POST',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!res.ok) return null;
+    const total = await res.json();
+    return typeof total === 'number' ? total : null;
+  } catch {
+    return null;
+  }
+}
+
 // Netlify injects visitor geo on the function context (context.geo.country.code)
 // with no third party or extra request. Fall back to the x-nf-geo header (JSON)
 // or x-country. Returns '' when geo isn't available.
@@ -62,6 +96,12 @@ export default async (req: Request, context: any): Promise<Response> => {
   const referrer = typeof body.referrer === 'string' ? body.referrer.slice(0, 500) : '';
   const path = typeof body.path === 'string' ? body.path.slice(0, 300) : '';
   const country = clientCountry(req, context).slice(0, 4);
+
+  // Excluded visitor (owner/teammate/bot/cloud browser) → don't record, but still
+  // return the current total so the footer counter shows a number.
+  if (isIgnoredIp(ip) || isBotUa(ua)) {
+    return json(200, { total: await readTotal(url, key) });
+  }
 
   try {
     const res = await fetch(`${url}/rest/v1/rpc/record_visit`, {
