@@ -132,6 +132,7 @@ export type Project = {
   slug?: string;
   images?: string[];
   route?: string; // if set, the card navigates to this in-app route instead of opening a gallery
+  wordmark?: string; // if set (with route), the card thumbnail shows the "Andrew.<wordmark>" logo
 };
 
 // Build a gallery path list for screenshots in /public/projects/<slug>/NN.png
@@ -189,6 +190,7 @@ export const projects: Project[] = [
       'Sample data populated live from randomuser.me with DiceBear avatars and a seeded generator; a Supabase-backed version with persisted records is next.',
     ],
     route: '/crm',
+    wordmark: 'CRM',
     link: '#',
   },
   {
@@ -204,6 +206,7 @@ export const projects: Project[] = [
       'Inventory items come live from DummyJSON and staff from randomuser.me, layered on a seeded generator; a Supabase-backed version with persisted records is next.',
     ],
     route: '/erp',
+    wordmark: 'ERP',
     link: '#',
   },
   {

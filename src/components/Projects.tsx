@@ -168,10 +168,17 @@ export default function Projects() {
                       className="relative flex aspect-video items-center justify-center overflow-hidden border-b border-white/10 bg-gradient-to-br from-[var(--brand)]/25 to-[var(--accent)]/10 text-left"
                       aria-label={`Open ${p.name} demo`}
                     >
-                      <CalendarCheck
-                        size={44}
-                        className="text-[var(--brand-bright)] transition-transform duration-500 group-hover:scale-110"
-                      />
+                      {p.wordmark ? (
+                        <span className="font-display text-4xl font-semibold tracking-tight text-white transition-transform duration-500 group-hover:scale-110 sm:text-5xl">
+                          Andrew<span className="text-[var(--brand-bright)]">.</span>
+                          {p.wordmark}
+                        </span>
+                      ) : (
+                        <CalendarCheck
+                          size={44}
+                          className="text-[var(--brand-bright)] transition-transform duration-500 group-hover:scale-110"
+                        />
+                      )}
                       <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-xs font-medium text-white">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--brand-bright)]" /> Live demo
                       </span>
