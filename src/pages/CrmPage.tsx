@@ -6,19 +6,25 @@ import {
   Search, Plus, X, Check, Phone, Mail, StickyNote, ChevronRight, Database,
   Clock, TrendingUp, Target, DollarSign, AlertTriangle, Send, Menu,
   UserPlus, LifeBuoy, ArrowRightLeft, Flame, Sparkles, Radio,
+  Package, BookOpen, ScrollText, ClipboardList, Trash2,
 } from 'lucide-react';
 import {
   fetchCrmData, avatarFor, money, invoiceTotal,
+  bookPrice, lineNet, quoteSubtotal, quoteTax, quoteGrand,
   STAGES, OPEN_STAGES, STAGE_PROB, STATUSES, ACTIVITY_TYPES, PRIORITIES, LEAD_SOURCES, OWNERS,
   LOST_REASONS, COMPETITORS, CASE_STATUSES, SLA_HOURS, caseSla,
   type Contact, type Company, type Deal, type Activity, type Task, type Meeting,
   type EmailThread, type EmailTemplate, type Invoice, type Campaign, type Automation,
   type Lead, type SupportCase, type LeadStatus, type CaseStatus, type SlaState,
   type Stage, type Status, type ActivityType, type Priority, type InvoiceStatus,
+  type Product, type PriceBook, type Quote, type QuoteLine, type QuoteStatus,
+  type SalesOrder, type SalesOrderStatus,
 } from '@/data/crmSeed';
 
 type Tab =
-  | 'dashboard' | 'contacts' | 'leads' | 'companies' | 'pipeline' | 'tasks' | 'calendar'
+  | 'dashboard' | 'contacts' | 'leads' | 'companies' | 'pipeline'
+  | 'quotes' | 'salesorders' | 'products' | 'pricebooks'
+  | 'tasks' | 'calendar'
   | 'inbox' | 'cases' | 'invoices' | 'campaigns' | 'automations' | 'reports' | 'settings';
 
 const NAV: { id: Tab; label: string; icon: typeof Users }[] = [
@@ -27,11 +33,15 @@ const NAV: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: 'contacts', label: 'Contacts', icon: Users },
   { id: 'companies', label: 'Accounts', icon: Building2 },
   { id: 'pipeline', label: 'Pipeline', icon: KanbanSquare },
+  { id: 'quotes', label: 'Quotes', icon: ScrollText },
+  { id: 'salesorders', label: 'Sales Orders', icon: ClipboardList },
+  { id: 'products', label: 'Products', icon: Package },
+  { id: 'pricebooks', label: 'Price Books', icon: BookOpen },
+  { id: 'invoices', label: 'Invoices', icon: FileText },
   { id: 'tasks', label: 'Tasks', icon: CheckSquare },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
   { id: 'inbox', label: 'Inbox', icon: Inbox },
   { id: 'cases', label: 'Cases', icon: LifeBuoy },
-  { id: 'invoices', label: 'Invoices', icon: FileText },
   { id: 'campaigns', label: 'Campaigns', icon: Megaphone },
   { id: 'automations', label: 'Automations', icon: Zap },
   { id: 'reports', label: 'Reports', icon: BarChart3 },
@@ -86,6 +96,18 @@ const INV_STYLE: Record<InvoiceStatus, string> = {
 };
 const ACT_ICON: Record<ActivityType, typeof Phone> = {
   Call: Phone, Email: Mail, Meeting: Calendar, Note: StickyNote, Task: CheckSquare,
+};
+const QUOTE_STYLE: Record<QuoteStatus, string> = {
+  Draft: 'bg-white/5 text-[var(--muted)] border-white/10',
+  Delivered: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  Accepted: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  Rejected: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+};
+const SO_STYLE: Record<SalesOrderStatus, string> = {
+  Created: 'bg-white/5 text-[var(--muted)] border-white/10',
+  Approved: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  Delivered: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  Invoiced: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
 };
 
 const fmtDate = (ms: number) =>
@@ -444,6 +466,10 @@ export default function CrmPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [threads, setThreads] = useState<EmailThread[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [priceBooks, setPriceBooks] = useState<PriceBook[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [automations, setAutomations] = useState<Automation[]>([]);
@@ -452,6 +478,7 @@ export default function CrmPage() {
   const [navOpen, setNavOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
   const [losingId, setLosingId] = useState<string | null>(null);
   const [blueprintId, setBlueprintId] = useState<string | null>(null);
 
@@ -487,6 +514,10 @@ export default function CrmPage() {
       setMeetings(d.meetings);
       setThreads(d.threads);
       setTemplates(d.templates);
+      setProducts(d.products);
+      setPriceBooks(d.priceBooks);
+      setQuotes(d.quotes);
+      setSalesOrders(d.salesOrders);
       setInvoices(d.invoices);
       setCampaigns(d.campaigns);
       setAutomations(d.automations);
@@ -713,6 +744,76 @@ export default function CrmPage() {
     setSelectedId(id);
   };
 
+  // ── Quote-to-cash ───────────────────────────────────────────────────────────
+  const toggleProduct = (id: string) =>
+    setProducts((ps) => ps.map((p) => (p.id === id ? { ...p, active: !p.active } : p)));
+  const togglePriceBook = (id: string) =>
+    setPriceBooks((bs) => bs.map((b) => (b.id === id ? { ...b, active: !b.active } : b)));
+
+  const createQuote = (data: { title: string; contactId: string; priceBookId: string; lines: QuoteLine[]; taxPct: number }) => {
+    const id = `q-${Date.now()}`;
+    const num = `QT-${2000 + quotes.length}`;
+    setQuotes((qs) => [
+      { id, number: num, title: data.title, contactId: data.contactId, dealId: deals.find((d) => d.contactId === data.contactId)?.id, priceBookId: data.priceBookId, lines: data.lines, taxPct: data.taxPct, status: 'Draft', createdAt: Date.now(), validUntil: Date.now() + 30 * 86_400_000 },
+      ...qs,
+    ]);
+    setQuoteOpen(false);
+    setTab('quotes');
+    notify(`Quote ${num} drafted — ${money(quoteGrand(data.lines, data.taxPct))}`, 'success', data.contactId);
+    pushActivity(data.contactId, 'Note', `Quote ${num} created`);
+  };
+  const sendQuote = (id: string) => {
+    const q = quotes.find((x) => x.id === id);
+    if (!q) return;
+    setQuotes((qs) => qs.map((x) => (x.id === id ? { ...x, status: 'Delivered' } : x)));
+    notify(`Quote ${q.number} sent to ${byId[q.contactId]?.name ?? 'client'}`, 'info', q.contactId);
+    pushActivity(q.contactId, 'Email', `Sent quote ${q.number}`);
+  };
+  const setQuoteOutcome = (id: string, status: QuoteStatus) => {
+    const q = quotes.find((x) => x.id === id);
+    if (!q) return;
+    setQuotes((qs) => qs.map((x) => (x.id === id ? { ...x, status } : x)));
+    notify(`Quote ${q.number} ${status.toLowerCase()}`, status === 'Accepted' ? 'success' : 'warn', q.contactId);
+    pushActivity(q.contactId, 'Note', `Quote ${q.number} ${status.toLowerCase()}`);
+  };
+  const convertQuoteToSO = (id: string) => {
+    const q = quotes.find((x) => x.id === id);
+    if (!q || q.salesOrderId) return;
+    const soId = `so-${Date.now()}`;
+    const num = `SO-${3000 + salesOrders.length}`;
+    setSalesOrders((so) => [
+      { id: soId, number: num, quoteId: q.id, contactId: q.contactId, lines: q.lines, taxPct: q.taxPct, status: 'Created', createdAt: Date.now() },
+      ...so,
+    ]);
+    setQuotes((qs) => qs.map((x) => (x.id === id ? { ...x, salesOrderId: soId } : x)));
+    setTab('salesorders');
+    notify(`Sales order ${num} created from ${q.number}`, 'success', q.contactId);
+    pushActivity(q.contactId, 'Note', `Sales order ${num} raised from quote ${q.number}`);
+  };
+  const approveSO = (id: string) =>
+    setSalesOrders((so) => so.map((x) => (x.id === id ? { ...x, status: 'Approved' } : x)));
+  const deliverSO = (id: string) =>
+    setSalesOrders((so) => so.map((x) => (x.id === id ? { ...x, status: 'Delivered' } : x)));
+  const invoiceSO = (id: string) => {
+    const so = salesOrders.find((x) => x.id === id);
+    if (!so || so.invoiceId) return;
+    const invId = `inv-${Date.now()}`;
+    const num = `INV-${1000 + invoices.length}`;
+    const items = so.lines.map((l) => ({
+      desc: products.find((p) => p.id === l.productId)?.name ?? 'Item',
+      qty: l.qty,
+      unitPrice: Math.round(l.listPrice * (1 - l.discountPct / 100)),
+    }));
+    setInvoices((iv) => [
+      { id: invId, number: num, contactId: so.contactId, items, status: 'Sent', issuedAt: Date.now(), dueAt: Date.now() + 30 * 86_400_000 },
+      ...iv,
+    ]);
+    setSalesOrders((sos) => sos.map((x) => (x.id === id ? { ...x, status: 'Invoiced', invoiceId: invId } : x)));
+    setTab('invoices');
+    notify(`Invoice ${num} raised from ${so.number}`, 'success', so.contactId);
+    pushActivity(so.contactId, 'Note', `Invoice ${num} raised from sales order ${so.number}`);
+  };
+
   const selected = selectedId ? byId[selectedId] : null;
   const go = (t: Tab) => { setTab(t); setNavOpen(false); };
 
@@ -777,6 +878,14 @@ export default function CrmPage() {
                 <Plus size={15} /> New contact
               </button>
             )}
+            {tab === 'quotes' && (
+              <button
+                onClick={() => setQuoteOpen(true)}
+                className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-bright)] px-4 py-2 text-sm font-medium text-[#0b0d10] transition-colors hover:bg-white"
+              >
+                <Plus size={15} /> New quote
+              </button>
+            )}
           </div>
 
           {loading ? (
@@ -794,6 +903,14 @@ export default function CrmPage() {
               )}
               {tab === 'companies' && <Companies companies={companies} contacts={contacts} deals={deals} onOpen={setSelectedId} />}
               {tab === 'pipeline' && <Pipeline deals={deals} byId={byId} onAdvance={(id) => setBlueprintId(id)} onLose={(id) => setLosingId(id)} />}
+              {tab === 'quotes' && (
+                <QuotesView quotes={quotes} byId={byId} priceBooks={priceBooks} products={products} onSend={sendQuote} onOutcome={setQuoteOutcome} onConvert={convertQuoteToSO} onNew={() => setQuoteOpen(true)} />
+              )}
+              {tab === 'salesorders' && (
+                <SalesOrdersView salesOrders={salesOrders} quotes={quotes} byId={byId} products={products} onApprove={approveSO} onDeliver={deliverSO} onInvoice={invoiceSO} onGoInvoices={() => go('invoices')} />
+              )}
+              {tab === 'products' && <ProductsView products={products} onToggle={toggleProduct} />}
+              {tab === 'pricebooks' && <PriceBooksView priceBooks={priceBooks} products={products} onToggle={togglePriceBook} />}
               {tab === 'tasks' && <Tasks tasks={tasks} byId={byId} contacts={contacts} onToggle={toggleTask} onAdd={addTask} />}
               {tab === 'calendar' && <CalendarView meetings={meetings} byId={byId} />}
               {tab === 'inbox' && (
@@ -821,6 +938,15 @@ export default function CrmPage() {
         />
       )}
       {addOpen && <AddContactModal onClose={() => setAddOpen(false)} onAdd={addContact} />}
+      {quoteOpen && (
+        <QuoteModal
+          contacts={contacts}
+          products={products.filter((p) => p.active)}
+          priceBooks={priceBooks.filter((b) => b.active)}
+          onClose={() => setQuoteOpen(false)}
+          onCreate={createQuote}
+        />
+      )}
       <Toasts items={toasts} onDismiss={dismissToast} onOpen={setSelectedId} />
       {losingId && (
         <LostDealModal
@@ -2104,6 +2230,321 @@ function AddContactModal({
             <select value={source} onChange={(e) => setSource(e.target.value)} className={field}>{LEAD_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}</select>
           </div>
           <button onClick={submit} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-bright)] py-2.5 font-medium text-[#0b0d10] transition-colors hover:bg-white"><Plus size={16} /> Add contact</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Products ─────────────────────────────────────────────────────────────────
+const CAT_STYLE: Record<Product['category'], string> = {
+  Subscription: 'bg-[var(--brand-bright)]/15 text-[var(--brand-bright)] border-[var(--brand-bright)]/30',
+  Services: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+  Support: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  'Add-on': 'bg-white/5 text-[var(--muted)] border-white/10',
+};
+function ProductsView({ products, onToggle }: { products: Product[]; onToggle: (id: string) => void }) {
+  const active = products.filter((p) => p.active).length;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className={`${card} p-4`}><div className="font-display text-xl text-white">{products.length}</div><div className="text-xs text-[var(--muted)]">Products</div></div>
+        <div className={`${card} p-4`}><div className="font-display text-xl text-emerald-300">{active}</div><div className="text-xs text-[var(--muted)]">Active</div></div>
+        <div className={`${card} p-4`}><div className="font-display text-xl text-white">{new Set(products.map((p) => p.category)).size}</div><div className="text-xs text-[var(--muted)]">Categories</div></div>
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+          <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
+            <tr>
+              <th className="px-4 py-3 font-medium">Code</th>
+              <th className="px-4 py-3 font-medium">Product</th>
+              <th className="px-4 py-3 font-medium">Category</th>
+              <th className="px-4 py-3 font-medium">List price</th>
+              <th className="px-4 py-3 font-medium">Active</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((p) => (
+              <tr key={p.id} className="border-t border-white/5">
+                <td className="px-4 py-3 font-mono text-xs text-[var(--muted)]">{p.code}</td>
+                <td className={`px-4 py-3 font-medium ${p.active ? 'text-white' : 'text-[var(--muted)] line-through'}`}>{p.name}</td>
+                <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${CAT_STYLE[p.category]}`}>{p.category}</span></td>
+                <td className="px-4 py-3 text-white">{money(p.unitPrice)}</td>
+                <td className="px-4 py-3">
+                  <button onClick={() => onToggle(p.id)} className={`h-5 w-9 rounded-full p-0.5 transition-colors ${p.active ? 'bg-emerald-500/70' : 'bg-white/15'}`} aria-label="Toggle active">
+                    <span className={`block h-4 w-4 rounded-full bg-white transition-transform ${p.active ? 'translate-x-4' : ''}`} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Price Books ────────────────────────────────────────────────────────────
+function PriceBooksView({ priceBooks, products, onToggle }: { priceBooks: PriceBook[]; products: Product[]; onToggle: (id: string) => void }) {
+  const preview = products.filter((p) => p.active).slice(0, 4);
+  return (
+    <div className="grid gap-3 lg:grid-cols-3">
+      {priceBooks.map((b) => (
+        <div key={b.id} className={`${card} flex flex-col p-5`}>
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="font-display text-lg text-white">{b.name}</div>
+              <span className={`mt-1 inline-block rounded-full border px-2.5 py-0.5 text-xs ${b.adjustmentPct < 0 ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-white/5 text-[var(--muted)] border-white/10'}`}>
+                {b.adjustmentPct === 0 ? 'List price' : `${b.adjustmentPct}% off list`}
+              </span>
+            </div>
+            <button onClick={() => onToggle(b.id)} className={`h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors ${b.active ? 'bg-emerald-500/70' : 'bg-white/15'}`} aria-label="Toggle active">
+              <span className={`block h-4 w-4 rounded-full bg-white transition-transform ${b.active ? 'translate-x-4' : ''}`} />
+            </button>
+          </div>
+          <p className="mt-2 text-sm text-[var(--muted)]">{b.description}</p>
+          <div className="mt-4 space-y-1.5 border-t border-white/5 pt-3">
+            {preview.map((p) => (
+              <div key={p.id} className="flex items-center justify-between text-[13px]">
+                <span className="min-w-0 truncate text-[var(--text)]">{p.name}</span>
+                <span className="ml-2 shrink-0">
+                  {b.adjustmentPct !== 0 && <span className="mr-1.5 text-xs text-[var(--muted)] line-through">{money(p.unitPrice)}</span>}
+                  <span className="text-[var(--brand-bright)]">{money(bookPrice(p.unitPrice, b))}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Quote / Sales-order shared line rendering ───────────────────────────────
+function LineTable({ lines, products }: { lines: QuoteLine[]; products: Product[] }) {
+  const name = (id: string) => products.find((p) => p.id === id)?.name ?? 'Item';
+  return (
+    <div className="space-y-1 border-t border-white/5 pt-3">
+      {lines.map((l, i) => (
+        <div key={i} className="flex items-center justify-between text-[13px]">
+          <span className="min-w-0 truncate text-[var(--text)]">
+            {name(l.productId)} <span className="text-[var(--muted)]">× {l.qty}</span>
+            {l.discountPct > 0 && <span className="ml-1 text-emerald-300">−{l.discountPct}%</span>}
+          </span>
+          <span className="ml-2 shrink-0 text-white">{money(lineNet(l))}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+function Totals({ lines, taxPct }: { lines: QuoteLine[]; taxPct: number }) {
+  return (
+    <div className="mt-2 space-y-0.5 border-t border-white/5 pt-2 text-[13px]">
+      <div className="flex justify-between text-[var(--muted)]"><span>Subtotal</span><span>{money(quoteSubtotal(lines))}</span></div>
+      <div className="flex justify-between text-[var(--muted)]"><span>VAT ({taxPct}%)</span><span>{money(quoteTax(lines, taxPct))}</span></div>
+      <div className="flex justify-between font-medium text-white"><span>Total</span><span>{money(quoteGrand(lines, taxPct))}</span></div>
+    </div>
+  );
+}
+
+// ── Quotes ───────────────────────────────────────────────────────────────────
+function QuotesView({
+  quotes, byId, priceBooks, products, onSend, onOutcome, onConvert, onNew,
+}: {
+  quotes: Quote[]; byId: Record<string, Contact>; priceBooks: PriceBook[]; products: Product[];
+  onSend: (id: string) => void; onOutcome: (id: string, s: QuoteStatus) => void; onConvert: (id: string) => void; onNew: () => void;
+}) {
+  const bookName = (id: string) => priceBooks.find((b) => b.id === id)?.name ?? '—';
+  const openValue = quotes.filter((q) => q.status === 'Draft' || q.status === 'Delivered').reduce((s, q) => s + quoteGrand(q.lines, q.taxPct), 0);
+  const stats: [string, string | number][] = [
+    ['Open value', money(openValue)],
+    ['Awaiting client', quotes.filter((q) => q.status === 'Delivered').length],
+    ['Accepted', quotes.filter((q) => q.status === 'Accepted').length],
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        {stats.map(([label, value]) => (
+          <div key={label} className={`${card} p-4`}><div className="font-display text-xl text-white">{value}</div><div className="text-xs text-[var(--muted)]">{label}</div></div>
+        ))}
+      </div>
+      {quotes.length === 0 && (
+        <div className={`${card} p-10 text-center`}>
+          <ScrollText size={28} className="mx-auto text-[var(--muted)]" />
+          <p className="mt-3 text-sm text-[var(--muted)]">No quotes yet.</p>
+          <button onClick={onNew} className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--brand-bright)] px-4 py-2 text-sm font-medium text-[#0b0d10] hover:bg-white"><Plus size={15} /> New quote</button>
+        </div>
+      )}
+      <div className="grid gap-3 lg:grid-cols-2">
+        {quotes.map((q) => (
+          <div key={q.id} className={`${card} flex flex-col p-5`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-xs text-[var(--muted)]"><span className="font-mono">{q.number}</span> · {bookName(q.priceBookId)}</div>
+                <div className="mt-0.5 truncate font-medium text-white">{q.title}</div>
+                <div className="mt-0.5 text-sm text-[var(--muted)]">{byId[q.contactId]?.name ?? '—'} · valid to {fmtDate(q.validUntil)}</div>
+              </div>
+              <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs ${QUOTE_STYLE[q.status]}`}>{q.status}</span>
+            </div>
+            <LineTable lines={q.lines} products={products} />
+            <Totals lines={q.lines} taxPct={q.taxPct} />
+            <div className="mt-4 flex flex-wrap gap-2">
+              {q.status === 'Draft' && (
+                <button onClick={() => onSend(q.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500/15 px-3 py-1.5 text-xs text-sky-300 hover:bg-sky-500/25"><Send size={13} /> Send to client</button>
+              )}
+              {q.status === 'Delivered' && (
+                <>
+                  <button onClick={() => onOutcome(q.id, 'Accepted')} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-500/25"><Check size={13} /> Mark accepted</button>
+                  <button onClick={() => onOutcome(q.id, 'Rejected')} className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-[var(--muted)] hover:bg-white/10"><X size={13} /> Rejected</button>
+                </>
+              )}
+              {q.status === 'Accepted' && (
+                q.salesOrderId
+                  ? <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-[var(--muted)]"><Check size={13} /> Sales order raised</span>
+                  : <button onClick={() => onConvert(q.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-bright)] px-3 py-1.5 text-xs font-medium text-[#0b0d10] hover:bg-white"><ArrowRightLeft size={13} /> Convert to sales order</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Sales Orders ─────────────────────────────────────────────────────────────
+function SalesOrdersView({
+  salesOrders, quotes, byId, products, onApprove, onDeliver, onInvoice, onGoInvoices,
+}: {
+  salesOrders: SalesOrder[]; quotes: Quote[]; byId: Record<string, Contact>; products: Product[];
+  onApprove: (id: string) => void; onDeliver: (id: string) => void; onInvoice: (id: string) => void; onGoInvoices: () => void;
+}) {
+  const quoteNum = (id?: string) => quotes.find((q) => q.id === id)?.number;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <div className={`${card} p-4`}><div className="font-display text-xl text-white">{salesOrders.length}</div><div className="text-xs text-[var(--muted)]">Orders</div></div>
+        <div className={`${card} p-4`}><div className="font-display text-xl text-sky-300">{salesOrders.filter((s) => s.status !== 'Invoiced').length}</div><div className="text-xs text-[var(--muted)]">In flight</div></div>
+        <div className={`${card} p-4`}><div className="font-display text-xl text-emerald-300">{salesOrders.filter((s) => s.status === 'Invoiced').length}</div><div className="text-xs text-[var(--muted)]">Invoiced</div></div>
+      </div>
+      {salesOrders.length === 0 && (
+        <div className={`${card} p-10 text-center`}>
+          <ClipboardList size={28} className="mx-auto text-[var(--muted)]" />
+          <p className="mt-3 text-sm text-[var(--muted)]">No sales orders yet. Accept a quote and convert it to raise one.</p>
+        </div>
+      )}
+      <div className="grid gap-3 lg:grid-cols-2">
+        {salesOrders.map((so) => (
+          <div key={so.id} className={`${card} flex flex-col p-5`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-xs text-[var(--muted)]"><span className="font-mono">{so.number}</span>{quoteNum(so.quoteId) && <> · from {quoteNum(so.quoteId)}</>}</div>
+                <div className="mt-0.5 truncate font-medium text-white">{byId[so.contactId]?.name ?? '—'}</div>
+                <div className="mt-0.5 text-sm text-[var(--muted)]">Raised {fmtDate(so.createdAt)}</div>
+              </div>
+              <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs ${SO_STYLE[so.status]}`}>{so.status}</span>
+            </div>
+            <LineTable lines={so.lines} products={products} />
+            <Totals lines={so.lines} taxPct={so.taxPct} />
+            <div className="mt-4 flex flex-wrap gap-2">
+              {so.status === 'Created' && (
+                <button onClick={() => onApprove(so.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs text-amber-300 hover:bg-amber-500/25"><Check size={13} /> Approve</button>
+              )}
+              {so.status === 'Approved' && (
+                <button onClick={() => onDeliver(so.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500/15 px-3 py-1.5 text-xs text-sky-300 hover:bg-sky-500/25"><Send size={13} /> Mark delivered</button>
+              )}
+              {so.status === 'Delivered' && (
+                <button onClick={() => onInvoice(so.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-bright)] px-3 py-1.5 text-xs font-medium text-[#0b0d10] hover:bg-white"><FileText size={13} /> Generate invoice</button>
+              )}
+              {so.status === 'Invoiced' && (
+                <button onClick={onGoInvoices} className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-[var(--muted)] hover:bg-white/10"><FileText size={13} /> View in Invoices</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── New quote modal ────────────────────────────────────────────────────────
+type DraftLine = { productId: string; qty: number; discountPct: number };
+function QuoteModal({
+  contacts, products, priceBooks, onClose, onCreate,
+}: {
+  contacts: Contact[]; products: Product[]; priceBooks: PriceBook[];
+  onClose: () => void;
+  onCreate: (data: { title: string; contactId: string; priceBookId: string; lines: QuoteLine[]; taxPct: number }) => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [contactId, setContactId] = useState(contacts[0]?.id ?? '');
+  const [priceBookId, setPriceBookId] = useState(priceBooks[0]?.id ?? '');
+  const [taxPct, setTaxPct] = useState(15);
+  const [lines, setLines] = useState<DraftLine[]>([{ productId: products[0]?.id ?? '', qty: 1, discountPct: 0 }]);
+
+  const book = priceBooks.find((b) => b.id === priceBookId) ?? priceBooks[0];
+  const prod = (id: string) => products.find((p) => p.id === id);
+  // Materialise draft lines into priced QuoteLines using the chosen price book.
+  const priced: QuoteLine[] = lines
+    .filter((l) => l.productId)
+    .map((l) => ({ productId: l.productId, qty: Math.max(1, l.qty), listPrice: book ? bookPrice(prod(l.productId)!.unitPrice, book) : prod(l.productId)!.unitPrice, discountPct: l.discountPct }));
+
+  const setLine = (i: number, patch: Partial<DraftLine>) => setLines((ls) => ls.map((l, k) => (k === i ? { ...l, ...patch } : l)));
+  const addLine = () => setLines((ls) => [...ls, { productId: products[0]?.id ?? '', qty: 1, discountPct: 0 }]);
+  const removeLine = (i: number) => setLines((ls) => (ls.length > 1 ? ls.filter((_, k) => k !== i) : ls));
+
+  const contact = contacts.find((c) => c.id === contactId);
+  const canSave = !!contactId && priced.length > 0;
+  const submit = () => {
+    if (!canSave) return;
+    onCreate({ title: title.trim() || `Quote — ${contact?.company ?? contact?.name ?? 'client'}`, contactId, priceBookId, lines: priced, taxPct });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl border border-white/10 bg-[var(--surface)] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-white/10 p-5">
+          <h2 className="font-display text-lg text-white">New quote</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-white/5 hover:text-white" aria-label="Close"><X size={18} /></button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Quote title (optional)" className={field} />
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs text-[var(--muted)]">Client
+              <select value={contactId} onChange={(e) => setContactId(e.target.value)} className={`${field} mt-1`}>{contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+            </label>
+            <label className="text-xs text-[var(--muted)]">Price book
+              <select value={priceBookId} onChange={(e) => setPriceBookId(e.target.value)} className={`${field} mt-1`}>{priceBooks.map((b) => <option key={b.id} value={b.id}>{b.name}{b.adjustmentPct !== 0 ? ` (${b.adjustmentPct}%)` : ''}</option>)}</select>
+            </label>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-wide text-[var(--muted)]">Line items</span><button onClick={addLine} className="inline-flex items-center gap-1 text-xs text-[var(--brand-bright)] hover:underline"><Plus size={13} /> Add line</button></div>
+            {lines.map((l, i) => {
+              const p = prod(l.productId);
+              const unit = p && book ? bookPrice(p.unitPrice, book) : p?.unitPrice ?? 0;
+              return (
+                <div key={i} className="rounded-xl bg-[var(--bg-soft)] p-3">
+                  <div className="flex items-center gap-2">
+                    <select value={l.productId} onChange={(e) => setLine(i, { productId: e.target.value })} className={`${field} min-w-0 flex-1`}>{products.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}</option>)}</select>
+                    {lines.length > 1 && <button onClick={() => removeLine(i)} className="shrink-0 rounded-lg p-1.5 text-[var(--muted)] hover:bg-white/5 hover:text-rose-300" aria-label="Remove line"><Trash2 size={15} /></button>}
+                  </div>
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                    <label className="text-[var(--muted)]">Qty<input type="number" min={1} value={l.qty} onChange={(e) => setLine(i, { qty: Math.max(1, Number(e.target.value) || 1) })} className={`${field} mt-1`} /></label>
+                    <label className="text-[var(--muted)]">Disc %<input type="number" min={0} max={100} value={l.discountPct} onChange={(e) => setLine(i, { discountPct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} className={`${field} mt-1`} /></label>
+                    <div className="text-[var(--muted)]">Line total<div className="mt-1 py-2 font-medium text-white">{money(Math.round(Math.max(1, l.qty) * unit * (1 - l.discountPct / 100)))}</div></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <label className="block text-xs text-[var(--muted)]">VAT %
+            <input type="number" min={0} max={100} value={taxPct} onChange={(e) => setTaxPct(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} className={`${field} mt-1 w-24`} />
+          </label>
+          <Totals lines={priced} taxPct={taxPct} />
+        </div>
+        <div className="border-t border-white/10 p-5">
+          <button onClick={submit} disabled={!canSave} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-bright)] py-2.5 font-medium text-[#0b0d10] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"><ScrollText size={16} /> Create quote</button>
         </div>
       </div>
     </div>

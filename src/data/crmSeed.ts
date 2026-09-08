@@ -303,6 +303,58 @@ export type Invoice = {
   dueAt: number;
 };
 
+// ── Quote-to-cash (Zoho: Products → Price Books → Quotes → Sales Orders → Invoices)
+// A sellable product/service in the catalogue.
+export type Product = {
+  id: string;
+  code: string; // SKU
+  name: string;
+  category: 'Subscription' | 'Services' | 'Support' | 'Add-on';
+  unitPrice: number; // list price
+  active: boolean;
+};
+
+// A named price list that adjusts list prices by a percentage (negative = discount).
+export type PriceBook = {
+  id: string;
+  name: string;
+  description: string;
+  adjustmentPct: number; // e.g. -12 = 12% off list
+  active: boolean;
+};
+
+// One line on a quote / sales order. `listPrice` is the per-unit price at add time
+// (already adjusted by the chosen price book); `discountPct` is a further line discount.
+export type QuoteLine = { productId: string; qty: number; listPrice: number; discountPct: number };
+export type QuoteStatus = 'Draft' | 'Delivered' | 'Accepted' | 'Rejected';
+export type Quote = {
+  id: string;
+  number: string; // QT-2000
+  title: string;
+  contactId: string;
+  dealId?: string;
+  priceBookId: string;
+  lines: QuoteLine[];
+  taxPct: number; // VAT
+  status: QuoteStatus;
+  createdAt: number;
+  validUntil: number;
+  salesOrderId?: string;
+};
+
+export type SalesOrderStatus = 'Created' | 'Approved' | 'Delivered' | 'Invoiced';
+export type SalesOrder = {
+  id: string;
+  number: string; // SO-3000
+  quoteId?: string;
+  contactId: string;
+  lines: QuoteLine[];
+  taxPct: number;
+  status: SalesOrderStatus;
+  createdAt: number;
+  invoiceId?: string;
+};
+
 export type Campaign = {
   id: string;
   name: string;
@@ -334,6 +386,10 @@ export type CrmData = {
   meetings: Meeting[];
   threads: EmailThread[];
   templates: EmailTemplate[];
+  products: Product[];
+  priceBooks: PriceBook[];
+  quotes: Quote[];
+  salesOrders: SalesOrder[];
   invoices: Invoice[];
   campaigns: Campaign[];
   automations: Automation[];
@@ -584,6 +640,80 @@ function buildCrmData(people: Person[], source: CrmData['source']): CrmData {
     { id: 'tpl4', name: 'Renewal reminder', subject: 'Your renewal is coming up', body: 'Hi {{first}},\n\nYour plan renews soon. Would you like to review usage and options before it does?\n\nBest,\nAndrew' },
   ];
 
+  // Product catalogue — the sellable items quotes are built from.
+  const products: Product[] = [
+    ['PLAT-SUB', 'Platform subscription (annual)', 'Subscription', 12000],
+    ['IMPL-SETUP', 'Implementation & setup', 'Services', 4000],
+    ['SUP-PRIO', 'Priority support', 'Support', 6000],
+    ['INT-CUSTOM', 'Custom integration', 'Services', 8000],
+    ['SEAT-ADD', 'Additional seats (per 5)', 'Add-on', 2500],
+    ['TRAIN-WS', 'Training workshop', 'Services', 1800],
+    ['DATA-MIG', 'Data migration', 'Services', 3500],
+  ].map(([code, name, category, unitPrice], i) => ({
+    id: `prod${i + 1}`,
+    code: code as string,
+    name: name as string,
+    category: category as Product['category'],
+    unitPrice: unitPrice as number,
+    active: true,
+  }));
+
+  // Price books — named lists that discount off list price.
+  const priceBooks: PriceBook[] = [
+    { id: 'pb1', name: 'Standard', description: 'List pricing for standard deals.', adjustmentPct: 0, active: true },
+    { id: 'pb2', name: 'Enterprise Volume', description: 'Volume discount for 200+ seat accounts.', adjustmentPct: -12, active: true },
+    { id: 'pb3', name: 'Startup / SMB', description: 'Reduced tier for small teams.', adjustmentPct: -20, active: true },
+  ];
+
+  const byCode = (code: string) => products.find((p) => p.code === code)!;
+  const mkLines = (rows: [string, number, number][], book: PriceBook): QuoteLine[] =>
+    rows.map(([code, qty, discountPct]) => ({
+      productId: byCode(code).id,
+      qty,
+      listPrice: bookPrice(byCode(code).unitPrice, book),
+      discountPct,
+    }));
+
+  // A few seeded quotes across the lifecycle so the module reads full on first open.
+  const qContacts = pickN(rng, contacts, Math.min(3, contacts.length));
+  const quoteSeeds: { book: PriceBook; rows: [string, number, number][]; status: QuoteStatus }[] = [
+    { book: priceBooks[0], rows: [['PLAT-SUB', 1, 0], ['IMPL-SETUP', 1, 0], ['TRAIN-WS', 1, 10]], status: 'Draft' },
+    { book: priceBooks[1], rows: [['PLAT-SUB', 2, 5], ['SUP-PRIO', 1, 0], ['SEAT-ADD', 4, 0]], status: 'Delivered' },
+    { book: priceBooks[2], rows: [['PLAT-SUB', 1, 0], ['DATA-MIG', 1, 0]], status: 'Accepted' },
+  ];
+  const quotes: Quote[] = quoteSeeds.map((s, i) => {
+    const c = qContacts[i % qContacts.length];
+    const createdAt = now - rint(rng, 3, 30) * day;
+    return {
+      id: `q${i + 1}`,
+      number: `QT-${2000 + i}`,
+      title: `${byCode(s.rows[0][0]).name.split(' ')[0]} package — ${c.company}`,
+      contactId: c.id,
+      dealId: deals.find((d) => d.contactId === c.id)?.id,
+      priceBookId: s.book.id,
+      lines: mkLines(s.rows, s.book),
+      taxPct: 15,
+      status: s.status,
+      createdAt,
+      validUntil: createdAt + 30 * day,
+    };
+  });
+
+  // One sales order already in flight (from an accepted quote), delivered and
+  // ready to invoice — so the tail of the chain is populated too.
+  const soContact = qContacts[0];
+  const salesOrders: SalesOrder[] = [
+    {
+      id: 'so1',
+      number: 'SO-3000',
+      contactId: soContact.id,
+      lines: mkLines([['PLAT-SUB', 1, 0], ['SUP-PRIO', 1, 5]], priceBooks[0]),
+      taxPct: 15,
+      status: 'Delivered',
+      createdAt: now - rint(rng, 5, 20) * day,
+    },
+  ];
+
   const invStatuses: InvoiceStatus[] = ['Draft', 'Sent', 'Paid', 'Paid', 'Overdue'];
   const invoices: Invoice[] = Array.from({ length: 11 }, (_, i) => {
     const c = pick(rng, contacts);
@@ -701,7 +831,8 @@ function buildCrmData(people: Person[], source: CrmData['source']): CrmData {
 
   return {
     contacts, companies, leads, cases, deals, activities, tasks, meetings,
-    threads, templates, invoices, campaigns, automations, source,
+    threads, templates, products, priceBooks, quotes, salesOrders,
+    invoices, campaigns, automations, source,
   };
 }
 
@@ -735,3 +866,13 @@ export const avatarFor = (seed: string) =>
 
 export const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 export const invoiceTotal = (inv: Invoice) => inv.items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
+
+// ── Quote-to-cash money math ────────────────────────────────────────────────
+// Price-book-adjusted unit price for a product.
+export const bookPrice = (unitPrice: number, book: PriceBook) =>
+  Math.round(unitPrice * (1 + book.adjustmentPct / 100));
+// Net total for one line after its own discount.
+export const lineNet = (l: QuoteLine) => Math.round(l.qty * l.listPrice * (1 - l.discountPct / 100));
+export const quoteSubtotal = (lines: QuoteLine[]) => lines.reduce((s, l) => s + lineNet(l), 0);
+export const quoteTax = (lines: QuoteLine[], taxPct: number) => Math.round(quoteSubtotal(lines) * taxPct / 100);
+export const quoteGrand = (lines: QuoteLine[], taxPct: number) => quoteSubtotal(lines) + quoteTax(lines, taxPct);
