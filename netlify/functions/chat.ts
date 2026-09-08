@@ -73,7 +73,8 @@ function clientIp(req: Request): string {
 // rather than break the chat over a non-critical guard.
 async function underRateLimit(ip: string): Promise<boolean> {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // check_chat_rate_limit is SECURITY DEFINER granted to anon; publishable key is enough.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return true; // not configured → allow
 
   try {

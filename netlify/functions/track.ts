@@ -81,7 +81,9 @@ export default async (req: Request, context: any): Promise<Response> => {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
 
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // record_visit / get_site_visits are SECURITY DEFINER granted to anon, so the
+  // publishable key is sufficient here; prefer the service-role key if present.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return json(200, { total: null }); // not configured → no-op
 
   let body: any = {};
