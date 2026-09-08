@@ -3,6 +3,7 @@ import { Lock, LogOut, Pencil, X, Loader2, CheckCircle2, AlertCircle, ShieldAler
 import { useAuth } from '@/context/AuthContext';
 import { useLayout } from '@/context/LayoutContext';
 import VisitorInsights from '@/components/VisitorInsights';
+import LeadInbox from '@/components/LeadInbox';
 import {
   lockRemainingMs,
   throttleDelayMs,
@@ -89,6 +90,7 @@ export default function OwnerBar() {
             <span className="hidden max-w-[160px] truncate text-xs text-[var(--muted)] sm:inline">
               {user.email}
             </span>
+            <LeadInbox />
             <VisitorInsights />
             <button
               onClick={() => signOut()}

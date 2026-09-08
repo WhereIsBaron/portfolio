@@ -29,7 +29,7 @@ const setFlag = (k: string) => {
 // The campaign/referral tag that brought this visit — so the owner can tell
 // which job application or posting was actually opened. Reads ?ref= first, then
 // the standard utm_source / utm_campaign. Trimmed and length-capped; '' when none.
-function campaignTag(): string {
+export function campaignTag(): string {
   try {
     const q = new URLSearchParams(window.location.search);
     const tag = q.get('ref') || q.get('utm_source') || q.get('utm_campaign') || '';

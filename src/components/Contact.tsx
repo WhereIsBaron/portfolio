@@ -1,10 +1,114 @@
-import { Mail, MapPin, Phone, Github, Linkedin, ArrowUpRight } from 'lucide-react';
+import { useState, FormEvent } from 'react';
+import {
+  Mail, MapPin, Phone, Github, Linkedin, ArrowUpRight, Send, Loader2, CheckCircle2, AlertCircle,
+} from 'lucide-react';
 import { profile } from '@/data/cv';
+import { supabase, supabaseConfigured } from '@/lib/supabase';
+import { campaignTag } from '@/lib/useVisitCount';
 
 const socialIcon: Record<string, React.ReactNode> = {
   github: <Github size={18} />,
   linkedin: <Linkedin size={18} />,
 };
+
+// The public "send a message" form. Writes a real lead into Supabase via the
+// validated submit_lead RPC (owner-only read), tagging it with the campaign the
+// visitor arrived on so a warm reply ties back to the application/link.
+function ContactForm() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [company, setCompany] = useState('');
+  const [message, setMessage] = useState('');
+  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (state === 'sending') return;
+    if (!supabase) {
+      setState('error');
+      setError('Messaging is offline right now — please email me directly.');
+      return;
+    }
+    setState('sending');
+    setError(null);
+    const { data, error } = await supabase.rpc('submit_lead', {
+      p_name: name.trim(),
+      p_email: email.trim(),
+      p_message: message.trim(),
+      p_company: company.trim(),
+      p_campaign: campaignTag(),
+    });
+    if (error || data !== true) {
+      setState('error');
+      setError(
+        error?.message?.includes('invalid email')
+          ? 'That email doesn’t look right — mind checking it?'
+          : 'Something went wrong sending that. You can email me directly instead.'
+      );
+      return;
+    }
+    setState('sent');
+    setName(''); setEmail(''); setCompany(''); setMessage('');
+  };
+
+  const field =
+    'w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2.5 text-white placeholder:text-[var(--muted)]/60 focus:border-[var(--brand-bright)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-bright)]';
+
+  if (state === 'sent') {
+    return (
+      <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-[var(--brand)]/30 bg-[var(--surface)] p-8 text-center">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--brand-bright)]/15">
+          <CheckCircle2 size={28} className="text-[var(--brand-bright)]" />
+        </span>
+        <h3 className="mt-4 font-display text-xl text-white">Message sent</h3>
+        <p className="mt-2 max-w-xs text-sm text-[var(--muted)]">
+          Thanks for reaching out — I’ll get back to you within two business days.
+        </p>
+        <button
+          onClick={() => setState('idle')}
+          className="mt-5 text-sm text-[var(--brand-bright)] hover:underline"
+        >
+          Send another
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-[var(--surface)] p-6">
+      <h3 className="font-display text-xl text-white">Send a message</h3>
+      <p className="mt-1 text-sm text-[var(--muted)]">Prefer a form? Drop me a line and I’ll reply by email.</p>
+      <div className="mt-5 space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input className={field} placeholder="Your name" required maxLength={120}
+            value={name} onChange={(e) => setName(e.target.value)} />
+          <input className={field} type="email" placeholder="Email" required maxLength={200}
+            value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <input className={field} placeholder="Company (optional)" maxLength={160}
+          value={company} onChange={(e) => setCompany(e.target.value)} />
+        <textarea className={`${field} min-h-[120px] resize-y`} placeholder="What’s on your mind?" required maxLength={4000}
+          value={message} onChange={(e) => setMessage(e.target.value)} />
+      </div>
+
+      {state === 'error' && error && (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" /> {error}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={state === 'sending'}
+        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-bright)] py-3 font-medium text-[#0b0d10] transition-colors hover:bg-white disabled:opacity-60"
+      >
+        {state === 'sending' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+        {state === 'sending' ? 'Sending…' : 'Send message'}
+      </button>
+    </form>
+  );
+}
 
 export default function Contact() {
   const details = [
@@ -47,8 +151,11 @@ export default function Contact() {
           two business days.
         </p>
 
+        <div className="mt-12 grid gap-8 lg:grid-cols-[1.1fr_1fr]">
+          {/* Left: contact details + actions */}
+          <div>
         {/* Contact details, front and centre */}
-        <div className="reveal mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="reveal grid gap-4 sm:grid-cols-2">
           {details.map((d) => {
             const inner = (
               <>
@@ -87,7 +194,7 @@ export default function Contact() {
         </div>
 
         {/* Primary email action + socials */}
-        <div className="reveal mt-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="reveal mt-8 flex flex-col gap-6">
           <a
             href={`mailto:${profile.email}`}
             className="group inline-flex w-fit items-center gap-2 rounded-full bg-[var(--brand-bright)] px-6 py-3 text-sm font-medium text-[#0b0d10] transition-all hover:bg-white"
@@ -113,6 +220,15 @@ export default function Contact() {
               </a>
             ))}
           </div>
+        </div>
+          </div>
+
+          {/* Right: message form (falls back to email when Supabase is offline) */}
+          {supabaseConfigured && (
+            <div className="reveal">
+              <ContactForm />
+            </div>
+          )}
         </div>
       </div>
     </section>
