@@ -504,6 +504,28 @@ function buildCrmData(people: Person[], source: CrmData['source']): CrmData {
     };
   });
 
+  // Seed a few engagement "signals" (opens, clicks, views) on several contacts so
+  // the record page shows SalesSignals on first open — the live ambient engine
+  // then adds more as you use the app.
+  const SIGNAL_SUBJECTS = [
+    'Opened your last email', 'Clicked a link in your proposal', 'Viewed your pricing page',
+    'Replied to your message', 'Opened your follow-up', 'Downloaded the case study',
+  ];
+  pickN(rng, contacts, Math.min(6, contacts.length)).forEach((c, i) => {
+    const count = rint(rng, 1, 3);
+    for (let k = 0; k < count; k++) {
+      activities.unshift({
+        id: `sig${i + 1}-${k + 1}`,
+        type: 'Email',
+        contactId: c.id,
+        subject: pick(rng, SIGNAL_SUBJECTS),
+        at: now - rint(rng, 1, 72) * 3_600_000,
+        done: true,
+        owner: c.owner,
+      });
+    }
+  });
+
   const tasks: Task[] = Array.from({ length: 14 }, (_, i) => {
     const c = pick(rng, contacts);
     const dueAt = now + (rint(rng, 0, 20) - 8) * day;

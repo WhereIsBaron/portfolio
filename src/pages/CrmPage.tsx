@@ -25,7 +25,7 @@ const NAV: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'leads', label: 'Leads', icon: UserPlus },
   { id: 'contacts', label: 'Contacts', icon: Users },
-  { id: 'companies', label: 'Companies', icon: Building2 },
+  { id: 'companies', label: 'Accounts', icon: Building2 },
   { id: 'pipeline', label: 'Pipeline', icon: KanbanSquare },
   { id: 'tasks', label: 'Tasks', icon: CheckSquare },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
@@ -116,6 +116,118 @@ const field =
 // One consistent pill for every quick reply — border matches the text colour, no emoji.
 const quickReplyPill =
   'rounded-full border border-[var(--brand-bright)]/40 bg-[var(--brand-bright)]/5 px-2.5 py-1 text-[11px] text-[var(--brand-bright)] transition-colors hover:bg-[var(--brand-bright)]/15';
+
+// ── Blueprint ────────────────────────────────────────────────────────────────
+// Zoho's signature "enforced process": a deal can't jump to the next stage until
+// the rep has completed the required steps for the transition. This turns the
+// pipeline into a teaching tool — it drills the actual motion of a sale, in order.
+type BlueprintStep = { next: Stage; guidance: string; checklist: string[]; nextStepLabel: string };
+const BLUEPRINT: Record<Stage, BlueprintStep | null> = {
+  'Lead In': {
+    next: 'Contacted',
+    guidance: 'Make first contact and confirm this is a real opportunity worth working.',
+    checklist: [
+      'Logged a call or email with the buyer',
+      'Confirmed you’re speaking to a decision-maker',
+      'Captured the problem they’re trying to solve',
+    ],
+    nextStepLabel: 'What’s the very next action? (e.g. “Book a discovery call”)',
+  },
+  Contacted: {
+    next: 'Proposal',
+    guidance: 'Qualify the need and budget, then get a tailored proposal out.',
+    checklist: [
+      'Ran a discovery / needs call',
+      'Confirmed budget and buying timeline',
+      'Sent a proposal tailored to their use case',
+    ],
+    nextStepLabel: 'What’s the next step after sending the proposal?',
+  },
+  Proposal: {
+    next: 'Negotiation',
+    guidance: 'Make sure the buyer has actually engaged with the proposal before negotiating.',
+    checklist: [
+      'Buyer has reviewed the proposal',
+      'Answered pricing / scope questions',
+      'Agreed who signs off and by when',
+    ],
+    nextStepLabel: 'What needs to happen to reach agreement?',
+  },
+  Negotiation: {
+    next: 'Won',
+    guidance: 'Lock in the commercials and close it out.',
+    checklist: [
+      'Final terms and price agreed',
+      'Contract sent for signature',
+      'Written or verbal commitment to proceed',
+    ],
+    nextStepLabel: 'Confirm the closing step (e.g. “Countersign & kick off onboarding”)',
+  },
+  Won: null,
+  Lost: null,
+};
+
+// ── Zia (AI insights) ─────────────────────────────────────────────────────────
+// A lightweight stand-in for Zoho's Zia: it reads the same signals a predictive
+// model would — source, engagement, stage, momentum, deal size — and explains its
+// read in plain language, so learners see WHY a lead is hot or a deal likely to
+// close rather than just a number.
+const SIGNAL_HINTS = ['open', 'click', 'view', 'repl', 'book', 'download', 'paid'];
+const isSignal = (subject: string) => SIGNAL_HINTS.some((h) => subject.toLowerCase().includes(h));
+
+function ziaDealRead(deal: Deal, activities: Activity[]) {
+  const reasons: string[] = [`In ${deal.stage} — deals here close around ${deal.probability}% of the time`];
+  const signals = activities.filter((a) => isSignal(a.subject)).length;
+  reasons.push(signals >= 2 ? `Strong engagement — ${signals} recent buyer signals` : signals === 1 ? 'Some engagement — one recent buyer signal' : 'Quiet lately — no recent buyer signals');
+  const days = Math.round((deal.expectedClose - Date.now()) / 86_400_000);
+  reasons.push(days < 0 ? `Past its expected close by ${Math.abs(days)}d — needs a push` : `Expected to close in ~${days}d`);
+  if (deal.value >= 40000) reasons.push('High-value — worth prioritising');
+  const verdict = deal.probability >= 70 ? 'Likely to close' : deal.probability >= 40 ? 'On track — keep momentum' : 'At risk — needs attention';
+  const tone: Warmth = deal.probability >= 70 ? 'warm' : deal.probability >= 40 ? 'neutral' : 'cool';
+  return { pct: deal.probability, verdict, tone, reasons: reasons.slice(0, 4) };
+}
+
+function ziaLeadRead(lead: Lead) {
+  const hotSource = /referral|linkedin|event|inbound/i.test(lead.source);
+  const reasons = [
+    hotSource ? `${lead.source} leads convert above average` : `${lead.source} is a lower-intent source`,
+    lead.estValue >= 30000 ? `Sizeable potential — ${money(lead.estValue)}` : `Modest potential — ${money(lead.estValue)}`,
+    lead.score >= 70 ? 'Profile closely matches your won deals' : lead.score >= 40 ? 'Partial fit to your ideal profile' : 'Weak fit to your ideal profile',
+  ];
+  const verdict = lead.score >= 70 ? 'Hot — act today' : lead.score >= 40 ? 'Warm — worth nurturing' : 'Cold — low priority';
+  const tone: Warmth = lead.score >= 70 ? 'warm' : lead.score >= 40 ? 'neutral' : 'cool';
+  return { pct: lead.score, verdict, tone, reasons };
+}
+
+const ZIA_TONE: Record<Warmth, string> = {
+  warm: 'border-emerald-500/30 text-emerald-300',
+  neutral: 'border-amber-500/30 text-amber-300',
+  cool: 'border-rose-500/30 text-rose-300',
+};
+
+// The compact Zia card — a score ring, a one-line verdict, and the reasons behind
+// it. Reused on the record page (deal read) and could drive a leads popover.
+function ZiaCard({ pct, verdict, tone, reasons, unit = '%' }: { pct: number; verdict: string; tone: Warmth; reasons: string[]; unit?: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-[var(--bg-soft)] p-3">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--brand-bright)]"><Sparkles size={13} /> Zia insights</div>
+      <div className="mt-2 flex items-center gap-3">
+        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 ${ZIA_TONE[tone]}`}>
+          <span className="font-display text-sm text-white">{pct}{unit}</span>
+        </div>
+        <div className="min-w-0">
+          <div className={`text-sm font-medium ${ZIA_TONE[tone].split(' ')[1]}`}>{verdict}</div>
+          <div className="text-[11px] text-[var(--muted)]">Zia's read of this record</div>
+        </div>
+      </div>
+      <ul className="mt-2.5 space-y-1">
+        {reasons.map((r) => (
+          <li key={r} className="flex gap-1.5 text-[11px] text-[var(--muted)]"><span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[var(--brand-bright)]" />{r}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 // ── Live simulation layer ────────────────────────────────────────────────────
 // This is a demo, but it behaves like a real CRM: your actions trigger reactions
@@ -341,6 +453,7 @@ export default function CrmPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [losingId, setLosingId] = useState<string | null>(null);
+  const [blueprintId, setBlueprintId] = useState<string | null>(null);
 
   // Live-simulation state: toast notifications, inbox "typing…", and a running
   // count of ambient events so the header can show the workspace is alive.
@@ -680,7 +793,7 @@ export default function CrmPage() {
                 <Contacts contacts={contacts} onOpen={setSelectedId} dealsFor={(id) => deals.filter((d) => d.contactId === id)} />
               )}
               {tab === 'companies' && <Companies companies={companies} contacts={contacts} deals={deals} onOpen={setSelectedId} />}
-              {tab === 'pipeline' && <Pipeline deals={deals} byId={byId} onAdvance={advanceDeal} onLose={(id) => setLosingId(id)} />}
+              {tab === 'pipeline' && <Pipeline deals={deals} byId={byId} onAdvance={(id) => setBlueprintId(id)} onLose={(id) => setLosingId(id)} />}
               {tab === 'tasks' && <Tasks tasks={tasks} byId={byId} contacts={contacts} onToggle={toggleTask} onAdd={addTask} />}
               {tab === 'calendar' && <CalendarView meetings={meetings} byId={byId} />}
               {tab === 'inbox' && (
@@ -714,6 +827,20 @@ export default function CrmPage() {
           deal={deals.find((d) => d.id === losingId)!}
           onClose={() => setLosingId(null)}
           onConfirm={(reason, competitor) => loseDeal(losingId, reason, competitor)}
+        />
+      )}
+      {blueprintId && deals.find((d) => d.id === blueprintId) && (
+        <BlueprintModal
+          deal={deals.find((d) => d.id === blueprintId)!}
+          contact={byId[deals.find((d) => d.id === blueprintId)!.contactId]}
+          onClose={() => setBlueprintId(null)}
+          onConfirm={(nextStep) => {
+            const d = deals.find((x) => x.id === blueprintId)!;
+            const bp = BLUEPRINT[d.stage];
+            advanceDeal(blueprintId);
+            if (bp) pushActivity(d.contactId, 'Note', `Blueprint ${d.stage} → ${bp.next} · next: ${nextStep}`);
+            setBlueprintId(null);
+          }}
         />
       )}
     </div>
@@ -963,6 +1090,10 @@ function LeadsView({
     ['Converted', leads.filter((l) => l.status === 'Converted').length],
     ['Avg. score', leads.length ? Math.round(leads.reduce((s, l) => s + l.score, 0) / leads.length) : 0],
   ] as const;
+  // Zia's top recommendation: the highest-scoring lead still worth working.
+  const hottest = [...leads]
+    .filter((l) => l.status !== 'Converted' && l.status !== 'Unqualified')
+    .sort((a, b) => b.score - a.score)[0];
 
   return (
     <div className="space-y-4">
@@ -977,8 +1108,22 @@ function LeadsView({
         ))}
       </div>
       <div className={`${card} p-3 text-xs text-[var(--muted)]`}>
-        <span className="text-white">Web-to-Lead:</span> new leads flow in from the website form and cold outreach, get scored and qualified, then <span className="text-[var(--brand-bright)]">convert</span> into a contact, a company, and an opportunity in one click.
+        <span className="text-white">Web-to-Lead:</span> new leads flow in from the website form and cold outreach, get scored and qualified, then <span className="text-[var(--brand-bright)]">convert</span> into a contact, an account, and an opportunity in one click.
       </div>
+      {hottest && (() => {
+        const z = ziaLeadRead(hottest);
+        return (
+          <div className={`${card} flex flex-wrap items-center gap-x-4 gap-y-2 p-3`}>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--brand-bright)]"><Sparkles size={13} /> Zia recommends</div>
+            <div className="flex items-center gap-2 text-sm">
+              <Avatar src={hottest.avatar} name={hottest.name} size={24} />
+              <span className="font-medium text-white">{hottest.name}</span>
+              <span className={`rounded-full border px-2 py-0.5 text-[11px] ${ZIA_TONE[z.tone]}`}>{z.verdict}</span>
+            </div>
+            <span className="text-xs text-[var(--muted)]">{z.reasons[0]} · score {z.pct}</span>
+          </div>
+        );
+      })()}
       <div className="overflow-x-auto rounded-2xl border border-white/10">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
@@ -1146,6 +1291,67 @@ function LostDealModal({
         <div className="mt-6 flex justify-end gap-2">
           <button onClick={onClose} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-[var(--muted)] hover:text-white">Cancel</button>
           <button onClick={() => onConfirm(reason, competitor)} className="rounded-xl bg-rose-500/90 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500">Mark lost</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Blueprint transition gate — the rep must tick every required step and record a
+// next action before the deal is allowed to advance. Mirrors Zoho's Blueprint.
+function BlueprintModal({
+  deal, contact, onClose, onConfirm,
+}: { deal: Deal; contact?: Contact; onClose: () => void; onConfirm: (nextStep: string) => void }) {
+  const bp = BLUEPRINT[deal.stage];
+  const [done, setDone] = useState<boolean[]>(() => (bp ? bp.checklist.map(() => false) : []));
+  const [nextStep, setNextStep] = useState('');
+  if (!bp) return null;
+  const allChecked = done.every(Boolean);
+  const ready = allChecked && nextStep.trim().length > 0;
+  const toggle = (i: number) => setDone((d) => d.map((v, k) => (k === i ? !v : v)));
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className={`${card} w-full max-w-lg p-6`} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand-bright)]/15 text-[var(--brand-bright)]"><KanbanSquare size={16} /></span>
+            <div>
+              <h3 className="font-display text-lg leading-tight text-white">Blueprint</h3>
+              <div className="flex items-center gap-1.5 text-xs text-[var(--muted)]">{deal.stage} <ChevronRight size={12} /> <span className="text-[var(--brand-bright)]">{bp.next}</span></div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-[var(--muted)] hover:text-white"><X size={18} /></button>
+        </div>
+        <p className="mt-3 text-sm text-[var(--muted)]">{money(deal.value)} · {deal.title}{contact ? ` · ${contact.name}` : ''}</p>
+        <div className="mt-3 rounded-xl border border-[var(--brand-bright)]/25 bg-[var(--brand-bright)]/5 px-3 py-2 text-[13px] text-[var(--text)]">{bp.guidance}</div>
+
+        <div className="mt-4 text-xs uppercase tracking-wide text-[var(--muted)]">Required before advancing</div>
+        <ul className="mt-2 space-y-1.5">
+          {bp.checklist.map((item, i) => (
+            <li key={item}>
+              <button onClick={() => toggle(i)} className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-left text-sm transition-colors hover:border-white/20">
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${done[i] ? 'border-[var(--brand-bright)] bg-[var(--brand-bright)] text-[#0b0d10]' : 'border-white/20 text-transparent'}`}><Check size={13} /></span>
+                <span className={done[i] ? 'text-white' : 'text-[var(--muted)]'}>{item}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        <label className="mt-4 block text-xs uppercase tracking-wide text-[var(--muted)]">Next step <span className="text-rose-300">*</span></label>
+        <input value={nextStep} onChange={(e) => setNextStep(e.target.value)} placeholder={bp.nextStepLabel} className={`mt-1 ${field}`} />
+
+        <div className="mt-6 flex items-center justify-between gap-2">
+          <span className="text-xs text-[var(--muted)]">{done.filter(Boolean).length}/{bp.checklist.length} steps done{ready ? '' : ' · complete all + a next step to continue'}</span>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-[var(--muted)] hover:text-white">Cancel</button>
+            <button
+              disabled={!ready}
+              onClick={() => onConfirm(nextStep.trim())}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${ready ? 'bg-[var(--brand-bright)] text-[#0b0d10] hover:bg-white' : 'cursor-not-allowed bg-white/5 text-[var(--muted)]'}`}
+            >
+              Complete & move to {bp.next} <ChevronRight size={15} />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1762,6 +1968,11 @@ function ContactDrawer({
   const [type, setType] = useState<ActivityType>('Note');
   const [subject, setSubject] = useState('');
   const submit = () => { if (!subject.trim()) return; onLog(type, subject.trim()); setSubject(''); };
+  // Zia reads the contact's most relevant open deal; SalesSignals surface recent
+  // engagement (opens, clicks, views) already captured on the timeline.
+  const focusDeal = deals.find((d) => OPEN_STAGES.includes(d.stage)) ?? deals[0];
+  const zia = focusDeal ? ziaDealRead(focusDeal, activities) : null;
+  const signals = activities.filter((a) => isSignal(a.subject)).slice(0, 4);
   return (
     <div className="fixed inset-0 z-[95] flex justify-end bg-black/60" onClick={onClose}>
       <div className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-white/10 bg-[var(--surface)] shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -1785,6 +1996,26 @@ function ContactDrawer({
           <Row icon={Calendar} text={`Added ${fmtDate(contact.createdAt)} · ${contact.location}`} />
           <div className="flex flex-wrap gap-1.5 pt-1">{contact.tags.map((t) => <span key={t} className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-[var(--muted)]">{t}</span>)}</div>
         </div>
+
+        {(zia || signals.length > 0) && (
+          <div className="space-y-3 border-b border-white/10 p-5">
+            {zia && <ZiaCard {...zia} />}
+            {signals.length > 0 && (
+              <div>
+                <h4 className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-[var(--muted)]"><Radio size={12} className="text-emerald-400" /> SalesSignals</h4>
+                <ul className="mt-2 space-y-1.5">
+                  {signals.map((a) => (
+                    <li key={a.id} className="flex items-center gap-2 text-[13px]">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                      <span className="min-w-0 flex-1 truncate text-[var(--text)]">{a.subject}</span>
+                      <span className="shrink-0 text-[11px] text-[var(--muted)]">{relTime(a.at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {deals.length > 0 && (
           <div className="border-b border-white/10 p-5">
