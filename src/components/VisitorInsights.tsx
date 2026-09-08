@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   BarChart3, X, Loader2, RefreshCw, Users, Radio, Globe, TrendingUp,
+  ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -87,34 +88,117 @@ function when(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB');
 }
 
-// ── Small inline charts (no dependency) ───────────────────────────────────────
-function TrendChart({ series }: { series: { day: number; visits: number }[] }) {
-  const W = 680;
-  const H = 150;
-  const P = 10;
-  const max = Math.max(1, ...series.map((d) => d.visits));
+const fmtDay = (ms: number, long = false) =>
+  new Date(ms).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', ...(long ? { weekday: 'short' } : {}) });
+
+// Round a max up to a friendly axis ceiling (5, 10, 20, 50, …).
+function niceCeil(v: number): number {
+  if (v <= 5) return 5;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / p;
+  const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+  return step * p;
+}
+
+// ── Trend chart: visits (area+line) + unique visitors (line), axes, hover ──────
+type TrendPoint = { day: number; visits: number; uniques: number };
+function TrendChart({ series }: { series: TrendPoint[] }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const W = 720, H = 190;
+  const PL = 34, PR = 12, PT = 12, PB = 22;
+  const plotW = W - PL - PR;
+  const plotH = H - PT - PB;
   const n = series.length;
-  const x = (i: number) => P + (n <= 1 ? 0 : (i / (n - 1)) * (W - 2 * P));
-  const y = (v: number) => H - P - (v / max) * (H - 2 * P);
-  const line = series.map((d, i) => `${x(i)},${y(d.visits)}`).join(' ');
-  const area = `M ${P},${H - P} L ${series.map((d, i) => `${x(i)},${y(d.visits)}`).join(' L ')} L ${x(n - 1)},${H - P} Z`;
-  const fmt = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  const max = niceCeil(Math.max(1, ...series.map((d) => d.visits)));
+  const x = (i: number) => PL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+  const y = (v: number) => PT + plotH - (v / max) * plotH;
+
+  const linePts = (key: 'visits' | 'uniques') => series.map((d, i) => `${x(i)},${y(d[key])}`).join(' ');
+  const area = `M ${x(0)},${PT + plotH} L ${series.map((d, i) => `${x(i)},${y(d.visits)}`).join(' L ')} L ${x(n - 1)},${PT + plotH} Z`;
+
+  const gridVals = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(max * f));
+  // ~6 evenly spaced x-axis date ticks.
+  const tickEvery = Math.max(1, Math.round(n / 6));
+  const xTicks = series.map((_, i) => i).filter((i) => i % tickEvery === 0 || i === n - 1);
+  const hp = hover != null ? series[hover] : null;
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none" style={{ height: 150 }}>
-      <defs>
-        <linearGradient id="vi-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--brand-bright)" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="var(--brand-bright)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill="url(#vi-fill)" />
-      <polyline points={line} fill="none" stroke="var(--brand-bright)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      {series.map((d, i) => (
-        <circle key={d.day} cx={x(i)} cy={y(d.visits)} r="6" fill="transparent">
-          <title>{`${fmt(d.day)} — ${d.visits} visit${d.visits === 1 ? '' : 's'}`}</title>
-        </circle>
-      ))}
-    </svg>
+    <div className="relative">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ display: 'block' }}>
+        <defs>
+          <linearGradient id="vi-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--brand-bright)" stopOpacity="0.32" />
+            <stop offset="100%" stopColor="var(--brand-bright)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* Y gridlines + labels */}
+        {gridVals.map((v, gi) => {
+          const gy = y(v);
+          return (
+            <g key={gi}>
+              <line x1={PL} y1={gy} x2={W - PR} y2={gy} stroke="currentColor" strokeOpacity="0.08" strokeWidth="1" />
+              <text x={PL - 6} y={gy + 3} textAnchor="end" fontSize="9" fill="currentColor" fillOpacity="0.45">{v}</text>
+            </g>
+          );
+        })}
+
+        {/* X date labels */}
+        {xTicks.map((i) => (
+          <text key={i} x={x(i)} y={H - 6} textAnchor="middle" fontSize="9" fill="currentColor" fillOpacity="0.45">
+            {fmtDay(series[i].day)}
+          </text>
+        ))}
+
+        {/* Visits area + line */}
+        <path d={area} fill="url(#vi-fill)" />
+        <polyline points={linePts('visits')} fill="none" stroke="var(--brand-bright)" strokeWidth="2"
+          strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        {/* Unique visitors line (dashed, muted) */}
+        <polyline points={linePts('uniques')} fill="none" stroke="currentColor" strokeOpacity="0.55" strokeWidth="1.4"
+          strokeDasharray="4 3" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+
+        {/* Hover guide + markers */}
+        {hp && (
+          <g>
+            <line x1={x(hover!)} y1={PT} x2={x(hover!)} y2={PT + plotH} stroke="var(--brand-bright)" strokeOpacity="0.4" strokeWidth="1" />
+            <circle cx={x(hover!)} cy={y(hp.visits)} r="3.5" fill="var(--brand-bright)" />
+            <circle cx={x(hover!)} cy={y(hp.uniques)} r="3" fill="var(--surface)" stroke="currentColor" strokeWidth="1.4" />
+          </g>
+        )}
+
+        {/* Invisible hit targets */}
+        {series.map((d, i) => (
+          <rect key={d.day} x={x(i) - plotW / (2 * Math.max(1, n - 1))} y={PT}
+            width={plotW / Math.max(1, n - 1)} height={plotH} fill="transparent"
+            onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover((h) => (h === i ? null : h))} />
+        ))}
+      </svg>
+
+      {/* Tooltip */}
+      {hp && (
+        <div
+          className="pointer-events-none absolute -translate-x-1/2 rounded-lg border border-white/10 bg-[var(--bg)]/95 px-2.5 py-1.5 text-[11px] shadow-lg"
+          style={{ left: `${(x(hover!) / W) * 100}%`, top: 0 }}
+        >
+          <div className="mb-0.5 font-medium text-white">{fmtDay(hp.day, true)}</div>
+          <div className="flex items-center gap-1.5 text-[var(--muted)]">
+            <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-bright)' }} />
+            {hp.visits} visit{hp.visits === 1 ? '' : 's'}
+          </div>
+          <div className="flex items-center gap-1.5 text-[var(--muted)]">
+            <span className="inline-block h-1.5 w-1.5 rounded-full border border-current opacity-60" />
+            {hp.uniques} unique
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="mt-1 flex items-center justify-center gap-4 text-[11px] text-[var(--muted)]">
+        <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-3 rounded-sm" style={{ background: 'var(--brand-bright)' }} /> Visits</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-0 w-3 border-t border-dashed border-current opacity-60" /> Unique visitors</span>
+      </div>
+    </div>
   );
 }
 
@@ -157,6 +241,13 @@ function topCounts<T>(items: T[], keyOf: (t: T) => string, limit = 6, lead?: (k:
     .map(([label, value]) => ({ label, value, lead: lead?.(label) }));
 }
 
+// Percentage change vs the previous equal-length window. null when there's no
+// prior data to compare against (so we don't show a misleading "+100%").
+function delta(cur: number, prev: number): number | null {
+  if (prev <= 0) return null;
+  return Math.round(((cur - prev) / prev) * 100);
+}
+
 export default function VisitorInsights() {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<VisitEvent[]>([]);
@@ -191,37 +282,75 @@ export default function VisitorInsights() {
   const stats = useMemo(() => {
     const now = Date.now();
     const from = now - range * DAY;
+    const prevFrom = from - range * DAY;
     const inRange = rows.filter((r) => new Date(r.ts).getTime() >= from);
+    const prevRange = rows.filter((r) => {
+      const t = new Date(r.ts).getTime();
+      return t >= prevFrom && t < from;
+    });
 
-    // Daily series across the whole range (zero-filled).
+    // First time each IP was EVER seen in the dataset — for new vs returning.
+    const firstSeen = new Map<string, number>();
+    for (const r of rows) {
+      const ip = r.ip ?? 'unknown';
+      const t = new Date(r.ts).getTime();
+      const cur = firstSeen.get(ip);
+      if (cur == null || t < cur) firstSeen.set(ip, t);
+    }
+
+    // Daily series across the whole range (zero-filled), with per-day uniques.
     const startDay = new Date(from);
     startDay.setHours(0, 0, 0, 0);
-    const days: { day: number; visits: number }[] = [];
+    const days: TrendPoint[] = [];
+    const dayIps: Set<string>[] = [];
     const idx = new Map<number, number>();
     for (let t = startDay.getTime(); t <= now; t += DAY) {
       idx.set(t, days.length);
-      days.push({ day: t, visits: 0 });
+      days.push({ day: t, visits: 0, uniques: 0 });
+      dayIps.push(new Set());
     }
     for (const r of inRange) {
       const d = new Date(r.ts);
       d.setHours(0, 0, 0, 0);
       const i = idx.get(d.getTime());
-      if (i != null) days[i].visits += 1;
+      if (i != null) {
+        days[i].visits += 1;
+        dayIps[i].add(r.ip ?? 'unknown');
+      }
     }
+    days.forEach((d, i) => { d.uniques = dayIps[i].size; });
 
-    const uniques = new Set(inRange.map((r) => r.ip ?? 'unknown')).size;
+    // Peak day by visits.
+    const peak = days.reduce((p, d) => (d.visits > p.visits ? d : p), days[0] ?? { day: now, visits: 0, uniques: 0 });
+
+    const uniqueIps = new Set(inRange.map((r) => r.ip ?? 'unknown'));
+    const uniques = uniqueIps.size;
+    let returning = 0;
+    for (const ip of uniqueIps) {
+      const fs = firstSeen.get(ip);
+      if (fs != null && fs < from) returning += 1;
+    }
+    const fresh = uniques - returning;
+
+    const prevUniques = new Set(prevRange.map((r) => r.ip ?? 'unknown')).size;
     const activeNow = new Set(
       rows.filter((r) => now - new Date(r.ts).getTime() < 5 * 60_000).map((r) => r.ip ?? 'unknown')
     ).size;
-    const perDay = days.length ? Math.round(inRange.length / days.length) : 0;
+    const perDay = days.length ? Math.round((inRange.length / days.length) * 10) / 10 : 0;
 
     return {
-      inRange,
       days,
       total: inRange.length,
       uniques,
       activeNow,
       perDay,
+      peak,
+      visitsDelta: delta(inRange.length, prevRange.length),
+      uniquesDelta: delta(uniques, prevUniques),
+      newReturning: [
+        { label: 'New visitors', value: fresh },
+        { label: 'Returning', value: returning },
+      ].filter((r) => r.value > 0),
       pages: topCounts(inRange, (r) => r.path || '/'),
       sources: topCounts(inRange, (r) => sourceOf(r.referrer)),
       devices: topCounts(inRange, (r) => deviceOf(r.user_agent), 3),
@@ -232,8 +361,8 @@ export default function VisitorInsights() {
   }, [rows, range]);
 
   const kpis = [
-    { label: 'Visits', value: stats.total.toLocaleString(), icon: BarChart3 },
-    { label: 'Unique visitors', value: stats.uniques.toLocaleString(), icon: Users },
+    { label: 'Visits', value: stats.total.toLocaleString(), icon: BarChart3, delta: stats.visitsDelta },
+    { label: 'Unique visitors', value: stats.uniques.toLocaleString(), icon: Users, delta: stats.uniquesDelta },
     { label: 'Active now', value: stats.activeNow.toLocaleString(), icon: Radio, live: stats.activeNow > 0 },
     { label: 'Avg / day', value: stats.perDay.toLocaleString(), icon: TrendingUp },
   ];
@@ -302,7 +431,10 @@ export default function VisitorInsights() {
                           {k.live ? <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" /> : <k.icon size={14} />}
                           <span className="text-xs">{k.label}</span>
                         </div>
-                        <div className="mt-2 font-display text-2xl text-white">{k.value}</div>
+                        <div className="mt-2 flex items-baseline gap-2">
+                          <span className="font-display text-2xl text-white">{k.value}</span>
+                          {k.delta != null && <DeltaChip pct={k.delta} />}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -310,20 +442,19 @@ export default function VisitorInsights() {
                   {/* Trend */}
                   <div className="rounded-xl border border-white/10 p-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-white">Visits — last {range} days</h3>
-                      <span className="text-xs text-[var(--muted)]">hover a point for the daily count</span>
+                      <h3 className="text-sm font-medium text-white">Traffic — last {range} days</h3>
+                      {stats.peak.visits > 0 && (
+                        <span className="text-xs text-[var(--muted)]">Peak {fmtDay(stats.peak.day)} · {stats.peak.visits} visits</span>
+                      )}
                     </div>
                     <TrendChart series={stats.days} />
-                    <div className="mt-1 flex justify-between text-[11px] text-[var(--muted)]">
-                      <span>{new Date(stats.days[0]?.day ?? Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>
-                      <span>{new Date(stats.days[stats.days.length - 1]?.day ?? Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>
-                    </div>
                   </div>
 
                   {/* Breakdowns */}
                   <div className="grid gap-6 md:grid-cols-2">
                     <Panel title="Top pages"><BarList rows={stats.pages} empty="No pages yet." /></Panel>
                     <Panel title="Sources"><BarList rows={stats.sources} empty="No referrers yet." /></Panel>
+                    <Panel title="New vs returning"><BarList rows={stats.newReturning} empty="No visitors yet." /></Panel>
                     <Panel title="Devices"><BarList rows={stats.devices} empty="No device data." /></Panel>
                     <Panel title="Browsers"><BarList rows={stats.browsers} empty="No browser data." /></Panel>
                     <Panel title={<span className="flex items-center gap-1.5"><Globe size={14} /> Countries</span>}>
@@ -354,6 +485,18 @@ export default function VisitorInsights() {
         </div>
       )}
     </>
+  );
+}
+
+// A GA-style ↑/↓ change chip vs the previous equal period.
+function DeltaChip({ pct }: { pct: number }) {
+  const up = pct > 0, flat = pct === 0;
+  const cls = flat ? 'text-[var(--muted)]' : up ? 'text-emerald-400' : 'text-red-300';
+  const Icon = flat ? Minus : up ? ArrowUpRight : ArrowDownRight;
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-xs ${cls}`} title="vs previous period">
+      <Icon size={13} />{Math.abs(pct)}%
+    </span>
   );
 }
 

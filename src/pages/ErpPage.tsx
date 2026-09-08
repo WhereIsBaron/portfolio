@@ -463,6 +463,29 @@ function Accounting({ d }: { d: ErpData }) {
   const equityTotal = equityBooked + profit + retained;
   const byType = (t: AcctType) => d.accounts.filter((a) => a.type === t);
 
+  // Itemised P&L lines (only accounts with a non-zero balance).
+  const acctLines = (t: AcctType) => byType(t).map((a) => ({ name: a.name, v: bal[a.name] ?? 0 })).filter((a) => a.v !== 0);
+  const incomeLines = acctLines('Income');
+  const expenseLines = acctLines('Expense');
+
+  // Trial balance — every account on its natural side (debit-normal = Asset/Expense),
+  // plus a retained-earnings line so the columns tie out, exactly like the sheet.
+  const debitNormal = (t: AcctType) => t === 'Asset' || t === 'Expense';
+  const tbRows = ACCT_ORDER.flatMap((t) =>
+    byType(t)
+      .map((a) => ({ name: a.name, type: t, v: bal[a.name] ?? 0 }))
+      .filter((a) => Math.round(a.v) !== 0)
+  );
+  if (Math.round(retained) !== 0) tbRows.push({ name: 'Opening balance equity', type: 'Equity', v: retained });
+  const tb = tbRows.map((r) => {
+    const putDebit = (debitNormal(r.type) && r.v > 0) || (!debitNormal(r.type) && r.v < 0);
+    const amt = Math.abs(r.v);
+    return { ...r, debit: putDebit ? amt : 0, credit: putDebit ? 0 : amt };
+  });
+  const tbDr = tb.reduce((s, r) => s + r.debit, 0);
+  const tbCr = tb.reduce((s, r) => s + r.credit, 0);
+  const tbBalanced = Math.abs(tbDr - tbCr) < 1;
+
   // Flatten live GL postings into ledger rows (newest first), then history.
   const glRows = d.gl.flatMap((e) => e.lines.map((l, k) => ({ key: `${e.id}-${k}`, live: true, date: e.date, voucher: e.voucherType, ref: e.voucherNo, account: l.account, debit: l.debit, credit: l.credit })));
   const histRows = d.journal.map((j) => ({ key: j.id, live: false, date: j.date, voucher: j.voucher, ref: '', account: j.account, debit: j.debit, credit: j.credit }));
@@ -475,11 +498,16 @@ function Accounting({ d }: { d: ErpData }) {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className={`${card} p-6`}>
           <h3 className="font-display text-lg text-white">Profit &amp; Loss</h3>
-          <div className="mt-4 space-y-2 text-sm">
-            <Line label="Income" value={money(income)} />
-            <Line label="Expenses" value={`(${money(expense)})`} muted />
-            <div className="my-2 border-t border-white/10" />
-            <div className="flex justify-between font-medium">
+          <div className="mt-4 space-y-1.5 text-sm">
+            <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Income</div>
+            {incomeLines.length ? incomeLines.map((a) => <Line key={a.name} label={a.name} value={money(a.v)} muted />)
+              : <div className="text-xs text-[var(--muted)]/70">No income posted yet.</div>}
+            <div className="flex justify-between border-t border-white/10 pt-1.5 font-medium"><span className="text-white">Total income</span><span className="text-white tabular-nums">{money(income)}</span></div>
+            <div className="mt-3 text-xs uppercase tracking-wide text-[var(--muted)]">Expenses</div>
+            {expenseLines.length ? expenseLines.map((a) => <Line key={a.name} label={a.name} value={`(${money(a.v)})`} muted />)
+              : <div className="text-xs text-[var(--muted)]/70">No expenses posted yet.</div>}
+            <div className="flex justify-between border-t border-white/10 pt-1.5 font-medium"><span className="text-white">Total expenses</span><span className="text-white tabular-nums">({money(expense)})</span></div>
+            <div className="mt-2 flex justify-between border-t border-white/10 pt-2 font-medium">
               <span className="text-white">Net profit</span>
               <span className={profit >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{money(profit)}</span>
             </div>
@@ -516,6 +544,39 @@ function Accounting({ d }: { d: ErpData }) {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className={`${card} overflow-hidden`}>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 p-4">
+          <h3 className="font-display text-lg text-white">Trial balance</h3>
+          <span className={`rounded-full border px-2 py-0.5 text-[11px] ${tbBalanced ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300' : 'border-rose-500/30 bg-rose-500/15 text-rose-300'}`}>
+            Dr {money(tbDr)} = Cr {money(tbCr)} {tbBalanced ? '✓' : '⚠'}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="bg-[var(--bg-soft)] text-xs uppercase tracking-wide text-[var(--muted)]">
+              <tr><th className="px-4 py-3 font-medium">Account</th><th className="px-4 py-3 font-medium">Type</th><th className="px-4 py-3 text-right font-medium">Debit</th><th className="px-4 py-3 text-right font-medium">Credit</th></tr>
+            </thead>
+            <tbody>
+              {tb.map((r) => (
+                <tr key={r.name} className="border-t border-white/5">
+                  <td className="px-4 py-2 text-[var(--text)]">{r.name}</td>
+                  <td className="px-4 py-2 text-xs text-[var(--muted)]">{r.type}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-white">{r.debit ? money(r.debit) : '—'}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-white">{r.credit ? money(r.credit) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-white/10 bg-[var(--bg-soft)] font-medium">
+                <td className="px-4 py-2.5 text-white" colSpan={2}>Total</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-white">{money(tbDr)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-white">{money(tbCr)}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
 
