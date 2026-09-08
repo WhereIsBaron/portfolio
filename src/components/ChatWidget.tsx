@@ -15,7 +15,7 @@ const GREETING: Msg = {
 // Proactive greeting shown to a visitor a few seconds after they land. Once per
 // browser session (dismiss or open the chat and it won't nag again on reloads /
 // in-app navigation).
-const PROMPT_TEXT = '👋 Curious about Andrew? Ask me anything about his work.';
+const PROMPT_TEXT = 'Curious about Andrew? Ask me anything about his work.';
 const PROMPT_SEEN_KEY = 'chatPromptSeen';
 const PROMPT_DELAY_MS = 3500;
 

@@ -123,11 +123,11 @@ type Warmth = 'warm' | 'neutral' | 'cool';
 // Fast quick-reply presets in the inbox — clicking one SENDS immediately, so you
 // can feel how different responses land. {{first}} is filled with the contact.
 const QUICK_REPLIES: { label: string; body: string }[] = [
-  { label: '👍 Acknowledge', body: 'Hi {{first}}, thanks for getting back to me — noted on all of this and much appreciated.' },
-  { label: '📅 Offer a call', body: 'Hi {{first}}, would a quick 20-minute call this week help? Happy to walk you through it — what time suits you?' },
-  { label: '💰 Send pricing', body: 'Hi {{first}}, sending pricing across now — the annual plan gives the best value. Shall I put a formal quote together?' },
-  { label: '🔧 Loop in support', body: 'Hi {{first}}, I’ve looped in our support team and someone will follow up with you shortly. Anything else I can chase in the meantime?' },
-  { label: '🙏 Thank & confirm', body: 'Thank you, {{first}}! I’ll get everything confirmed and send a calendar invite over. Speak soon.' },
+  { label: 'Acknowledge', body: 'Hi {{first}}, thanks for the update — noted, and I’ll follow up shortly.' },
+  { label: 'Offer a call', body: 'Hi {{first}}, would a 20-minute call this week work? Let me know a time that suits and I’ll send an invite.' },
+  { label: 'Send pricing', body: 'Hi {{first}}, I’ll send pricing over now. Let me know if you’d like a formal quote.' },
+  { label: 'Loop in support', body: 'Hi {{first}}, I’ve passed this to our support team and they’ll follow up shortly.' },
+  { label: 'Thank & confirm', body: 'Thanks, {{first}}. I’ll confirm the details and send a calendar invite.' },
 ];
 
 // Score an outgoing reply the way a sales coach would, so the user can reflect on
@@ -317,7 +317,7 @@ export default function CrmPage() {
     setDeals((ds) => ds.map((x) => (x.id === id ? { ...x, stage: next, probability: STAGE_PROB[next] } : x)));
     const c = byId[d.contactId];
     // Reaction 1: log the stage change on the timeline.
-    notify(next === 'Won' ? `🎉 ${d.title} marked Won — ${money(d.value)}` : `${d.title} advanced to ${next} · win probability now ${STAGE_PROB[next]}%`, next === 'Won' ? 'success' : 'info');
+    notify(next === 'Won' ? `${d.title} marked Won — ${money(d.value)}` : `${d.title} advanced to ${next} · win probability now ${STAGE_PROB[next]}%`, next === 'Won' ? 'success' : 'info');
     pushActivity(d.contactId, 'Note', `Deal moved to ${next}`);
     // Reaction 2: advancing an open deal spins up a follow-up task automatically.
     if (next !== 'Won') {
@@ -1214,7 +1214,7 @@ function InboxView({
   };
 
   const warmthUi: Record<Warmth, { label: string; cls: string }> = {
-    warm: { label: 'Warm, well-pitched reply 👍', cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' },
+    warm: { label: 'Warm, well-pitched reply', cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' },
     neutral: { label: 'Decent — room to warm it up', cls: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
     cool: { label: 'A bit flat — see the tips', cls: 'border-rose-500/30 bg-rose-500/10 text-rose-300' },
   };
