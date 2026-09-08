@@ -136,34 +136,36 @@ const BASE_REPLIES: QuickReply[] = [
 ];
 
 // Each intent is matched against the contact's latest message; first match wins.
+// Patterns are word-STEMS anchored at the start of a word (leading \b, no trailing
+// \b) so "pric" catches pricing/price/priced, "schedul" catches scheduling, etc.
 const REPLY_INTENTS: { test: RegExp; replies: QuickReply[] }[] = [
-  { test: /\b(pric|quote|cost|budget|discount|plan|afford|expensive)\b/i, replies: [
+  { test: /\b(pric|quot|cost|budget|discount|afford|expensiv|how much)/i, replies: [
     { label: 'Send pricing', body: 'Hi {{first}}, I’ll send pricing over now. Let me know if you’d like a formal quote for finance.' },
     { label: 'Offer annual rate', body: 'Hi {{first}}, happy to share options — the annual plan works out best value if that helps the budget.' },
     { label: 'Prepare quote', body: 'Hi {{first}}, I’ll prepare a formal quote you can take to your finance team and send it across.' },
   ] },
-  { test: /\b(call|meet|demo|schedul|calendar|book|zoom|invite|available|thursday|friday|monday|tuesday|wednesday)\b/i, replies: [
+  { test: /\b(call|meet|demo|schedul|calendar|book|zoom|invit|availab|thursday|friday|monday|tuesday|wednesday)/i, replies: [
     { label: 'Propose times', body: 'Hi {{first}}, I’ve got Wednesday or Thursday afternoon free — would either suit for a quick call?' },
     { label: 'Send invite', body: 'Hi {{first}}, great — I’ll send a calendar invite across now.' },
     { label: 'Confirm the call', body: 'Hi {{first}}, that works for me. I’ll be there and will send an invite to confirm.' },
   ] },
-  { test: /\b(onboard|get started|kick ?off|next step|timeline|implement|roll ?out)\b/i, replies: [
+  { test: /\b(onboard|get started|getting started|kick ?off|next step|timeline|implement|roll ?out|set up|setup)/i, replies: [
     { label: 'Outline onboarding', body: 'Hi {{first}}, onboarding is quick — we set up your workspace, import your data, and run a short training session. I’ll share a timeline.' },
     { label: 'Share timeline', body: 'Hi {{first}}, I’ll send a short timeline so your team knows what to expect and when.' },
   ] },
-  { test: /\b(proposal|document|scope|spec|deck|send over|send me)\b/i, replies: [
+  { test: /\b(proposal|document|scope|spec|deck|send over|send me|send across)/i, replies: [
     { label: 'Send proposal', body: 'Hi {{first}}, I’ll send a tailored proposal over today — happy to walk through it live afterwards.' },
     { label: 'Follow up', body: 'Hi {{first}}, just checking you received everything — any questions I can answer?' },
   ] },
-  { test: /\b(support|issue|bug|problem|help|broke|error|not working|fix|down)\b/i, replies: [
+  { test: /\b(support|issue|bug|problem|broke|error|not working|doesn.?t work|fix|down|urgent)/i, replies: [
     { label: 'Reassure & ETA', body: 'Hi {{first}}, thanks for flagging this — I’m on it and will have an update for you shortly.' },
     { label: 'Loop in support', body: 'Hi {{first}}, I’ve passed this to our support team and they’ll follow up with you directly.' },
   ] },
-  { test: /\b(not sure|hesit|think about|competitor|already use|concern|risk|worried|too expensive|not convinced)\b/i, replies: [
+  { test: /\b(not sure|hesit|think about|thinking|competitor|already us|concern|worried|not convinced|too expensiv|hold off)/i, replies: [
     { label: 'Handle objection', body: 'Hi {{first}}, that’s a fair point — happy to talk it through so you’ve got what you need to decide.' },
     { label: 'Share case study', body: 'Hi {{first}}, I’ll send a short case study from a similar team — it might help put the concern to rest.' },
   ] },
-  { test: /\b(thank|thanks|appreciate|great|perfect|sounds good|awesome|brilliant|excellent)\b/i, replies: [
+  { test: /\b(thank|appreciat|sounds good|looks good|perfect|awesome|brilliant|excellent|great, )/i, replies: [
     { label: 'Acknowledge', body: 'Hi {{first}}, glad that helps — I’ll keep things moving on my side.' },
     { label: 'Thank & confirm', body: 'Thanks, {{first}}. I’ll confirm the details and send a calendar invite.' },
   ] },
