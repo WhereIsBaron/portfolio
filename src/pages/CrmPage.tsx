@@ -232,17 +232,61 @@ function coachReply(body: string, firstName: string) {
 
 // The buyer's simulated reply — reacts to BOTH intent (what you offered) and
 // quality (how warmly you wrote it), so good replies earn enthusiastic ones.
-function inboundReaction(body: string, firstName: string): { body: string; warmth: Warmth } {
+// Each intent has several variants and we skip whatever the buyer said last, so
+// a thread never loops the same line back at you (`avoid` = their previous reply).
+function inboundReaction(body: string, firstName: string, avoid = ''): { body: string; warmth: Warmth } {
   const { warmth } = coachReply(body, firstName);
   const b = body.toLowerCase();
-  let base: string;
-  if (/\b(pric|quote|cost|discount|budget|plan)\b/.test(b)) base = 'Thanks for the numbers — can you put together a formal quote I can take to my finance team?';
-  else if (/\b(call|meet|demo|schedul|calendar|book|zoom|time|invite)\b/.test(b)) base = "Sounds good — I'm free Thursday afternoon. Send the invite and I'll be there.";
-  else if (/\b(sorry|apolog|delay|late)\b/.test(b)) base = 'No problem at all — I appreciate you keeping me in the loop.';
-  else if (/\b(thank|thanks|appreciate|welcome)\b/.test(b)) base = 'Likewise — really looking forward to working together on this.';
-  else if (/\b(support|help|issue|fix|team)\b/.test(b)) base = 'Great, thanks for chasing that up. I’ll keep an eye out for their message.';
-  else base = 'Got it, thanks. Let me run this past the team and come back to you.';
-  const opener = warmth === 'warm' ? 'This is really helpful — ' : warmth === 'cool' ? 'Okay. ' : '';
+  let variants: string[];
+  if (/\b(pric|quote|cost|discount|budget|plan)\b/.test(b)) variants = [
+    'Thanks for the numbers — can you put together a formal quote I can take to my finance team?',
+    'That works for our budget. Send the quote across and I’ll kick off sign-off.',
+    'Appreciate it — once the quote lands I’ll loop in finance and come back to you.',
+    'Good, that’s in range. What would the annual plan look like versus monthly?',
+  ];
+  else if (/\b(call|meet|demo|schedul|calendar|book|zoom|time|invite)\b/.test(b)) variants = [
+    "Sounds good — I'm free Thursday afternoon. Send the invite and I'll be there.",
+    'Perfect, put something in the diary for next week and I’ll make it work.',
+    'A quick call works — mornings suit me best if you’ve got a slot.',
+  ];
+  else if (/\b(sorry|apolog|delay|late)\b/.test(b)) variants = [
+    'No problem at all — I appreciate you keeping me in the loop.',
+    'These things happen — thanks for the heads up.',
+  ];
+  else if (/\b(thank|thanks|appreciate|welcome)\b/.test(b)) variants = [
+    'Likewise — really looking forward to working together on this.',
+    'Thanks again, you’ve made this easy. Talk soon.',
+  ];
+  else if (/\b(support|issue|bug|problem|broke|error|ticket|fix|fault|outage|down)\b/.test(b)) variants = [
+    'Great, thanks for chasing that up. I’ll keep an eye out for their message.',
+    'Appreciate you jumping on it — I’ll watch for the follow-up.',
+  ];
+  else if (/\b(onboard|get started|getting started|implement|roll ?out|set ?up|setup|training|migrat|import)\b/.test(b)) variants = [
+    'That’s reassuring — two weeks is very manageable. What do you need from us to kick off?',
+    'Great, the timeline works for us. I’ll line up the team for the training session.',
+    'Perfect. Who handles the data import — is that your side or ours?',
+  ];
+  else if (/\b(proposal|document|scope|spec|deck|next step|timeline)\b/.test(b)) variants = [
+    'Perfect — send it over and I’ll review with the team this week.',
+    'That’s helpful, thanks. Anything you need from our side before we start?',
+  ];
+  else variants = [
+    'Got it, thanks. Let me run this past the team and come back to you.',
+    'Understood — I’ll review and get back to you shortly.',
+    'Makes sense. I’ll take a look and follow up.',
+  ];
+  // Don't echo the buyer's own last line (opener is a prefix, so substring-match).
+  const pool = variants.filter((v) => !avoid || !avoid.includes(v));
+  const choices = pool.length ? pool : variants;
+  const base = choices[Math.floor(Math.random() * choices.length)];
+  // A varied, occasional opener signals tone without templating every reply.
+  const openers: Record<Warmth, string[]> = {
+    warm: ['This is really helpful — ', 'Brilliant — ', 'Perfect — '],
+    cool: ['Okay. ', 'Right. ', 'Noted. '],
+    neutral: ['', 'Thanks — ', ''],
+  };
+  const bank = openers[warmth];
+  const opener = Math.random() < 0.6 ? bank[Math.floor(Math.random() * bank.length)] : '';
   return { body: opener + base, warmth };
 }
 
@@ -514,6 +558,8 @@ export default function CrmPage() {
     // Build the history the AI sees (prior turns + the message just sent).
     const priorMsgs = thread ? thread.messages.map((m) => ({ from: m.from, body: m.body })) : [];
     const history = [...priorMsgs, { from: 'me' as const, body }];
+    // The buyer's own last line — so the scripted fallback never echoes it back.
+    const lastInbound = thread ? [...thread.messages].reverse().find((m) => m.from === 'them')?.body ?? '' : '';
 
     setThreads((th) => th.map((t) =>
       t.id === id ? { ...t, unread: false, messages: [...t.messages, { from: 'me', at: Date.now(), body }] } : t));
@@ -533,8 +579,8 @@ export default function CrmPage() {
     };
 
     fetchAiReply(c, history)
-      .then((aiReply) => deliver(aiReply ?? inboundReaction(body, first).body))
-      .catch(() => deliver(inboundReaction(body, first).body));
+      .then((aiReply) => deliver(aiReply ?? inboundReaction(body, first, lastInbound).body))
+      .catch(() => deliver(inboundReaction(body, first, lastInbound).body));
   };
   const markThreadRead = (id: string) =>
     setThreads((th) => th.map((t) => (t.id === id ? { ...t, unread: false } : t)));
@@ -1299,6 +1345,7 @@ function InboxView({
   const first = contact?.name.split(' ')[0] ?? '';
   const isTyping = !!active && typingId === active.id;
   const endRef = useRef<HTMLDivElement>(null);
+  const draftRef = useRef<HTMLTextAreaElement>(null);
 
   // Contextual quick replies — read the contact's LAST message and suggest matching
   // responses, so the options change with the conversation instead of a fixed list.
@@ -1314,6 +1361,14 @@ function InboxView({
   useEffect(() => setCoach(null), [openId]);
   // Keep the newest message (and the typing bubble) in view.
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [active?.messages.length, isTyping]);
+  // Grow the reply box to fit its text (up to a cap; then it scrolls internally),
+  // whether the change comes from typing or from a clicked quick reply.
+  useEffect(() => {
+    const el = draftRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+  }, [draft]);
 
   const send = (raw?: string) => {
     const body = (raw ?? draft).trim();
@@ -1356,7 +1411,7 @@ function InboxView({
         </ul>
       </div>
 
-      <div className={`${card} flex min-h-[400px] flex-col`}>
+      <div className={`${card} flex h-[70vh] min-h-[420px] flex-col`}>
         {active && contact ? (
           <>
             <div className="flex items-center gap-3 border-b border-white/10 p-4">
@@ -1408,7 +1463,7 @@ function InboxView({
                 </div>
               )}
               <div className="flex items-end gap-2">
-                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} rows={2} placeholder="Write a reply… (Enter to send, or pick a quick reply)" className="flex-1 resize-none rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none placeholder:text-[var(--muted)]" />
+                <textarea ref={draftRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} rows={2} placeholder="Write a reply… (Enter to send, or pick a quick reply)" className="max-h-[180px] min-h-[52px] flex-1 resize-none overflow-y-auto rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none placeholder:text-[var(--muted)]" />
                 <button onClick={() => send()} className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--brand-bright)] px-3 py-2.5 text-sm font-medium text-[#0b0d10] hover:bg-white"><Send size={15} /></button>
               </div>
             </div>

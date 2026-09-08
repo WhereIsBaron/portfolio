@@ -199,6 +199,91 @@ export type EmailThread = {
   unread: boolean;
 };
 
+// Distinct inbox conversations. Each is a hand-written scenario with its own
+// subject and back-and-forth, so every thread in the demo reads differently.
+// `first` = contact's first name, `co` = company; both are interpolated per thread.
+type EmailScenario = {
+  subject: (co: string) => string;
+  turns: { from: 'me' | 'them'; body: (first: string, co: string) => string }[];
+};
+const EMAIL_SCENARIOS: EmailScenario[] = [
+  {
+    subject: () => 'Re: Pricing',
+    turns: [
+      { from: 'them', body: (_f, co) => `Hi, thanks for the demo. Could you share pricing for ${co}? I'll need something to take to finance.` },
+      { from: 'me', body: (f) => `Hi ${f}, of course — I'll send our plan tiers now and flag the one that fits your team size.` },
+      { from: 'them', body: () => `Perfect. If the numbers land I can push sign-off through this quarter.` },
+    ],
+  },
+  {
+    subject: () => 'Onboarding & timelines',
+    turns: [
+      { from: 'them', body: () => `Loved the walkthrough. Realistically, what would onboarding look like for a team of twelve?` },
+      { from: 'me', body: (f) => `Hi ${f}, about two weeks: workspace setup, data import, then a live training session. A dedicated lead runs it with you.` },
+      { from: 'them', body: () => `That's reassuring — the last tool we tried took months. Send the timeline and I'll rally the team.` },
+    ],
+  },
+  {
+    subject: () => 'Comparing options',
+    turns: [
+      { from: 'them', body: () => `Being upfront — we're weighing you against two others. What genuinely sets you apart?` },
+      { from: 'me', body: (f) => `Fair question, ${f}. The short version: automation that actually runs itself, and support that answers in minutes, not days. I'll send a one-pager.` },
+    ],
+  },
+  {
+    subject: () => 'Quick call this week?',
+    turns: [
+      { from: 'them', body: () => `Could we grab 20 minutes this week? Tuesday or Wednesday afternoon works my end.` },
+      { from: 'me', body: (f) => `Hi ${f}, Wednesday at 2 suits me — I'll send an invite with a dial-in.` },
+      { from: 'them', body: () => `Booked, thanks. I'll bring our ops lead along too.` },
+    ],
+  },
+  {
+    subject: (co) => `Proposal for ${co}`,
+    turns: [
+      { from: 'me', body: (f, co) => `Hi ${f}, as promised the proposal tailored to ${co} is attached. Happy to walk through it live.` },
+      { from: 'them', body: () => `Got it, thank you. One thing — does the mid tier include the reporting add-on, or is that separate?` },
+    ],
+  },
+  {
+    subject: () => 'Renewal coming up',
+    turns: [
+      { from: 'me', body: (f) => `Hi ${f}, your plan renews next month. Want to review usage and options before it does?` },
+      { from: 'them', body: () => `Yes please. Usage is up a lot since we added the sales team — curious whether we should move up a tier.` },
+    ],
+  },
+  {
+    subject: () => 'Following up on that ticket',
+    turns: [
+      { from: 'them', body: () => `Any word on the export bug my team flagged? It's slowing down our month-end.` },
+      { from: 'me', body: (f) => `Hi ${f}, fix went out this morning and I've asked support to confirm with you directly. Sorry for the hold-up.` },
+      { from: 'them', body: () => `No worries — just tested it and exports are clean again. Appreciate the quick turnaround.` },
+    ],
+  },
+  {
+    subject: () => 'Intro — thanks for connecting',
+    turns: [
+      { from: 'them', body: (_f, co) => `Good to connect! A colleague recommended you. We're rethinking how ${co} handles its pipeline.` },
+      { from: 'me', body: (f) => `Great to hear from you, ${f}. Sounds like a good fit — would a short call next week be a sensible first step?` },
+    ],
+  },
+  {
+    subject: () => 'Security & data questions',
+    turns: [
+      { from: 'them', body: () => `Before we go further, our IT team needs the basics: where's data hosted, and are you SOC 2?` },
+      { from: 'me', body: (f) => `Hi ${f}, EU-hosted with encryption at rest, and yes — SOC 2 Type II. I'll email the report and our DPA.` },
+      { from: 'them', body: () => `Exactly what they'll want. That should clear the last hurdle internally.` },
+    ],
+  },
+  {
+    subject: () => 'Contract for signature',
+    turns: [
+      { from: 'me', body: (f) => `Hi ${f}, the agreement's ready — I've sent it over for e-signature. Shout if anything needs adjusting.` },
+      { from: 'them', body: () => `Reviewing with legal today. Assuming no surprises we should have it back to you by Friday.` },
+    ],
+  },
+];
+
 export type EmailTemplate = {
   id: string;
   name: string;
@@ -448,30 +533,23 @@ function buildCrmData(people: Person[], source: CrmData['source']): CrmData {
     };
   });
 
-  const threads: EmailThread[] = pickN(rng, contacts, Math.min(8, contacts.length)).map((c, i) => {
-    const subj = pick(rng, ['Proposal for ' + c.company, 'Re: Pricing', 'Next steps', 'Intro & scheduling', 'Following up']);
-    const n = rint(rng, 1, 3);
+  // Each inbox thread is its own scenario, assigned uniquely so no two
+  // conversations read alike — pricing, onboarding, a competitor bake-off,
+  // scheduling, a support follow-up, renewal, and so on.
+  const chosen = pickN(rng, contacts, Math.min(EMAIL_SCENARIOS.length, contacts.length));
+  const threads: EmailThread[] = chosen.map((c, i) => {
+    const scenario = EMAIL_SCENARIOS[i % EMAIL_SCENARIOS.length];
+    const first = c.name.split(' ')[0];
     const base = now - rint(rng, 1, 20) * day;
-    const messages: EmailMessage[] = Array.from({ length: n }, (_, k) => ({
-      from: k % 2 === 0 ? 'them' : 'me',
+    const messages: EmailMessage[] = scenario.turns.map((t, k) => ({
+      from: t.from,
       at: base + k * rint(rng, 1, 3) * day,
-      body:
-        k % 2 === 0
-          ? pick(rng, [
-              `Hi, thanks for reaching out. Could you share pricing for ${c.company}?`,
-              `Appreciate the demo. What would onboarding look like for our team?`,
-              `We're comparing a couple of options — what makes yours different?`,
-            ])
-          : pick(rng, [
-              `Happy to help! I've attached a proposal tailored to ${c.company}.`,
-              `Great question — onboarding takes about two weeks with a dedicated lead.`,
-              `Let's set up a quick call this week to walk through it.`,
-            ]),
+      body: t.body(first, c.company),
     }));
     return {
       id: `em${i + 1}`,
       contactId: c.id,
-      subject: subj,
+      subject: scenario.subject(c.company),
       messages,
       unread: messages[messages.length - 1].from === 'them' && rng() > 0.4,
     };
