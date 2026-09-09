@@ -5,7 +5,7 @@ import { createPayment } from '@/lib/dpoPay';
 
 // Currencies the DPO account is set up to charge in. Keep in sync with the
 // allow-list in netlify/functions/dpo.ts.
-const CURRENCIES = ['USD', 'ZAR', 'KES', 'GBP', 'EUR'] as const;
+const CURRENCIES = ['USD', 'ZAR', 'BWP', 'KES', 'GBP', 'EUR'] as const;
 const PRESETS = [50, 100, 250, 500];
 
 const input =

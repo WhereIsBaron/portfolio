@@ -29,7 +29,7 @@ const PAY_HOST = (() => {
 })();
 
 // Currencies we allow to be charged. Keep tight; add as the DPO account supports them.
-const ALLOWED_CURRENCIES = new Set(['USD', 'ZAR', 'KES', 'GBP', 'EUR', 'TZS', 'UGX', 'GHS', 'NGN']);
+const ALLOWED_CURRENCIES = new Set(['USD', 'ZAR', 'BWP', 'KES', 'GBP', 'EUR', 'TZS', 'UGX', 'GHS', 'NGN']);
 const DEFAULT_CURRENCY = (process.env.DPO_CURRENCY || 'USD').toUpperCase();
 
 // Amount guard rails (in the charged currency's major unit).
