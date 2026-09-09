@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Mail, MapPin, Phone, Github, Linkedin, ArrowUpRight, Send, Loader2, CheckCircle2, AlertCircle,
+  Mail, MapPin, Phone, Github, Linkedin, ArrowUpRight, Send, Loader2, CheckCircle2, AlertCircle, CreditCard,
 } from 'lucide-react';
 import { profile } from '@/data/cv';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
@@ -195,17 +196,26 @@ export default function Contact() {
 
         {/* Primary email action + socials */}
         <div className="reveal mt-8 flex flex-col gap-6">
-          <a
-            href={`mailto:${profile.email}`}
-            className="group inline-flex w-fit items-center gap-2 rounded-full bg-[var(--brand-bright)] px-6 py-3 text-sm font-medium text-[#0b0d10] transition-all hover:bg-white"
-          >
-            <Mail size={16} />
-            Email me
-            <ArrowUpRight
-              size={16}
-              className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-            />
-          </a>
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href={`mailto:${profile.email}`}
+              className="group inline-flex w-fit items-center gap-2 rounded-full bg-[var(--brand-bright)] px-6 py-3 text-sm font-medium text-[#0b0d10] transition-all hover:bg-white"
+            >
+              <Mail size={16} />
+              Email me
+              <ArrowUpRight
+                size={16}
+                className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+              />
+            </a>
+            <Link
+              to="/pay"
+              className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 px-6 py-3 text-sm font-medium text-white transition-colors hover:border-[var(--brand-bright)]/50 hover:text-[var(--brand-bright)]"
+            >
+              <CreditCard size={16} />
+              Make a payment
+            </Link>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             {profile.socials.map((s) => (
               <a

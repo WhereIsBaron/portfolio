@@ -3,6 +3,8 @@ import Home from '@/pages/Home';
 import BookingPage from '@/pages/BookingPage';
 import CrmPage from '@/pages/CrmPage';
 import ErpPage from '@/pages/ErpPage';
+import PayPage from '@/pages/PayPage';
+import PayReturn from '@/pages/PayReturn';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import ScrollToHash from '@/components/ScrollToHash';
 import ChatWidget from '@/components/ChatWidget';
@@ -20,6 +22,8 @@ function App() {
             <Route path="/booking" element={<BookingPage />} />
             <Route path="/crm" element={<CrmPage />} />
             <Route path="/erp" element={<ErpPage />} />
+            <Route path="/pay" element={<PayPage />} />
+            <Route path="/pay/return" element={<PayReturn />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
           </Routes>
           <ChatWidget />
