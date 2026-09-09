@@ -7,6 +7,7 @@ import {
   Clock, TrendingUp, Target, DollarSign, AlertTriangle, Send, Menu,
   UserPlus, LifeBuoy, ArrowRightLeft, Flame, Sparkles, Radio,
   Package, BookOpen, ScrollText, ClipboardList, Trash2,
+  GraduationCap, CheckCircle2, Circle, ChevronDown, PartyPopper,
 } from 'lucide-react';
 import {
   fetchCrmData, avatarFor, money, invoiceTotal,
@@ -188,6 +189,23 @@ const BLUEPRINT: Record<Stage, BlueprintStep | null> = {
   Won: null,
   Lost: null,
 };
+
+// ── Guided Training Mode ──────────────────────────────────────────────────────
+// A step-by-step challenge track that walks a learner through the whole sales
+// lifecycle in order — the same motion a real rep runs, turned into checkable
+// objectives. Each step is marked done when the matching action actually fires
+// anywhere in the app (see trainStep calls), so the panel teaches by DOING, not
+// by reading. Steps intentionally mirror the real Zoho lead-to-cash flow.
+type TrainStep = { id: string; title: string; hint: string; tab: Tab };
+const TRAINING_STEPS: TrainStep[] = [
+  { id: 'qualify', title: 'Qualify a lead', hint: 'Open Leads and advance a New lead through Contacted to Qualified.', tab: 'leads' },
+  { id: 'convert', title: 'Convert the lead', hint: 'Convert your qualified lead — it becomes a contact, account & an open deal.', tab: 'leads' },
+  { id: 'advance', title: 'Advance the deal', hint: 'In Pipeline, hit Advance and clear the Blueprint gate to move the deal on.', tab: 'pipeline' },
+  { id: 'quote', title: 'Build a quote', hint: 'Create a quote — pick a price book and add a product line or two.', tab: 'quotes' },
+  { id: 'salesorder', title: 'Raise a sales order', hint: 'Mark the quote Accepted, then convert it into a sales order.', tab: 'quotes' },
+  { id: 'invoice', title: 'Generate the invoice', hint: 'Approve & deliver the order, then generate its invoice.', tab: 'salesorders' },
+  { id: 'win', title: 'Close it Won', hint: 'Keep advancing the opportunity in Pipeline until it closes Won.', tab: 'pipeline' },
+];
 
 // ── Zia (AI insights) ─────────────────────────────────────────────────────────
 // A lightweight stand-in for Zoho's Zia: it reads the same signals a predictive
@@ -453,6 +471,112 @@ function Toasts({ items, onDismiss, onOpen }: { items: Toast[]; onDismiss: (id: 
   );
 }
 
+// The Guided Training overlay — a dockable challenge card (bottom-left) with the
+// live checklist, a progress bar, a "Go" jump to the step's module, and a
+// celebration when the full lifecycle is complete. Purely presentational: it
+// reads the `done` map the parent maintains from real actions.
+function TrainingPanel({
+  done, minimized, onMinimize, onRestore, onClose, onGo, onReset,
+}: {
+  done: Record<string, boolean>;
+  minimized: boolean;
+  onMinimize: () => void;
+  onRestore: () => void;
+  onClose: () => void;
+  onGo: (t: Tab) => void;
+  onReset: () => void;
+}) {
+  const total = TRAINING_STEPS.length;
+  const doneCount = TRAINING_STEPS.filter((s) => done[s.id]).length;
+  const allDone = doneCount === total;
+  const currentIdx = TRAINING_STEPS.findIndex((s) => !done[s.id]);
+
+  if (minimized) {
+    return (
+      <button
+        onClick={onRestore}
+        className="fixed bottom-4 left-4 z-[70] inline-flex items-center gap-2 rounded-full border border-[var(--brand-bright)]/40 bg-[var(--surface)]/95 px-3.5 py-2 text-sm text-white shadow-xl backdrop-blur transition-colors hover:border-[var(--brand-bright)]"
+      >
+        <GraduationCap size={15} className="text-[var(--brand-bright)]" />
+        Training <span className="text-[var(--muted)]">· {doneCount}/{total}</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="fixed bottom-4 left-4 z-[70] flex max-h-[min(78vh,640px)] w-[min(92vw,360px)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface)]/97 shadow-2xl backdrop-blur">
+      <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
+        <GraduationCap size={17} className="shrink-0 text-[var(--brand-bright)]" />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium text-white">Guided Training</div>
+          <div className="text-[11px] text-[var(--muted)]">Lead → cash, one step at a time</div>
+        </div>
+        <button onClick={onMinimize} className="rounded-lg p-1 text-[var(--muted)] hover:bg-white/5 hover:text-white" aria-label="Minimise training"><ChevronDown size={16} /></button>
+        <button onClick={onClose} className="rounded-lg p-1 text-[var(--muted)] hover:bg-white/5 hover:text-white" aria-label="Close training"><X size={16} /></button>
+      </div>
+
+      <div className="px-4 pt-3">
+        <div className="flex items-center justify-between text-[11px] text-[var(--muted)]">
+          <span>{allDone ? 'Complete' : `Step ${Math.min(currentIdx + 1, total)} of ${total}`}</span>
+          <span>{doneCount}/{total}</span>
+        </div>
+        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/5">
+          <div className="h-full rounded-full bg-[var(--brand-bright)] transition-all duration-500" style={{ width: `${(doneCount / total) * 100}%` }} />
+        </div>
+      </div>
+
+      <ol className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-3 py-3">
+        {TRAINING_STEPS.map((s, i) => {
+          const complete = Boolean(done[s.id]);
+          const current = !complete && i === currentIdx;
+          return (
+            <li
+              key={s.id}
+              className={`rounded-xl border px-3 py-2.5 transition-colors ${
+                current ? 'border-[var(--brand-bright)]/40 bg-[var(--brand-bright)]/5' : complete ? 'border-emerald-500/20 bg-emerald-500/[0.06]' : 'border-white/10 bg-[var(--bg-soft)]'
+              }`}
+            >
+              <div className="flex items-start gap-2.5">
+                {complete
+                  ? <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-400" />
+                  : <Circle size={17} className={`mt-0.5 shrink-0 ${current ? 'text-[var(--brand-bright)]' : 'text-[var(--muted)]'}`} />}
+                <div className="min-w-0 flex-1">
+                  <div className={`text-sm font-medium ${complete ? 'text-[var(--muted)] line-through' : 'text-white'}`}>{s.title}</div>
+                  {!complete && (current || currentIdx < 0) && (
+                    <div className="mt-0.5 text-[11px] leading-snug text-[var(--muted)]">{s.hint}</div>
+                  )}
+                </div>
+                {current && (
+                  <button
+                    onClick={() => onGo(s.tab)}
+                    className="shrink-0 rounded-full border border-[var(--brand-bright)]/40 bg-[var(--brand-bright)]/10 px-2.5 py-1 text-[11px] font-medium text-[var(--brand-bright)] transition-colors hover:bg-[var(--brand-bright)]/20"
+                  >
+                    Go →
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+
+      {allDone && (
+        <div className="border-t border-white/10 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-emerald-300">
+            <PartyPopper size={16} /> Full lifecycle complete
+          </div>
+          <p className="mt-1 text-[11px] leading-snug text-[var(--muted)]">
+            You qualified a lead, converted it, advanced the deal through the Blueprint, quoted, raised a sales order, invoiced, and closed it Won — the entire Zoho lead-to-cash motion.
+          </p>
+          <button onClick={onReset} className="mt-2.5 w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-xs font-medium text-white transition-colors hover:border-white/25">
+            Restart challenge
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CrmPage() {
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState('');
@@ -481,6 +605,14 @@ export default function CrmPage() {
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [losingId, setLosingId] = useState<string | null>(null);
   const [blueprintId, setBlueprintId] = useState<string | null>(null);
+
+  // Guided Training Mode — a challenge overlay whose objectives tick off as the
+  // matching real actions fire. `trainingOn` gates tracking; `trainDone` is the
+  // per-step completion map; `trainingMin` collapses the panel to a chip.
+  const [trainingOn, setTrainingOn] = useState(false);
+  const [trainingMin, setTrainingMin] = useState(false);
+  const [trainDone, setTrainDone] = useState<Record<string, boolean>>({});
+  const trainCelebrated = useRef(false);
 
   // Live-simulation state: toast notifications, inbox "typing…", and a running
   // count of ambient events so the header can show the workspace is alive.
@@ -584,6 +716,25 @@ export default function CrmPage() {
     return () => window.clearInterval(iv);
   }, [loading, notify, pushActivity]);
 
+  // Mark a training objective complete when its real action fires. No-op unless
+  // the challenge is active and the step isn't already done; nudges with a coach
+  // toast so the learner feels the progress.
+  const trainStep = (id: string) => {
+    if (!trainingOn || trainDone[id]) return;
+    setTrainDone((d) => (d[id] ? d : { ...d, [id]: true }));
+    const s = TRAINING_STEPS.find((x) => x.id === id);
+    if (s) notify(`Training complete: ${s.title}`, 'coach');
+  };
+  // Celebrate once when every objective is done.
+  useEffect(() => {
+    if (!trainingOn) { trainCelebrated.current = false; return; }
+    const all = TRAINING_STEPS.every((s) => trainDone[s.id]);
+    if (all && !trainCelebrated.current) {
+      trainCelebrated.current = true;
+      notify('Training complete — you ran the full lead-to-cash lifecycle! 🎉', 'success');
+    }
+  }, [trainingOn, trainDone, notify]);
+
   // ── Mutations ─────────────────────────────────────────────────────────────
   const advanceDeal = (id: string) => {
     const d = deals.find((x) => x.id === id);
@@ -593,6 +744,7 @@ export default function CrmPage() {
     if (idx < 0 || idx >= order.length - 1) { notify(`${d.title} is already at the final stage`, 'info'); return; }
     const next = order[idx + 1];
     setDeals((ds) => ds.map((x) => (x.id === id ? { ...x, stage: next, probability: STAGE_PROB[next] } : x)));
+    if (next === 'Won') trainStep('win');
     const c = byId[d.contactId];
     // Reaction 1: log the stage change on the timeline.
     notify(next === 'Won' ? `${d.title} marked Won — ${money(d.value)}` : `${d.title} advanced to ${next} · win probability now ${STAGE_PROB[next]}%`, next === 'Won' ? 'success' : 'info');
@@ -625,6 +777,7 @@ export default function CrmPage() {
     if (idx < 0 || idx >= order.length - 1) return;
     const next = order[idx + 1];
     setLeads((ls) => ls.map((x) => (x.id === id ? { ...x, status: next } : x)));
+    if (next === 'Qualified') trainStep('qualify');
     notify(next === 'Qualified' ? `${l.name} is now Qualified — ready to convert` : `${l.name} moved to ${next}`, next === 'Qualified' ? 'success' : 'info');
   };
   const disqualifyLead = (id: string) => {
@@ -662,6 +815,7 @@ export default function CrmPage() {
     // 4) Lead is marked Converted and linked to the new records.
     setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status: 'Converted', convertedContactId: contactId, convertedDealId: dealId } : l)));
     pushActivity(contactId, 'Note', `Lead converted — contact, company & opportunity created`);
+    trainStep('convert');
     notify(`${lead.name} converted → contact, company & a ${money(lead.estValue)} opportunity created`, 'success');
     setSelectedId(contactId);
     setTab('contacts');
@@ -759,6 +913,7 @@ export default function CrmPage() {
     ]);
     setQuoteOpen(false);
     setTab('quotes');
+    trainStep('quote');
     notify(`Quote ${num} drafted — ${money(quoteGrand(data.lines, data.taxPct))}`, 'success', data.contactId);
     pushActivity(data.contactId, 'Note', `Quote ${num} created`);
   };
@@ -787,6 +942,7 @@ export default function CrmPage() {
     ]);
     setQuotes((qs) => qs.map((x) => (x.id === id ? { ...x, salesOrderId: soId } : x)));
     setTab('salesorders');
+    trainStep('salesorder');
     notify(`Sales order ${num} created from ${q.number}`, 'success', q.contactId);
     pushActivity(q.contactId, 'Note', `Sales order ${num} raised from quote ${q.number}`);
   };
@@ -810,6 +966,7 @@ export default function CrmPage() {
     ]);
     setSalesOrders((sos) => sos.map((x) => (x.id === id ? { ...x, status: 'Invoiced', invoiceId: invId } : x)));
     setTab('invoices');
+    trainStep('invoice');
     notify(`Invoice ${num} raised from ${so.number}`, 'success', so.contactId);
     pushActivity(so.contactId, 'Note', `Invoice ${num} raised from sales order ${so.number}`);
   };
@@ -838,9 +995,22 @@ export default function CrmPage() {
               <span className="text-emerald-300/60">· synced {relTime(lastSync)}</span>
             </span>
           </div>
-          <Link to="/#work" className="inline-flex items-center gap-2 text-sm text-[var(--muted)] transition-colors hover:text-white">
-            <ArrowLeft size={15} /> Back to portfolio
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { setTrainingOn((v) => !v); setTrainingMin(false); }}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                trainingOn
+                  ? 'border-[var(--brand-bright)]/50 bg-[var(--brand-bright)]/10 text-[var(--brand-bright)]'
+                  : 'border-white/10 text-[var(--muted)] hover:border-white/25 hover:text-white'
+              }`}
+              title="Guided walkthrough of the full sales lifecycle"
+            >
+              <GraduationCap size={15} /> <span className="hidden sm:inline">Guided Training</span>
+            </button>
+            <Link to="/#work" className="inline-flex items-center gap-2 text-sm text-[var(--muted)] transition-colors hover:text-white">
+              <ArrowLeft size={15} /> <span className="hidden sm:inline">Back to portfolio</span>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -948,6 +1118,17 @@ export default function CrmPage() {
         />
       )}
       <Toasts items={toasts} onDismiss={dismissToast} onOpen={setSelectedId} />
+      {trainingOn && (
+        <TrainingPanel
+          done={trainDone}
+          minimized={trainingMin}
+          onMinimize={() => setTrainingMin(true)}
+          onRestore={() => setTrainingMin(false)}
+          onClose={() => setTrainingOn(false)}
+          onGo={go}
+          onReset={() => { setTrainDone({}); trainCelebrated.current = false; }}
+        />
+      )}
       {losingId && (
         <LostDealModal
           deal={deals.find((d) => d.id === losingId)!}
@@ -964,6 +1145,7 @@ export default function CrmPage() {
             const d = deals.find((x) => x.id === blueprintId)!;
             const bp = BLUEPRINT[d.stage];
             advanceDeal(blueprintId);
+            trainStep('advance');
             if (bp) pushActivity(d.contactId, 'Note', `Blueprint ${d.stage} → ${bp.next} · next: ${nextStep}`);
             setBlueprintId(null);
           }}
