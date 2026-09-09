@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Lock, ShieldCheck, Loader2 } from 'lucide-react';
+import { ArrowLeft, Lock, ShieldCheck, Loader2, ChevronDown } from 'lucide-react';
 import { createPayment } from '@/lib/dpoPay';
 
 // Currencies the DPO account is set up to charge in. Keep in sync with the
@@ -16,8 +16,17 @@ export default function PayPage() {
   const [params] = useSearchParams();
   const cancelled = params.get('cancelled') === '1';
 
-  const [amount, setAmount] = useState('100');
-  const [currency, setCurrency] = useState<(typeof CURRENCIES)[number]>('USD');
+  // Prefill from the homepage mini-form (/pay?amount=…&currency=…).
+  const presetAmount = params.get('amount');
+  const presetCurrency = params.get('currency')?.toUpperCase();
+  const [amount, setAmount] = useState(
+    presetAmount && Number(presetAmount) > 0 ? presetAmount : '100'
+  );
+  const [currency, setCurrency] = useState<(typeof CURRENCIES)[number]>(
+    (CURRENCIES as readonly string[]).includes(presetCurrency ?? '')
+      ? (presetCurrency as (typeof CURRENCIES)[number])
+      : 'USD'
+  );
   const [description, setDescription] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -84,26 +93,29 @@ export default function PayPage() {
         <form onSubmit={onSubmit} className="mt-8 space-y-5">
           <div>
             <span className={label}>Amount</span>
-            <div className="flex gap-2">
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value as (typeof CURRENCIES)[number])}
-                className={`${input} w-28 shrink-0`}
-                aria-label="Currency"
-              >
-                {CURRENCIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+            <div className="flex items-stretch overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-soft)] transition-colors focus-within:border-[var(--brand-bright)] focus-within:ring-1 focus-within:ring-[var(--brand-bright)]">
+              <div className="relative flex items-center border-r border-white/10">
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value as (typeof CURRENCIES)[number])}
+                  className="h-full cursor-pointer appearance-none bg-transparent py-3 pl-4 pr-9 font-medium text-white focus:outline-none"
+                  aria-label="Currency"
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c} value={c} className="bg-[var(--bg-soft)] text-white">
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={15} className="pointer-events-none absolute right-3 text-[var(--muted)]" />
+              </div>
               <input
                 type="number"
                 min="1"
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className={input}
+                className="w-full min-w-0 bg-transparent px-4 py-3 text-lg text-white placeholder:text-[var(--muted)]/50 focus:outline-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
                 placeholder="0.00"
                 required
               />

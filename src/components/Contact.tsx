@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  Mail, MapPin, Phone, Github, Linkedin, ArrowUpRight, Send, Loader2, CheckCircle2, AlertCircle, CreditCard,
+  Mail, MapPin, Phone, Github, Linkedin, ArrowUpRight, Send, Loader2, CheckCircle2, AlertCircle, CreditCard, ChevronDown,
 } from 'lucide-react';
 import { profile } from '@/data/cv';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
@@ -111,6 +111,74 @@ function ContactForm() {
   );
 }
 
+// Compact "make a payment" card on the homepage. Collects a currency + amount,
+// then hands off to the dedicated /pay page (which prefills from the query) to
+// finish on DPO's secure hosted checkout. Keep currencies in sync with PayPage.
+const PAY_CURRENCIES = ['USD', 'ZAR', 'BWP', 'KES', 'GBP', 'EUR'];
+
+function PaymentCard() {
+  const navigate = useNavigate();
+  const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState('USD');
+
+  const go = () => {
+    const params = new URLSearchParams({ currency });
+    if (amount && Number(amount) > 0) params.set('amount', amount);
+    navigate(`/pay?${params.toString()}`);
+  };
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[var(--surface)] p-6">
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[var(--bg-soft)]">
+          <CreditCard size={20} className="text-[var(--brand-bright)]" />
+        </span>
+        <div>
+          <h3 className="font-display text-lg text-white">Make a payment</h3>
+          <p className="text-sm text-[var(--muted)]">Settle a deposit or invoice securely via DPO Pay.</p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-stretch">
+        <div className="flex flex-1 items-stretch overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-soft)] transition-colors focus-within:border-[var(--brand-bright)] focus-within:ring-1 focus-within:ring-[var(--brand-bright)]">
+          <div className="relative flex items-center border-r border-white/10">
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="h-full cursor-pointer appearance-none bg-transparent py-2.5 pl-3.5 pr-8 text-sm font-medium text-white focus:outline-none"
+              aria-label="Currency"
+            >
+              {PAY_CURRENCIES.map((c) => (
+                <option key={c} value={c} className="bg-[var(--bg-soft)] text-white">
+                  {c}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="pointer-events-none absolute right-2.5 text-[var(--muted)]" />
+          </div>
+          <input
+            type="number"
+            min="1"
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && go()}
+            placeholder="Amount"
+            className="w-full min-w-0 bg-transparent px-3.5 text-white placeholder:text-[var(--muted)]/50 focus:outline-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
+          />
+        </div>
+        <button
+          onClick={go}
+          className="group inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[var(--brand-bright)] px-5 py-2.5 text-sm font-medium text-[#0b0d10] transition-colors hover:bg-white"
+        >
+          Pay
+          <ArrowUpRight size={15} className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Contact() {
   const details = [
     {
@@ -208,15 +276,6 @@ export default function Contact() {
                 className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
               />
             </a>
-            <Link
-              to="/pay"
-              className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 px-6 py-3 text-sm font-medium text-white transition-colors hover:border-[var(--brand-bright)]/50 hover:text-[var(--brand-bright)]"
-            >
-              <CreditCard size={16} />
-              Make a payment
-            </Link>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
             {profile.socials.map((s) => (
               <a
                 key={s.label}
@@ -230,6 +289,9 @@ export default function Contact() {
               </a>
             ))}
           </div>
+
+          {/* Compact payment entry → hands off to /pay */}
+          <PaymentCard />
         </div>
           </div>
 
