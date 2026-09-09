@@ -18,7 +18,9 @@ cascading documents, perpetual inventory, SLA logic, weighted forecasting —
 not the long tail of doctypes. Chasing "everything" would mean reimplementing
 an ERP and would dilute the demo. Both demos are client-side, seeded
 (mulberry32) with some real data pulled from public APIs (DummyJSON products,
-randomuser.me people, DiceBear avatars); in-memory state resets on reload.
+randomuser.me people, DiceBear avatars). CRM state is persisted to the
+browser's localStorage (survives reload); Settings → Workspace data has a Reset
+control that wipes it and re-seeds. ERP state is still in-memory (resets on reload).
 
 ---
 

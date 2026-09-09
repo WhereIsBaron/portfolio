@@ -19,7 +19,7 @@ import {
   type Lead, type SupportCase, type LeadStatus, type CaseStatus, type SlaState,
   type Stage, type Status, type ActivityType, type Priority, type InvoiceStatus,
   type Product, type PriceBook, type Quote, type QuoteLine, type QuoteStatus,
-  type SalesOrder, type SalesOrderStatus,
+  type SalesOrder, type SalesOrderStatus, type CrmData,
 } from '@/data/crmSeed';
 
 type Tab =
@@ -27,6 +27,48 @@ type Tab =
   | 'quotes' | 'salesorders' | 'products' | 'pricebooks'
   | 'tasks' | 'calendar'
   | 'inbox' | 'cases' | 'invoices' | 'campaigns' | 'automations' | 'reports' | 'settings';
+
+// ── Persistence ───────────────────────────────────────────────────────────────
+// The whole workspace is saved to localStorage so edits survive a reload. The
+// snapshot is the seeded dataset plus guided-training progress; UI/ephemeral
+// state (open tab, toasts, live-sim counters) is intentionally left out. A
+// version tag lets us discard incompatible snapshots after a shape change, and
+// every read/write is guarded — private mode or a full quota just falls back to
+// in-memory operation without breaking the demo.
+const STORAGE_KEY = 'crm.demo.v1';
+const SCHEMA_VERSION = 1;
+type Snapshot = CrmData & { trainDone: Record<string, boolean> };
+
+function loadSnapshot(): Snapshot | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.v !== SCHEMA_VERSION) return null;
+    const d = parsed.data;
+    // Sanity-check the shape; a non-empty contacts array means it's usable.
+    if (!d || !Array.isArray(d.contacts) || d.contacts.length === 0) return null;
+    return d as Snapshot;
+  } catch {
+    return null;
+  }
+}
+
+function saveSnapshot(data: Snapshot): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: SCHEMA_VERSION, at: Date.now(), data }));
+  } catch {
+    /* quota exceeded / storage disabled — demo keeps working in memory */
+  }
+}
+
+function clearSnapshot(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 const NAV: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -654,32 +696,78 @@ export default function CrmPage() {
     return true;
   }, [notify]);
 
+  // Push a full dataset (seed fetch or restored snapshot) into every slice.
+  const applyData = useCallback((d: CrmData) => {
+    setContacts(d.contacts);
+    setCompanies(d.companies);
+    setLeads(d.leads);
+    setCases(d.cases);
+    setDeals(d.deals);
+    setActivities(d.activities);
+    setTasks(d.tasks);
+    setMeetings(d.meetings);
+    setThreads(d.threads);
+    setTemplates(d.templates);
+    setProducts(d.products);
+    setPriceBooks(d.priceBooks);
+    setQuotes(d.quotes);
+    setSalesOrders(d.salesOrders);
+    setInvoices(d.invoices);
+    setCampaigns(d.campaigns);
+    setAutomations(d.automations);
+    setSource(d.source);
+  }, []);
+
+  // On mount, restore the saved workspace if one exists; otherwise seed fresh.
   useEffect(() => {
+    const snap = loadSnapshot();
+    if (snap) {
+      applyData(snap);
+      setTrainDone(snap.trainDone ?? {});
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     fetchCrmData().then((d) => {
       if (cancelled) return;
-      setContacts(d.contacts);
-      setCompanies(d.companies);
-      setLeads(d.leads);
-      setCases(d.cases);
-      setDeals(d.deals);
-      setActivities(d.activities);
-      setTasks(d.tasks);
-      setMeetings(d.meetings);
-      setThreads(d.threads);
-      setTemplates(d.templates);
-      setProducts(d.products);
-      setPriceBooks(d.priceBooks);
-      setQuotes(d.quotes);
-      setSalesOrders(d.salesOrders);
-      setInvoices(d.invoices);
-      setCampaigns(d.campaigns);
-      setAutomations(d.automations);
-      setSource(d.source);
+      applyData(d);
       setLoading(false);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [applyData]);
+
+  // Persist the workspace whenever it changes (debounced so the 7s ambient
+  // ticks don't hammer storage). Skipped while loading so we never overwrite a
+  // good snapshot with the empty initial state.
+  const saveTimer = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (loading) return;
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      saveSnapshot({
+        contacts, companies, leads, cases, deals, activities, tasks, meetings,
+        threads, templates, products, priceBooks, quotes, salesOrders, invoices,
+        campaigns, automations, source: source as CrmData['source'], trainDone,
+      });
+    }, 700);
+    return () => window.clearTimeout(saveTimer.current);
+  }, [loading, contacts, companies, leads, cases, deals, activities, tasks, meetings,
+      threads, templates, products, priceBooks, quotes, salesOrders, invoices,
+      campaigns, automations, source, trainDone]);
+
+  // Reset control: wipe the saved snapshot and re-seed a clean workspace.
+  const resetWorkspace = useCallback(() => {
+    clearSnapshot();
+    setLoading(true);
+    setTrainDone({});
+    trainCelebrated.current = false;
+    setSelectedId(null);
+    fetchCrmData().then((d) => {
+      applyData(d);
+      setLoading(false);
+      notify('Workspace reset to fresh seed data', 'success');
+    });
+  }, [applyData, notify]);
 
   const byId = useMemo(() => Object.fromEntries(contacts.map((c) => [c.id, c])), [contacts]);
 
@@ -1073,7 +1161,7 @@ export default function CrmPage() {
       <div className="mx-auto flex max-w-[1400px]">
         {/* Sidebar */}
         <aside
-          className={`${navOpen ? 'block' : 'hidden'} fixed inset-x-0 top-[57px] z-20 border-b border-white/10 bg-[var(--bg)] px-3 py-3 lg:sticky lg:top-[57px] lg:block lg:h-[calc(100vh-57px)] lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r lg:py-6`}
+          className={`${navOpen ? 'block' : 'hidden'} fixed inset-x-0 top-[57px] z-20 max-h-[calc(100vh-57px)] overflow-y-auto border-b border-white/10 bg-[var(--bg)] px-3 py-3 lg:sticky lg:top-[57px] lg:block lg:h-[calc(100vh-57px)] lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r lg:py-6`}
         >
           <nav className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:flex lg:flex-col">
             {NAV.map((n) => (
@@ -1147,7 +1235,7 @@ export default function CrmPage() {
               {tab === 'campaigns' && <Campaigns campaigns={campaigns} />}
               {tab === 'automations' && <Automations automations={automations} runs={autoRuns} onToggle={toggleAutomation} />}
               {tab === 'reports' && <Reports deals={deals} invoices={invoices} contacts={contacts} campaigns={campaigns} />}
-              {tab === 'settings' && <SettingsView contacts={contacts} source={source} />}
+              {tab === 'settings' && <SettingsView contacts={contacts} source={source} onReset={resetWorkspace} />}
             </>
           )}
         </main>
@@ -2405,7 +2493,8 @@ function Reports({
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
-function SettingsView({ contacts, source }: { contacts: Contact[]; source: string }) {
+function SettingsView({ contacts, source, onReset }: { contacts: Contact[]; source: string; onReset: () => void }) {
+  const [armed, setArmed] = useState(false);
   const team = OWNERS.map((o, i) => ({
     name: o, role: i === 0 ? 'Admin' : i === 1 ? 'Manager' : 'Sales rep',
     contacts: contacts.filter((c) => c.owner === o).length,
@@ -2435,6 +2524,41 @@ function SettingsView({ contacts, source }: { contacts: Contact[]; source: strin
         </div>
       </div>
 
+      <div className={`${card} p-6`}>
+        <h3 className="font-display text-lg text-white">Workspace data</h3>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Everything you do here — new contacts, advanced deals, quotes, invoices, guided-training
+          progress — is saved in this browser and restored automatically next time. Resetting wipes
+          those local changes and reloads a fresh seeded dataset.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {!armed ? (
+            <button
+              onClick={() => setArmed(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition-colors hover:border-red-500/50 hover:bg-red-500/15"
+            >
+              <Trash2 size={15} /> Reset workspace
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => { onReset(); setArmed(false); }}
+                className="inline-flex items-center gap-2 rounded-xl border border-red-500/50 bg-red-500/20 px-4 py-2 text-sm font-medium text-red-200 transition-colors hover:bg-red-500/30"
+              >
+                <AlertTriangle size={15} /> Yes, reset everything
+              </button>
+              <button
+                onClick={() => setArmed(false)}
+                className="rounded-xl border border-white/10 px-4 py-2 text-sm text-[var(--muted)] transition-colors hover:text-white"
+              >
+                Cancel
+              </button>
+              <span className="text-xs text-[var(--muted)]">This can't be undone.</span>
+            </>
+          )}
+        </div>
+      </div>
+
       <ApiCredit source={source} />
     </div>
   );
@@ -2455,7 +2579,7 @@ function ApiCredit({ source }: { source: string }) {
         <li>• <span className="text-white">DiceBear</span> — generated avatars for contacts you add, and as an image fallback.</li>
       </ul>
       <p className="mt-3 text-xs text-[var(--muted)]/70">
-        Front-end demo — everything you change lives in your browser only. A Supabase-backed version (persisted records) is the next step, matching the booking demo.
+        Front-end demo — everything you change is persisted to this browser's localStorage and restored on your next visit; nothing leaves the device. Use Reset workspace above to return to the seeded dataset.
       </p>
     </div>
   );
