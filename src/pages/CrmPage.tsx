@@ -275,6 +275,8 @@ function ZiaCard({ pct, verdict, tone, reasons, unit = '%' }: { pct: number; ver
 // workspace ticks along on its own so it feels live. Nothing leaves the browser.
 type Toast = { id: number; text: string; tone: 'info' | 'success' | 'warn' | 'coach'; contactId?: string };
 type Warmth = 'warm' | 'neutral' | 'cool';
+// One line in the automation run log — which rule fired, what it did, and when.
+type AutoRun = { id: string; autoId: string; name: string; detail: string; at: number };
 
 // Contextual quick replies — the instant, rules-based half of the inbox: read the
 // contact's LAST message and offer matching responses (no network). Clicking one
@@ -617,6 +619,7 @@ export default function CrmPage() {
   // Live-simulation state: toast notifications, inbox "typing…", and a running
   // count of ambient events so the header can show the workspace is alive.
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [autoRuns, setAutoRuns] = useState<AutoRun[]>([]);
   const [typingId, setTypingId] = useState<string | null>(null);
   const [liveCount, setLiveCount] = useState(0);
   const [lastSync, setLastSync] = useState(Date.now());
@@ -631,6 +634,25 @@ export default function CrmPage() {
   // Append an activity (append-only, always safe) — the currency of "reactions".
   const pushActivity = useCallback((contactId: string, type: ActivityType, subject: string) =>
     setActivities((as) => [{ id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, type, contactId, subject, at: Date.now(), done: true, owner: OWNERS[0] }, ...as].slice(0, 250)), []);
+
+  // ── Workflow automations ────────────────────────────────────────────────────
+  // The Automations module isn't decorative: enabled rules actually fire when
+  // their trigger event happens (a contact is created, a deal hits Proposal, a
+  // deal is Won, an invoice goes overdue…). Firing bumps the rule's run count,
+  // appends to a visible run log, raises a toast, and performs its side effect.
+  // Toggling a rule off genuinely stops it. `autoRef` gives the ambient engine
+  // and plain handlers the latest rules without re-arming effects.
+  const autoRef = useRef<Automation[]>([]);
+  autoRef.current = automations;
+  const fireAutomation = useCallback((autoId: string, detail: string, action?: () => void) => {
+    const a = autoRef.current.find((x) => x.id === autoId);
+    if (!a || !a.enabled) return false;
+    setAutomations((list) => list.map((x) => (x.id === autoId ? { ...x, runs: x.runs + 1 } : x)));
+    setAutoRuns((rs) => [{ id: `ar-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, autoId, name: a.name, detail, at: Date.now() }, ...rs].slice(0, 40));
+    notify(`Automation ran — ${a.name}`, 'info');
+    action?.();
+    return true;
+  }, [notify]);
 
   useEffect(() => {
     let cancelled = false;
@@ -682,6 +704,28 @@ export default function CrmPage() {
       const mate = pickR(OWNERS.filter((o) => o !== OWNERS[0])) ?? OWNERS[1];
       const roll = Math.random();
 
+      // ~1 in 4 ticks an eligible TIME-BASED automation fires instead of an
+      // ordinary ambient event — so enabled rules visibly do work over time,
+      // and disabled ones stay silent.
+      const eligible = autoRef.current.filter((a) => a.enabled && ['au3', 'au5', 'au6'].includes(a.id));
+      if (eligible.length && Math.random() < 0.25) {
+        const a = pickR(eligible)!;
+        if (a.id === 'au5') {
+          const overdue = iv.find((x) => x.status !== 'Paid');
+          const who = overdue ? bid[overdue.contactId]?.name : null;
+          fireAutomation('au5', overdue ? `Payment reminder emailed${who ? ` to ${who}` : ''} — ${overdue.number}` : 'Scanned invoices — none overdue');
+        } else if (a.id === 'au3') {
+          const openDeal = pickR(ds.filter((x) => OPEN_STAGES.includes(x.stage)));
+          fireAutomation('au3', openDeal ? `Nudged owner on idle deal “${openDeal.title}”` : 'Scanned pipeline for stale deals');
+        } else {
+          const cust = pickR(cs.filter((x) => x.status === 'Customer')) ?? c;
+          fireAutomation('au6', `Renewal reminder sent to ${cust.name}`);
+        }
+        setLiveCount((n) => n + 1);
+        setLastSync(Date.now());
+        return;
+      }
+
       if (roll < 0.22) {
         notify(`${c.name} opened your email`, 'info', c.id);
         pushActivity(c.id, 'Email', 'Opened your last email');
@@ -714,7 +758,7 @@ export default function CrmPage() {
     };
     const iv = window.setInterval(tick, 7000);
     return () => window.clearInterval(iv);
-  }, [loading, notify, pushActivity]);
+  }, [loading, notify, pushActivity, fireAutomation]);
 
   // Mark a training objective complete when its real action fires. No-op unless
   // the challenge is active and the step isn't already done; nudges with a coach
@@ -752,6 +796,16 @@ export default function CrmPage() {
     // Reaction 2: advancing an open deal spins up a follow-up task automatically.
     if (next !== 'Won') {
       setTasks((ts) => [{ id: `t-${Date.now()}`, contactId: d.contactId, title: `Follow up on “${d.title}” (${next})`, priority: next === 'Negotiation' ? 'High' : 'Medium', dueAt: Date.now() + 2 * 86_400_000, done: false, owner: OWNERS[0] }, ...ts]);
+    }
+    // Automation triggers: Proposal follow-up rule, and Won → onboarding rule.
+    if (next === 'Proposal') fireAutomation('au2', `Follow-up task queued for “${d.title}”`);
+    if (next === 'Won') {
+      fireAutomation('au4', `Onboarding meeting booked with ${c?.name ?? 'the customer'}`, () =>
+        setMeetings((ms) => [{
+          id: `m-${Date.now()}`, title: `Onboarding — ${c?.name?.split(' ')[0] ?? 'new customer'}`,
+          contactId: d.contactId, startAt: Date.now() + 3 * 86_400_000, durationMin: 60,
+          kind: 'Onboarding', location: 'Google Meet', owner: OWNERS[0],
+        }, ...ms]));
     }
     // Reaction 3: at proposal/negotiation the buyer reacts a couple of seconds later.
     if (next === 'Proposal' || next === 'Negotiation') {
@@ -815,6 +869,7 @@ export default function CrmPage() {
     // 4) Lead is marked Converted and linked to the new records.
     setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status: 'Converted', convertedContactId: contactId, convertedDealId: dealId } : l)));
     pushActivity(contactId, 'Note', `Lead converted — contact, company & opportunity created`);
+    fireAutomation('au1', `Intro email sent to ${lead.name}`, () => pushActivity(contactId, 'Email', 'Intro / first touch email sent'));
     trainStep('convert');
     notify(`${lead.name} converted → contact, company & a ${money(lead.estValue)} opportunity created`, 'success');
     setSelectedId(contactId);
@@ -896,6 +951,7 @@ export default function CrmPage() {
     setAddOpen(false);
     setTab('contacts');
     setSelectedId(id);
+    fireAutomation('au1', `Intro email sent to ${c.name}`, () => pushActivity(id, 'Email', 'Intro / first touch email sent'));
   };
 
   // ── Quote-to-cash ───────────────────────────────────────────────────────────
@@ -1089,7 +1145,7 @@ export default function CrmPage() {
               {tab === 'cases' && <CasesView cases={cases} byId={byId} onAdvance={advanceCase} />}
               {tab === 'invoices' && <Invoices invoices={invoices} byId={byId} onPaid={markPaid} />}
               {tab === 'campaigns' && <Campaigns campaigns={campaigns} />}
-              {tab === 'automations' && <Automations automations={automations} onToggle={toggleAutomation} />}
+              {tab === 'automations' && <Automations automations={automations} runs={autoRuns} onToggle={toggleAutomation} />}
               {tab === 'reports' && <Reports deals={deals} invoices={invoices} contacts={contacts} campaigns={campaigns} />}
               {tab === 'settings' && <SettingsView contacts={contacts} source={source} />}
             </>
@@ -2081,27 +2137,54 @@ function Meter({ label, pct, detail }: { label: string; pct: number; detail: str
 }
 
 // ── Automations ──────────────────────────────────────────────────────────────
-function Automations({ automations, onToggle }: { automations: Automation[]; onToggle: (id: string) => void }) {
+function Automations({ automations, runs, onToggle }: { automations: Automation[]; runs: AutoRun[]; onToggle: (id: string) => void }) {
+  const active = automations.filter((a) => a.enabled).length;
+  const totalRuns = automations.reduce((s, a) => s + a.runs, 0);
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-[var(--muted)]">Rules that run automatically when something happens. Toggle any rule on or off.</p>
-      {automations.map((a) => (
-        <div key={a.id} className={`${card} flex items-center gap-4 p-4`}>
-          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${a.enabled ? 'bg-[var(--brand-bright)]/15 text-[var(--brand-bright)]' : 'bg-white/5 text-[var(--muted)]'}`}><Zap size={18} /></span>
-          <div className="min-w-0 flex-1">
-            <div className="font-medium text-white">{a.name}</div>
-            <div className="text-xs text-[var(--muted)]"><span className="text-[var(--text)]">When</span> {a.trigger} → <span className="text-[var(--text)]">do</span> {a.action}</div>
-            <div className="mt-0.5 text-[11px] text-[var(--muted)]/70">{a.runs} runs</div>
-          </div>
-          <button
-            onClick={() => onToggle(a.id)}
-            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${a.enabled ? 'bg-[var(--brand-bright)]' : 'bg-white/10'}`}
-            aria-label={a.enabled ? 'Disable' : 'Enable'}
-          >
-            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${a.enabled ? 'left-[22px]' : 'left-0.5'}`} />
-          </button>
+    <div className="grid gap-6 lg:grid-cols-3">
+      <div className="space-y-3 lg:col-span-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-[var(--muted)]">Rules that run automatically when something happens. Toggle any rule on or off — disabled rules genuinely stop firing.</p>
+          <span className="shrink-0 rounded-full border border-[var(--brand-bright)]/30 bg-[var(--brand-bright)]/10 px-3 py-1 text-xs text-[var(--brand-bright)]">{active} of {automations.length} active</span>
         </div>
-      ))}
+        {automations.map((a) => (
+          <div key={a.id} className={`${card} flex items-center gap-4 p-4`}>
+            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${a.enabled ? 'bg-[var(--brand-bright)]/15 text-[var(--brand-bright)]' : 'bg-white/5 text-[var(--muted)]'}`}><Zap size={18} /></span>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium text-white">{a.name}</div>
+              <div className="text-xs text-[var(--muted)]"><span className="text-[var(--text)]">When</span> {a.trigger} → <span className="text-[var(--text)]">do</span> {a.action}</div>
+              <div className="mt-0.5 text-[11px] text-[var(--muted)]/70">{a.runs} runs{a.enabled ? '' : ' · paused'}</div>
+            </div>
+            <button
+              onClick={() => onToggle(a.id)}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${a.enabled ? 'bg-[var(--brand-bright)]' : 'bg-white/10'}`}
+              aria-label={a.enabled ? 'Disable' : 'Enable'}
+            >
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${a.enabled ? 'left-[22px]' : 'left-0.5'}`} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className={`${card} flex flex-col p-5 lg:sticky lg:top-[73px] lg:max-h-[calc(100vh-96px)]`}>
+        <h3 className="flex items-center gap-2 font-display text-lg text-white"><Zap size={17} className="text-[var(--brand-bright)]" /> Run log</h3>
+        <p className="mt-1 text-xs text-[var(--muted)]">{totalRuns} total runs · live as rules fire</p>
+        <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto">
+          {runs.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">No runs yet this session. Convert a lead, advance a deal to Proposal or Won, or wait for a time-based rule to fire — each run shows up here.</p>
+          ) : (
+            runs.map((r) => (
+              <div key={r.id} className="rounded-xl border border-white/5 bg-[var(--bg-soft)] px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-medium text-white">{r.name}</span>
+                  <span className="shrink-0 text-[10px] text-[var(--muted)]">{relTime(r.at)}</span>
+                </div>
+                <div className="mt-0.5 text-[11px] text-[var(--muted)]">{r.detail}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2123,11 +2206,48 @@ function Reports({
   });
   const maxRev = Math.max(1, ...months.map((m) => m.total));
 
-  // Funnel
-  const funnel = ['Lead In', 'Contacted', 'Proposal', 'Negotiation', 'Won'].map((s) => ({
-    stage: s, count: deals.filter((d) => d.stage === s).length,
+  // Conversion funnel — cumulative "reached at least this stage" (Won counts for
+  // every earlier stage), so it decreases monotonically and stage-to-stage
+  // conversion rates are meaningful. Lost deals are excluded from the flow.
+  const stageOrder: Stage[] = ['Lead In', 'Contacted', 'Proposal', 'Negotiation', 'Won'];
+  const active = deals.filter((d) => d.stage !== 'Lost');
+  const funnel = stageOrder.map((s, idx) => ({
+    stage: s,
+    count: active.filter((d) => stageOrder.indexOf(d.stage) >= idx).length,
   }));
-  const maxFunnel = Math.max(1, ...funnel.map((f) => f.count));
+  const maxFunnel = Math.max(1, funnel[0].count);
+  const leadToWin = funnel[0].count ? Math.round((funnel[funnel.length - 1].count / funnel[0].count) * 100) : 0;
+
+  // Forecast vs. target: committed (Won) + weighted open pipeline against a
+  // quarterly quota, the number a sales manager actually reports on.
+  const quarterTarget = 450_000;
+  const committed = deals.filter((d) => d.stage === 'Won').reduce((s, d) => s + d.value, 0);
+  const weighted = deals.filter((d) => OPEN_STAGES.includes(d.stage)).reduce((s, d) => s + (d.value * d.probability) / 100, 0);
+  const forecast = committed + weighted;
+  const attainment = Math.round((committed / quarterTarget) * 100);
+  const forecastPct = Math.round((forecast / quarterTarget) * 100);
+
+  // Win/loss reasons — why deals slipped away (from the Lost-deal modal capture).
+  const lostDeals = deals.filter((d) => d.stage === 'Lost');
+  const lossReasons = LOST_REASONS
+    .map((r) => ({ label: r, count: lostDeals.filter((d) => d.lostReason === r).length }))
+    .filter((x) => x.count > 0)
+    .sort((a, b) => b.count - a.count);
+  const maxLoss = Math.max(1, ...lossReasons.map((r) => r.count));
+
+  // Per-owner leaderboard — won value, open pipeline and personal win rate.
+  const board = OWNERS.map((o) => {
+    const od = deals.filter((d) => d.owner === o);
+    const w = od.filter((d) => d.stage === 'Won');
+    const l = od.filter((d) => d.stage === 'Lost');
+    return {
+      owner: o,
+      wonValue: w.reduce((s, d) => s + d.value, 0),
+      openValue: od.filter((d) => OPEN_STAGES.includes(d.stage)).reduce((s, d) => s + d.value, 0),
+      winRate: w.length + l.length ? Math.round((w.length / (w.length + l.length)) * 100) : 0,
+    };
+  }).sort((a, b) => b.wonValue - a.wonValue);
+  const maxBoard = Math.max(1, ...board.map((b) => b.wonValue + b.openValue));
 
   // Lead sources
   const sources = LEAD_SOURCES.map((s) => ({ label: s, count: contacts.filter((c) => c.source === s).length })).filter((s) => s.count > 0);
@@ -2143,15 +2263,40 @@ function Reports({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
           { label: 'Win rate', value: `${winRate}%` },
           { label: 'Avg. deal size', value: money(avgDeal) },
+          { label: 'Weighted forecast', value: money(forecast) },
+          { label: 'Quarter attainment', value: `${attainment}%` },
           { label: 'Deals won', value: won.toString() },
           { label: 'Email open rate', value: `${emailOpen}%` },
         ].map((k) => (
           <div key={k.label} className={`${card} p-4`}><div className="font-display text-2xl text-white">{k.value}</div><div className="text-xs text-[var(--muted)]">{k.label}</div></div>
         ))}
+      </div>
+
+      {/* Forecast vs. target — full width */}
+      <div className={`${card} p-6`}>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h3 className="font-display text-lg text-white">Forecast vs. quarter target</h3>
+          <div className="text-sm text-[var(--muted)]">Target <span className="text-white">{money(quarterTarget)}</span></div>
+        </div>
+        <div className="mt-5 h-9 w-full overflow-hidden rounded-xl bg-white/5">
+          <div className="flex h-full">
+            <div className="flex h-full items-center justify-end bg-emerald-500/80 px-2 text-[11px] font-medium text-[#0b0d10] transition-all" style={{ width: `${Math.min((committed / quarterTarget) * 100, 100)}%` }} title={`Committed (Won): ${money(committed)}`}>
+              {committed / quarterTarget > 0.12 ? money(committed) : ''}
+            </div>
+            <div className="flex h-full items-center justify-end bg-[var(--brand-bright)]/50 px-2 text-[11px] font-medium text-white transition-all" style={{ width: `${Math.min((weighted / quarterTarget) * 100, Math.max(0, 100 - (committed / quarterTarget) * 100))}%` }} title={`Weighted open pipeline: ${money(weighted)}`}>
+              {weighted / quarterTarget > 0.12 ? money(weighted) : ''}
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-[var(--muted)]">
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" /> Committed (Won) · {money(committed)}</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--brand-bright)]/50" /> Weighted pipeline · {money(weighted)}</span>
+          <span className="ml-auto text-[var(--text)]">Forecast {money(forecast)} · <span className={forecastPct >= 100 ? 'text-emerald-300' : 'text-amber-300'}>{forecastPct}% of target</span></span>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -2171,17 +2316,67 @@ function Reports({
         </div>
 
         <div className={`${card} p-6`}>
-          <h3 className="font-display text-lg text-white">Conversion funnel</h3>
+          <div className="flex items-baseline justify-between">
+            <h3 className="font-display text-lg text-white">Conversion funnel</h3>
+            <span className="text-xs text-[var(--muted)]">Lead→Won <span className="text-[var(--brand-bright)]">{leadToWin}%</span></span>
+          </div>
           <div className="mt-4 space-y-2">
-            {funnel.map((f) => (
-              <div key={f.stage} className="flex items-center gap-3">
-                <span className="w-24 shrink-0 text-xs text-[var(--muted)]">{f.stage}</span>
-                <div className="h-7 flex-1 overflow-hidden rounded-lg bg-white/5">
-                  <div className="flex h-full items-center justify-end rounded-lg bg-[var(--brand-bright)] px-2 text-[11px] font-medium text-[#0b0d10]" style={{ width: `${Math.max((f.count / maxFunnel) * 100, 8)}%` }}>{f.count}</div>
+            {funnel.map((f, i) => {
+              const prev = i > 0 ? funnel[i - 1].count : 0;
+              const step = i > 0 && prev ? Math.round((f.count / prev) * 100) : null;
+              return (
+                <div key={f.stage} className="flex items-center gap-3">
+                  <span className="w-24 shrink-0 text-xs text-[var(--muted)]">{f.stage}</span>
+                  <div className="h-7 flex-1 overflow-hidden rounded-lg bg-white/5">
+                    <div className="flex h-full items-center justify-end rounded-lg bg-[var(--brand-bright)] px-2 text-[11px] font-medium text-[#0b0d10]" style={{ width: `${Math.max((f.count / maxFunnel) * 100, 8)}%` }}>{f.count}</div>
+                  </div>
+                  <span className="w-12 shrink-0 text-right text-[11px] text-[var(--muted)]">{step !== null ? `${step}%` : ''}</span>
                 </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className={`${card} p-6 lg:col-span-2`}>
+          <h3 className="font-display text-lg text-white">Sales leaderboard</h3>
+          <div className="mt-4 space-y-3">
+            {board.map((b) => (
+              <div key={b.owner} className="flex items-center gap-3">
+                <div className="flex w-28 shrink-0 items-center gap-2 sm:w-40">
+                  <Avatar src={avatarFor(b.owner)} name={b.owner} size={28} />
+                  <span className="truncate text-sm text-white">{b.owner}</span>
+                </div>
+                <div className="flex h-6 flex-1 overflow-hidden rounded-lg bg-white/5">
+                  <div className="h-full bg-emerald-500/80 transition-all" style={{ width: `${(b.wonValue / maxBoard) * 100}%` }} title={`Won: ${money(b.wonValue)}`} />
+                  <div className="h-full bg-[var(--brand-bright)]/50 transition-all" style={{ width: `${(b.openValue / maxBoard) * 100}%` }} title={`Open: ${money(b.openValue)}`} />
+                </div>
+                <span className="hidden w-24 shrink-0 text-right text-xs text-white sm:block">{money(b.wonValue)}</span>
+                <span className="w-14 shrink-0 text-right text-xs text-[var(--muted)]">{b.winRate}% win</span>
               </div>
             ))}
           </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[var(--muted)]">
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" /> Won revenue</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--brand-bright)]/50" /> Open pipeline</span>
+          </div>
+        </div>
+
+        <div className={`${card} p-6`}>
+          <h3 className="font-display text-lg text-white">Why deals are lost</h3>
+          {lossReasons.length ? (
+            <div className="mt-4 space-y-2">
+              {lossReasons.map((r) => (
+                <div key={r.label} className="flex items-center gap-3">
+                  <span className="w-32 shrink-0 truncate text-xs text-[var(--muted)]" title={r.label}>{r.label}</span>
+                  <div className="h-6 flex-1 overflow-hidden rounded-lg bg-white/5">
+                    <div className="flex h-full items-center justify-end rounded-lg bg-rose-500/70 px-2 text-[11px] font-medium text-white" style={{ width: `${Math.max((r.count / maxLoss) * 100, 10)}%` }}>{r.count}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-[var(--muted)]">No lost deals yet — mark a deal Lost in the pipeline to see reasons here.</p>
+          )}
         </div>
 
         <div className={`${card} p-6`}>

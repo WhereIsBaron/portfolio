@@ -533,6 +533,11 @@ function buildCrmData(people: Person[], source: CrmData['source']): CrmData {
   const deals: Deal[] = Array.from({ length: 12 }, (_, i) => {
     const c = pick(rng, contacts);
     const stage = DEAL_STAGES[i];
+    // Lost deals carry a reason + competitor so win/loss reporting is populated
+    // out of the box (these are otherwise only captured via the Lost-deal modal).
+    const lost = stage === 'Lost'
+      ? { lostReason: pick(rng, LOST_REASONS), competitor: pick(rng, COMPETITORS.filter((x) => x !== 'None')) }
+      : {};
     return {
       id: `d${i + 1}`,
       title: `${pick(rng, DEAL_TEMPLATES)} — ${c.company}`,
@@ -542,6 +547,7 @@ function buildCrmData(people: Person[], source: CrmData['source']): CrmData {
       probability: STAGE_PROB[stage],
       expectedClose: now + (rint(rng, 0, 90) - 15) * day,
       owner: c.owner,
+      ...lost,
     };
   });
 
