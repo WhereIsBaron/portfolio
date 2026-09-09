@@ -18,7 +18,7 @@
 // DPO_API_URL                 override the API endpoint (default v6)
 // PUBLIC_SITE_URL             canonical site origin for redirect URLs (falls back to Netlify URL, then request origin)
 
-const API_URL = process.env.DPO_API_URL || 'https://secure.dpopay.com/API/v6/';
+const API_URL = process.env.DPO_API_URL || 'https://secure.3gdirectpay.com/API/v6/';
 // Hosted payment page lives on the same host as the API.
 const PAY_HOST = (() => {
   try {
@@ -158,7 +158,7 @@ async function handleCreate(req: Request, payload: any, companyToken: string): P
       amount: amountStr,
       currency,
       // Where the browser should send the payer to complete payment.
-      paymentUrl: `${PAY_HOST}/payv3.php?ID=${encodeURIComponent(transToken)}`,
+      paymentUrl: `${PAY_HOST}/payv2.php?ID=${encodeURIComponent(transToken)}`,
     });
   }
 
