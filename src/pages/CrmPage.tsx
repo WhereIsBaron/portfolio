@@ -174,7 +174,7 @@ function Avatar({ src, name, size = 40 }: { src: string; name: string; size?: nu
   );
 }
 
-const card = 'rounded-2xl border border-white/10 bg-[var(--surface)]';
+const card = 'min-w-0 rounded-2xl border border-white/10 bg-[var(--surface)]';
 const field =
   'w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--brand-bright)]';
 
