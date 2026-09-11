@@ -5,6 +5,7 @@ import CrmPage from '@/pages/CrmPage';
 import ErpPage from '@/pages/ErpPage';
 import PayPage from '@/pages/PayPage';
 import PayReturn from '@/pages/PayReturn';
+import ProductionPage from '@/pages/ProductionPage';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import ScrollToHash from '@/components/ScrollToHash';
 import ChatWidget from '@/components/ChatWidget';
@@ -24,6 +25,7 @@ function App() {
             <Route path="/erp" element={<ErpPage />} />
             <Route path="/pay" element={<PayPage />} />
             <Route path="/pay/return" element={<PayReturn />} />
+            <Route path="/production" element={<ProductionPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
           </Routes>
           <ChatWidget />

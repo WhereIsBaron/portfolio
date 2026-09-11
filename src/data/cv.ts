@@ -144,6 +144,25 @@ const gallery = (slug: string, count: number): string[] =>
 
 export const projects: Project[] = [
   {
+    name: 'Chemical Production Operations Dashboard',
+    category: 'Product',
+    description:
+      'A full Production Operations Management dashboard built for a chemical manufacturing environment — batch tracking, real-time QC parameter checks (pH, viscosity, active ingredient %), OEE monitoring, raw materials inventory with reorder alerts, SHE (safety/health/environment) log, PTW management, and shift handover reporting. Modelled on real chemical plant workflows.',
+    year: '2026',
+    tags: ['React', 'TypeScript', 'Operations', 'Manufacturing', 'QC'],
+    highlights: [
+      'Live batch register across 6 concurrent production batches with status tracking (Mixing → QC → Approved → Bottling → Complete / Hold).',
+      'Quality Control panel with per-parameter pass/fail assessment — pH, viscosity, active ingredient %, microbial count, density — matching real chemical manufacturing specs.',
+      'OEE gauge, production rate, yield %, and QC first-pass rate KPIs derived live from batch states.',
+      'Raw materials inventory with visual stock bars and automatic reorder alerts triggered below minimum threshold.',
+      'SHE log with PTW (Permit to Work) tracking, near-miss reporting, GHS hazard labelling, and compliance dashboard.',
+      'Shift handover log and pending-actions tracker to ensure clean supervisor-to-supervisor transition.',
+    ],
+    route: '/production',
+    wordmark: 'OPS',
+    link: '#',
+  },
+  {
     name: 'Limkonnect — University Community Platform',
     category: 'Community Platform',
     description:
