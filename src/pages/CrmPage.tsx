@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft, LayoutDashboard, Users, Building2, KanbanSquare, CheckSquare,
@@ -622,6 +623,7 @@ function TrainingPanel({
 }
 
 export default function CrmPage() {
+  usePageTitle('CRM System Demo');
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);

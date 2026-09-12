@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, SearchX } from 'lucide-react';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function NotFound() {
+  usePageTitle('Page Not Found');
   const navigate = useNavigate();
 
   return (

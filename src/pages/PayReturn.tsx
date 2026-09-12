@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { ArrowLeft, CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react';
 import { verifyPayment, type VerifyResult } from '@/lib/dpoPay';
 
@@ -21,6 +22,7 @@ function extractToken(params: URLSearchParams): string | null {
 }
 
 export default function PayReturn() {
+  usePageTitle('Payment Confirmation');
   const [params] = useSearchParams();
   const [state, setState] = useState<State>({ kind: 'verifying' });
 

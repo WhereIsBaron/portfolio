@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { profile } from '@/data/cv';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const CONTACT_EMAIL = 'andrewpjlangeveldt@gmail.com';
 const UPDATED = '7 September 2026';
@@ -16,6 +17,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function PrivacyPolicy() {
+  usePageTitle('Privacy Policy');
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       {/* Top bar */}

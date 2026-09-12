@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { ArrowLeft, Lock, ShieldCheck, Loader2, ChevronDown } from 'lucide-react';
 import { createPayment } from '@/lib/dpoPay';
 
@@ -13,6 +14,7 @@ const input =
 const label = 'block text-sm font-medium text-[var(--muted)] mb-1.5';
 
 export default function PayPage() {
+  usePageTitle('Make a Payment');
   const [params] = useSearchParams();
   const cancelled = params.get('cancelled') === '1';
 

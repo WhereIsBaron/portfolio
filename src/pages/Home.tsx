@@ -9,8 +9,10 @@ import Contact from '@/components/Contact';
 import Footer from '@/components/Footer';
 import OwnerBar from '@/components/OwnerBar';
 import { useReveal } from '@/hooks/useReveal';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function Home() {
+  usePageTitle('');
   useReveal([]);
 
   return (

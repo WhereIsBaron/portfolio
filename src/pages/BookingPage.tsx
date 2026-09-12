@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { verticals, type Vertical, type Resource } from '@/data/booking';
 import Footer from '@/components/Footer';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 const ICONS: Record<Vertical['icon'], React.ComponentType<{ size?: number; className?: string }>> = {
   hotel: BedDouble,
@@ -85,6 +86,7 @@ function SummaryRows({
 }
 
 export default function BookingPage() {
+  usePageTitle('Universal Booking System');
   const [vertId, setVertId] = useState(verticals[0].id);
   const vert = useMemo(() => verticals.find((v) => v.id === vertId) || verticals[0], [vertId]);
 

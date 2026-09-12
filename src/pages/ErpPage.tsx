@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft, LayoutDashboard, Wallet, Boxes, ShoppingCart, Truck, Factory,
@@ -96,6 +97,7 @@ function Avatar({ src, name, size = 36 }: { src: string; name: string; size?: nu
 }
 
 export default function ErpPage() {
+  usePageTitle('ERP System Demo');
   const [loading, setLoading] = useState(true);
   const [d, setD] = useState<ErpData | null>(null);
   const [tab, setTab] = useState<Tab>('dashboard');

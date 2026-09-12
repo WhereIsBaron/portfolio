@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePageTitle } from '@/hooks/usePageTitle';
 import {
   ArrowLeft, CheckCircle2, Circle, ChevronRight, ChevronDown, ChevronUp,
   FlaskConical, ShieldCheck, Users, Package, TrendingUp, ClipboardList,
@@ -713,6 +714,7 @@ const MODULES: { id: ModuleId; icon: React.ReactNode; title: string; tagline: st
 ];
 
 export default function ProductionPage() {
+  usePageTitle('Production Supervisor Training');
   const navigate = useNavigate();
   const [active, setActive] = useState<ModuleId>('production');
   const [completed, setCompleted] = useState<Set<ModuleId>>(new Set());
