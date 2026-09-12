@@ -144,19 +144,18 @@ const gallery = (slug: string, count: number): string[] =>
 
 export const projects: Project[] = [
   {
-    name: 'Chemical Production Operations Dashboard',
+    name: 'Production Supervisor Training',
     category: 'Product',
     description:
-      'A full Production Operations Management dashboard built for a chemical manufacturing environment — batch tracking, real-time QC parameter checks (pH, viscosity, active ingredient %), OEE monitoring, raw materials inventory with reorder alerts, SHE (safety/health/environment) log, PTW management, and shift handover reporting. Modelled on real chemical plant workflows.',
+      'An interactive training simulator for new chemical plant supervisors — covering daily production management, quality control, safety & compliance, team leadership, inventory, and continuous improvement. Built from real manufacturing workflows.',
     year: '2026',
-    tags: ['React', 'TypeScript', 'Operations', 'Manufacturing', 'QC'],
+    tags: ['React', 'TypeScript', 'Operations', 'Manufacturing', 'Training'],
     highlights: [
-      'Live batch register across 6 concurrent production batches with status tracking (Mixing → QC → Approved → Bottling → Complete / Hold).',
-      'Quality Control panel with per-parameter pass/fail assessment — pH, viscosity, active ingredient %, microbial count, density — matching real chemical manufacturing specs.',
-      'OEE gauge, production rate, yield %, and QC first-pass rate KPIs derived live from batch states.',
-      'Raw materials inventory with visual stock bars and automatic reorder alerts triggered below minimum threshold.',
-      'SHE log with PTW (Permit to Work) tracking, near-miss reporting, GHS hazard labelling, and compliance dashboard.',
-      'Shift handover log and pending-actions tracker to ensure clean supervisor-to-supervisor transition.',
+      '6 in-depth modules covering OEE, PPE, GHS pictograms, Permit to Work, batch release decisions, and Kaizen — with a clickable glossary for every key term.',
+      'Interactive scenario blocks per module: pick the correct supervisor response, get immediate expert feedback on your reasoning.',
+      'Live OEE calculator (Availability × Performance × Quality) with drag sliders — see world-class vs. below-average benchmarks in real time.',
+      'Progress tracking with localStorage persistence — mark modules complete, resume where you left off, unlock the completion banner at 100%.',
+      'Collapsible concept cards (shift briefing, FEFO vs. FIFO, 5 Whys, PDCA, Heinrich\'s Triangle) and a GHS hazard pictogram reference grid.',
     ],
     route: '/production',
     wordmark: 'OPS',
