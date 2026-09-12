@@ -237,8 +237,8 @@ export default function AgeOrbit() {
               cx={x * STAR_SCALE}
               cy={y * STAR_SCALE}
               r={i % 5 === 0 ? 1.6 : 1}
-              fill="#fff"
-              opacity={i % 3 === 0 ? 0.35 : 0.18}
+              fill="var(--text)"
+              opacity={i % 3 === 0 ? 0.25 : 0.12}
             />
           ))}
 
@@ -250,7 +250,8 @@ export default function AgeOrbit() {
               cy={C}
               r={r.radius}
               fill="none"
-              stroke="rgba(255,255,255,0.09)"
+              stroke="var(--border)"
+              strokeOpacity={0.6}
               strokeWidth={1}
             />
           ))}
@@ -302,8 +303,7 @@ export default function AgeOrbit() {
                 }}
                 textAnchor="middle"
                 y={0}
-                className="fill-white"
-                style={{ fontSize: 14, fontWeight: 700 }}
+                style={{ fontSize: 14, fontWeight: 700, fill: 'var(--text)' }}
               >
                 {init.values[ring.key]}
               </text>
@@ -320,7 +320,7 @@ export default function AgeOrbit() {
       </div>
 
       {/* exact live readout */}
-      <p className="mt-4 text-center font-display text-xl font-light text-white tabular-nums sm:text-2xl">
+      <p className="mt-4 text-center font-display text-xl font-light text-[var(--text)] tabular-nums sm:text-2xl">
         <span ref={yrRef}>{init.year}</span>
         <span className="text-sm text-[var(--muted)] sm:text-base"> yrs </span>
         <span ref={moRef}>{init.month}</span>
