@@ -8,6 +8,7 @@ import References from '@/components/References';
 import Contact from '@/components/Contact';
 import Footer from '@/components/Footer';
 import OwnerBar from '@/components/OwnerBar';
+import MobileCTA from '@/components/MobileCTA';
 import { useReveal } from '@/hooks/useReveal';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
@@ -29,6 +30,7 @@ export default function Home() {
       </main>
       <Footer />
       <OwnerBar />
+      <MobileCTA />
     </div>
   );
 }

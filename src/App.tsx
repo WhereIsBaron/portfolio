@@ -10,6 +10,7 @@ import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import NotFound from '@/pages/NotFound';
 import ScrollToHash from '@/components/ScrollToHash';
 import ChatWidget from '@/components/ChatWidget';
+import CookieBanner from '@/components/CookieBanner';
 import { AuthProvider } from '@/context/AuthContext';
 import { LayoutProvider } from '@/context/LayoutContext';
 
@@ -31,6 +32,7 @@ function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
           <ChatWidget />
+          <CookieBanner />
         </LayoutProvider>
       </AuthProvider>
     </BrowserRouter>
