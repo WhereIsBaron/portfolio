@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Don't index payment or return pages
+Disallow: /pay/
+Disallow: /pay/return
+
+Sitemap: https://andrew-langeveldt.netlify.app/sitemap.xml

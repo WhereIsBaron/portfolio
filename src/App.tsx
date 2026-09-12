@@ -7,6 +7,7 @@ import PayPage from '@/pages/PayPage';
 import PayReturn from '@/pages/PayReturn';
 import ProductionPage from '@/pages/ProductionPage';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import NotFound from '@/pages/NotFound';
 import ScrollToHash from '@/components/ScrollToHash';
 import ChatWidget from '@/components/ChatWidget';
 import { AuthProvider } from '@/context/AuthContext';
@@ -27,6 +28,7 @@ function App() {
             <Route path="/pay/return" element={<PayReturn />} />
             <Route path="/production" element={<ProductionPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
           <ChatWidget />
         </LayoutProvider>
