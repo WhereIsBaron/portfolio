@@ -15,6 +15,19 @@
     --accent: #e0b25c;
   }
 
+  html[data-theme="light"] {
+    --bg: #f5f4ef;
+    --bg-soft: #eceae5;
+    --surface: #e3e1db;
+    --border: #c9c7c0;
+    --text: #14161a;
+    --muted: #5c6272;
+    --brand: #327878;
+    --brand-bright: #1e8080;
+    --accent: #b06e0c;
+    color-scheme: light;
+  }
+
   html {
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
@@ -75,6 +88,49 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #3a424f;
+}
+
+/* ── Light-mode global overrides ─────────────────────────────────
+   Components use hardcoded Tailwind dark utilities (text-white,
+   border-white/*, bg-white/*, bg-[#0b0d10]). These overrides remap
+   them to theme tokens without touching every component file.
+   Elements that must stay dark (code windows, syntax highlighting)
+   get class="preserve-dark" on their wrapper to cancel these rules.
+   ──────────────────────────────────────────────────────────────── */
+
+html[data-theme="light"] .text-white { color: var(--text); }
+html[data-theme="light"] .hover\:text-white:hover { color: var(--text); }
+html[data-theme="light"] [class*="border-white"] { border-color: var(--border); }
+html[data-theme="light"] [class*="bg-white\/"] { background-color: var(--surface); }
+html[data-theme="light"] .hover\:bg-white:hover { background-color: var(--surface); }
+
+/* Navbar scrolled + mobile menu backgrounds */
+.nav-scrolled-bg {
+  background-color: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.nav-mobile-bg {
+  background-color: color-mix(in srgb, var(--bg) 95%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Navbar CTA "Get in touch" adapts in light mode */
+html[data-theme="light"] .nav-cta {
+  background-color: var(--text);
+  color: var(--bg);
+}
+
+/* Preserve dark inside code windows / syntax blocks */
+html[data-theme="light"] .preserve-dark .text-white { color: #e7ecef; }
+html[data-theme="light"] .preserve-dark [class*="border-white"] { border-color: rgba(255,255,255,0.08); }
+html[data-theme="light"] .preserve-dark [class*="bg-white\/"] { background-color: rgba(255,255,255,0.05); }
+
+/* CookieBanner hardcoded dark bg */
+html[data-theme="light"] .cookie-bg {
+  background-color: color-mix(in srgb, var(--bg) 97%, transparent);
+  border-color: var(--border);
 }
 
 /* Mount animation for the chat greeting bubble. */

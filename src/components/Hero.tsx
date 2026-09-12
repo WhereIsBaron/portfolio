@@ -96,7 +96,7 @@ export default function Hero() {
           <div className="reveal relative mx-auto max-w-md">
             <div className="absolute -inset-3 rounded-[2rem] border border-white/10" />
             <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-[var(--accent)]/20 blur-2xl" />
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0e1117] shadow-2xl">
+            <div className="preserve-dark overflow-hidden rounded-2xl border border-white/10 bg-[#0e1117] shadow-2xl">
               {/* window bar */}
               <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
                 <span className="h-3 w-3 rounded-full bg-[#ff5f56]" />
@@ -176,7 +176,7 @@ export default function Hero() {
       >
         <span className="text-[10px] uppercase tracking-[0.2em]">Scroll</span>
         <span className="flex h-9 w-5 items-start justify-center rounded-full border border-white/20 p-1">
-          <span className="h-2 w-1 animate-bounce rounded-full bg-white/60" />
+          <span className="h-2 w-1 animate-bounce rounded-full bg-[var(--text)]/60" />
         </span>
       </a>
     </section>

@@ -32,7 +32,7 @@ export default function CookieBanner() {
     <div
       role="dialog"
       aria-label="Cookie consent"
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#0b0d10]/95 px-5 py-4 backdrop-blur-md sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm sm:rounded-2xl sm:border"
+      className="cookie-bg fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--border)] bg-[#0b0d10]/95 px-5 py-4 backdrop-blur-md sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm sm:rounded-2xl sm:border"
     >
       <div className="mb-3 flex items-start gap-3">
         <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--brand-bright)]/10 text-[var(--brand-bright)]">
