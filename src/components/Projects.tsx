@@ -149,7 +149,7 @@ export default function Projects() {
                         loading="lazy"
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
-                      <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-xs font-medium text-white">
+                      <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-xs font-medium" style={{ color: 'white' }}>
                         <Images size={14} />
                         {imgs.length} photos
                       </span>
@@ -179,7 +179,7 @@ export default function Projects() {
                           className="text-[var(--brand-bright)] transition-transform duration-500 group-hover:scale-110"
                         />
                       )}
-                      <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-xs font-medium text-white">
+                      <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-xs font-medium" style={{ color: 'white' }}>
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--brand-bright)]" /> Live demo
                       </span>
                       <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
