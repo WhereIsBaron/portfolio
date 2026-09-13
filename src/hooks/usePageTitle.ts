@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const BASE = 'Andrew Langeveldt — Software Engineer & Developer';
+const BASE = 'Andrew Langeveldt — Junior Software Engineer & Developer';
 
 /**
  * Sets document.title for the current page and resets to the portfolio

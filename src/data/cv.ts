@@ -2,7 +2,7 @@ export const profile = {
   name: 'Andrew Peter John Langeveldt',
   shortName: 'Andrew Langeveldt',
   initials: 'AP',
-  title: 'Software Engineer · Full-Stack Web & Mobile Developer',
+  title: 'Junior Software Engineer · Full-Stack Web & Mobile Developer',
   tagline:
     'Software engineer and full-stack developer. I design, build, and maintain websites, databases, mobile apps, games, and automation solutions, with a problem-solving mindset and real attention to detail.',
   location: 'Gaborone, Botswana',
