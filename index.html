@@ -29,6 +29,9 @@
         if (t) document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
     </script>
+    <!-- Umami Analytics — replace UMAMI_WEBSITE_ID with your actual ID from umami.is -->
+    <!-- To exclude your own visits: open console and run: localStorage.setItem('umami.disabled', 1) -->
+    <script defer src="https://cloud.umami.is/script.js" data-website-id="UMAMI_WEBSITE_ID"></script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
