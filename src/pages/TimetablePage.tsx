@@ -40,40 +40,33 @@ const ROLES: Record<DemoRole, {
   label: string;
   desc: string;
   Icon: React.ComponentType<{ size?: number; className?: string }>;
-  canAdd: boolean;
-  canEdit: boolean;
-  canDelete: boolean;
-  canDirectory: boolean;
   canConflicts: boolean;
+  canDirectory: boolean;
   filtered: boolean;
 }> = {
   viewer: {
     label: 'Viewer',
-    desc: 'Read-only access to all sessions',
+    desc: 'See the full weekly schedule',
     Icon: Eye,
-    canAdd: false, canEdit: false, canDelete: false,
-    canDirectory: false, canConflicts: true, filtered: false,
+    canConflicts: false, canDirectory: false, filtered: false,
   },
   coordinator: {
     label: 'Timetable Coordinator',
-    desc: 'Add and edit sessions, resolve conflicts',
+    desc: 'Full schedule view + conflicts + directory',
     Icon: ClipboardList,
-    canAdd: true, canEdit: true, canDelete: false,
-    canDirectory: false, canConflicts: true, filtered: false,
+    canConflicts: true, canDirectory: true, filtered: false,
   },
   lecturer: {
     label: 'Lecturer',
-    desc: 'View your own assigned sessions',
+    desc: 'Your assigned sessions only',
     Icon: UserSquare2,
-    canAdd: false, canEdit: false, canDelete: false,
-    canDirectory: false, canConflicts: false, filtered: true,
+    canConflicts: false, canDirectory: false, filtered: true,
   },
   student: {
     label: 'Student',
-    desc: 'View your cohort timetable',
+    desc: 'Your cohort timetable only',
     Icon: GraduationCap,
-    canAdd: false, canEdit: false, canDelete: false,
-    canDirectory: false, canConflicts: false, filtered: true,
+    canConflicts: false, canDirectory: false, filtered: true,
   },
 };
 
@@ -172,9 +165,7 @@ function RoleSwitcher({
 
             <div className="border-t border-white/5 px-4 py-2.5">
               <p className="text-[10px] text-[var(--muted)]/60">
-                {ROLES[role].canAdd
-                  ? 'Coordinator writes require admin sign-in to persist.'
-                  : 'Read-only — no changes can be saved in this role.'}
+                All guest roles are read-only. Admin sign-in unlocks full management.
               </p>
             </div>
           </div>
@@ -897,7 +888,7 @@ export default function TimetablePage() {
   const perms = useMemo(() => {
     if (isAdmin) return { canAdd: true, canEdit: true, canDelete: true, canDirectory: true, canConflicts: true };
     const r = ROLES[demoRole];
-    return { canAdd: r.canAdd, canEdit: r.canEdit, canDelete: false, canDirectory: false, canConflicts: r.canConflicts };
+    return { canAdd: false, canEdit: false, canDelete: false, canDirectory: r.canDirectory, canConflicts: r.canConflicts };
   }, [isAdmin, demoRole]);
 
   // ── Computed ───────────────────────────────────────────────────────────────
