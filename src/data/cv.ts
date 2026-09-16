@@ -242,8 +242,6 @@ export const projects: Project[] = [
     route: '/timetable',
     wordmark: 'SCH',
     link: '#',
-    slug: 'classroom-scheduling',
-    images: gallery('classroom-scheduling', 9),
   },
   {
     name: 'UN Coding4Integrity Hackathon',
