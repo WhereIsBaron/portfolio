@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft, LayoutGrid, AlertTriangle, Plus, X, Edit2, Trash2,
-  RefreshCw, ChevronDown, Loader2, ShieldCheck, BookOpen,
-  Users, DoorOpen, GraduationCap, UserSquare2,
+  RefreshCw, Loader2, ShieldCheck, BookOpen, ChevronDown,
+  DoorOpen, GraduationCap, UserSquare2, Eye, Users, ClipboardList,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -19,10 +19,10 @@ import {
 
 // ── Shared styles ──────────────────────────────────────────────────────────────
 
-const input =
+const inp =
   'w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white placeholder:text-[var(--muted)]/50 focus:border-[var(--brand-bright)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-bright)]';
 
-const select =
+const sel =
   'w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white focus:border-[var(--brand-bright)] focus:outline-none';
 
 const btn = (variant: 'primary' | 'ghost' | 'danger' = 'ghost') => {
@@ -32,25 +32,205 @@ const btn = (variant: 'primary' | 'ghost' | 'danger' = 'ghost') => {
   return `${base} border border-white/10 text-[var(--muted)] hover:border-white/30 hover:text-white`;
 };
 
-// ── Conflict badge colours ─────────────────────────────────────────────────────
+// ── Demo role system ───────────────────────────────────────────────────────────
 
-const CONFLICT_COLOURS: Record<string, string> = {
-  room:     '#f87171',
-  lecturer: '#fb923c',
-  cohort:   '#facc15',
+type DemoRole = 'viewer' | 'coordinator' | 'lecturer' | 'student';
+
+const ROLES: Record<DemoRole, {
+  label: string;
+  desc: string;
+  Icon: React.ComponentType<{ size?: number; className?: string }>;
+  canAdd: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canDirectory: boolean;
+  canConflicts: boolean;
+  filtered: boolean;
+}> = {
+  viewer: {
+    label: 'Viewer',
+    desc: 'Read-only access to all sessions',
+    Icon: Eye,
+    canAdd: false, canEdit: false, canDelete: false,
+    canDirectory: false, canConflicts: true, filtered: false,
+  },
+  coordinator: {
+    label: 'Timetable Coordinator',
+    desc: 'Add and edit sessions, resolve conflicts',
+    Icon: ClipboardList,
+    canAdd: true, canEdit: true, canDelete: false,
+    canDirectory: false, canConflicts: true, filtered: false,
+  },
+  lecturer: {
+    label: 'Lecturer',
+    desc: 'View your own assigned sessions',
+    Icon: UserSquare2,
+    canAdd: false, canEdit: false, canDelete: false,
+    canDirectory: false, canConflicts: false, filtered: true,
+  },
+  student: {
+    label: 'Student',
+    desc: 'View your cohort timetable',
+    Icon: GraduationCap,
+    canAdd: false, canEdit: false, canDelete: false,
+    canDirectory: false, canConflicts: false, filtered: true,
+  },
 };
 
-// ── Session card ──────────────────────────────────────────────────────────────
+// ── Role switcher ──────────────────────────────────────────────────────────────
+
+function RoleSwitcher({
+  role, setRole, lecturerId, setLecturerId, cohortId, setCohortId,
+  lecturers, cohorts,
+}: {
+  role: DemoRole;
+  setRole: (r: DemoRole) => void;
+  lecturerId: number | null;
+  setLecturerId: (id: number | null) => void;
+  cohortId: number | null;
+  setCohortId: (id: number | null) => void;
+  lecturers: TLecturer[];
+  cohorts: TCohort[];
+}) {
+  const [open, setOpen] = useState(false);
+  const current = ROLES[role];
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 rounded-xl border border-white/10 bg-[var(--surface)] px-3 py-1.5 text-xs text-white transition-colors hover:border-white/30"
+      >
+        <current.Icon size={12} className="text-[var(--brand-bright)]" />
+        <span className="hidden sm:inline">{current.label}</span>
+        <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface)] shadow-2xl">
+            <div className="border-b border-white/10 px-4 py-3">
+              <p className="text-xs font-semibold text-white">Switch Role</p>
+              <p className="text-[10px] text-[var(--muted)]">Demo mode — explore system permissions</p>
+            </div>
+
+            <div className="p-2 space-y-1">
+              {(Object.entries(ROLES) as [DemoRole, typeof ROLES[DemoRole]][]).map(([key, cfg]) => {
+                const active = role === key;
+                return (
+                  <div key={key}>
+                    <button
+                      onClick={() => { setRole(key); if (!cfg.filtered) { setLecturerId(null); setCohortId(null); } }}
+                      className={`w-full rounded-xl px-3 py-2.5 text-left transition-colors ${
+                        active ? 'bg-[var(--brand-bright)]/10 ring-1 ring-[var(--brand-bright)]/30' : 'hover:bg-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <cfg.Icon size={14} className={active ? 'text-[var(--brand-bright)]' : 'text-[var(--muted)]'} />
+                        <div>
+                          <p className={`text-xs font-medium ${active ? 'text-white' : 'text-[var(--muted)]'}`}>{cfg.label}</p>
+                          <p className="text-[10px] text-[var(--muted)]/70">{cfg.desc}</p>
+                        </div>
+                        {active && (
+                          <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[var(--brand-bright)]" />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Sub-selector for lecturer role */}
+                    {active && key === 'lecturer' && (
+                      <div className="mx-2 mt-1 mb-1">
+                        <select
+                          className={sel + ' text-[11px] py-1.5'}
+                          value={lecturerId ?? ''}
+                          onChange={e => setLecturerId(e.target.value ? Number(e.target.value) : null)}
+                        >
+                          <option value="">— select a lecturer —</option>
+                          {lecturers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Sub-selector for student role */}
+                    {active && key === 'student' && (
+                      <div className="mx-2 mt-1 mb-1">
+                        <select
+                          className={sel + ' text-[11px] py-1.5'}
+                          value={cohortId ?? ''}
+                          onChange={e => setCohortId(e.target.value ? Number(e.target.value) : null)}
+                        >
+                          <option value="">— select your cohort —</option>
+                          {cohorts.map(c => <option key={c.id} value={c.id}>{c.code} · {c.faculty}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="border-t border-white/5 px-4 py-2.5">
+              <p className="text-[10px] text-[var(--muted)]/60">
+                {ROLES[role].canAdd
+                  ? 'Coordinator writes require admin sign-in to persist.'
+                  : 'Read-only — no changes can be saved in this role.'}
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Delete confirm dialog ──────────────────────────────────────────────────────
+
+function DeleteConfirm({
+  session, onConfirm, onCancel, loading,
+}: {
+  session: TSession;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onCancel}>
+      <div
+        className="w-full max-w-sm rounded-2xl border border-white/10 bg-[var(--surface)] p-6 shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10">
+          <Trash2 size={18} className="text-red-400" />
+        </div>
+        <h3 className="font-display text-base text-white">Delete session?</h3>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          <span className="text-white">{session.module_title}</span> will be soft-deleted and hidden from the timetable. This can be recovered from the database.
+        </p>
+        <div className="mt-5 flex gap-2 justify-end">
+          <button onClick={onCancel} className={btn()}>Cancel</button>
+          <button onClick={onConfirm} disabled={loading} className={btn('danger')}>
+            {loading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Session card ───────────────────────────────────────────────────────────────
 
 function SessionCard({
-  s, cohort, room, lecturer, conflictTypes, isAdmin, onEdit, onDelete,
+  s, cohort, room, lecturer, conflictTypes, canEdit, canDelete, onEdit, onDelete,
 }: {
   s: LanedSession;
   cohort: TCohort | undefined;
   room: TRoom | undefined;
   lecturer: TLecturer | undefined;
   conflictTypes: string[];
-  isAdmin: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
   onEdit: (s: TSession) => void;
   onDelete: (id: number) => void;
 }) {
@@ -61,26 +241,28 @@ function SessionCard({
   const colour = facultyColour(cohort?.faculty ?? '');
   const short  = height < 80;
 
+  const CONFLICT_COLOURS: Record<string, string> = {
+    room: '#f87171', lecturer: '#fb923c', cohort: '#facc15',
+  };
+
   return (
     <div
-      className="absolute overflow-hidden rounded-lg border transition-all"
+      className="absolute overflow-hidden rounded-lg transition-all"
       style={{
         top: `${top}px`,
         height: `${height - 2}px`,
         left: `${s.lane * pct + 0.5}%`,
         width: `${pct - 1}%`,
-        borderColor: `${colour}40`,
-        background: `${colour}18`,
-        cursor: isAdmin ? 'pointer' : 'default',
+        background: 'var(--surface)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderTop: `3px solid ${colour}`,
+        cursor: canEdit ? 'pointer' : 'default',
         zIndex: hover ? 20 : 10,
       }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      {/* Colour accent bar */}
-      <div className="absolute left-0 top-0 h-full w-0.5 rounded-l-lg" style={{ background: colour }} />
-
-      <div className="flex h-full flex-col justify-between px-1.5 py-1 pl-2.5">
+      <div className="flex h-full flex-col justify-between px-2 py-1">
         <div className="min-w-0">
           <p className="truncate text-[10px] font-semibold leading-tight text-white" title={s.module_title}>
             {s.module_title}
@@ -94,7 +276,6 @@ function SessionCard({
           )}
         </div>
 
-        {/* Conflict badges */}
         {conflictTypes.length > 0 && (
           <div className="mt-0.5 flex flex-wrap gap-0.5">
             {conflictTypes.map(t => (
@@ -110,31 +291,35 @@ function SessionCard({
         )}
       </div>
 
-      {/* Admin hover actions */}
-      {isAdmin && hover && (
+      {(canEdit || canDelete) && hover && (
         <div className="absolute right-1 top-1 flex gap-0.5">
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(s); }}
-            className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-white hover:bg-white/20"
-          >
-            <Edit2 size={9} />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(s.id); }}
-            className="flex h-5 w-5 items-center justify-center rounded bg-red-500/20 text-red-400 hover:bg-red-500/40"
-          >
-            <Trash2 size={9} />
-          </button>
+          {canEdit && (
+            <button
+              onClick={e => { e.stopPropagation(); onEdit(s); }}
+              className="flex h-5 w-5 items-center justify-center rounded bg-white/10 text-white hover:bg-white/25"
+            >
+              <Edit2 size={9} />
+            </button>
+          )}
+          {canDelete && (
+            <button
+              onClick={e => { e.stopPropagation(); onDelete(s.id); }}
+              className="flex h-5 w-5 items-center justify-center rounded bg-red-500/20 text-red-400 hover:bg-red-500/40"
+            >
+              <Trash2 size={9} />
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ── Weekly grid ───────────────────────────────────────────────────────────────
+// ── Weekly grid ────────────────────────────────────────────────────────────────
 
 function TimetableGrid({
-  sessions, rooms, cohorts, lecturers, conflicts, dayFilter, isAdmin, onEdit, onDelete, onAdd,
+  sessions, rooms, cohorts, lecturers, conflicts, dayFilter,
+  canAdd, canEdit, canDelete, onEdit, onDelete, onAdd,
 }: {
   sessions: TSession[];
   rooms: TRoom[];
@@ -142,7 +327,7 @@ function TimetableGrid({
   lecturers: TLecturer[];
   conflicts: TConflict[];
   dayFilter: number | null;
-  isAdmin: boolean;
+  canAdd: boolean; canEdit: boolean; canDelete: boolean;
   onEdit: (s: TSession) => void;
   onDelete: (id: number) => void;
   onAdd: (day: number) => void;
@@ -151,33 +336,28 @@ function TimetableGrid({
   const cohortIdx   = useMemo(() => new Map(cohorts.map(c => [c.id, c])), [cohorts]);
   const lecturerIdx = useMemo(() => new Map(lecturers.map(l => [l.id, l])), [lecturers]);
 
-  const active = sessions.filter(s => !s.deleted);
   const days = dayFilter != null ? [dayFilter] : [1, 2, 3, 4, 5];
-
-  // Hour labels 08:00–15:00 (16:00 is the end, just shown as a line)
   const hourLabels = Array.from({ length: 9 }, (_, i) => GRID_START + i * 60);
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[var(--surface)]">
-      {/* Day header row */}
       <div
         className="grid border-b border-white/10"
         style={{ gridTemplateColumns: `3rem repeat(${days.length}, minmax(120px,1fr))` }}
       >
         <div className="border-r border-white/10 py-2" />
         {days.map(d => {
-          const daySessions = active.filter(s => s.day_of_week === d);
+          const daySessions = sessions.filter(s => s.day_of_week === d);
           const hasConflict = daySessions.some(s => sessionConflictTypes(s.id, conflicts).length > 0);
           return (
             <div key={d} className="flex items-center justify-between border-r border-white/10 px-3 py-2 last:border-r-0">
               <span className="text-xs font-medium text-white">{DAY_SHORT[d - 1]}</span>
               <div className="flex items-center gap-1">
                 {hasConflict && <AlertTriangle size={11} className="text-red-400" />}
-                {isAdmin && (
+                {canAdd && (
                   <button
                     onClick={() => onAdd(d)}
                     className="flex h-5 w-5 items-center justify-center rounded-md bg-white/5 text-[var(--muted)] hover:bg-[var(--brand-bright)] hover:text-[#0b0d10]"
-                    title={`Add session on ${DAYS[d - 1]}`}
                   >
                     <Plus size={11} />
                   </button>
@@ -188,12 +368,10 @@ function TimetableGrid({
         })}
       </div>
 
-      {/* Grid body */}
       <div
         className="grid"
         style={{ gridTemplateColumns: `3rem repeat(${days.length}, minmax(120px,1fr))` }}
       >
-        {/* Time labels column */}
         <div className="relative border-r border-white/10" style={{ height: `${GRID_H}px` }}>
           {hourLabels.map(min => (
             <div
@@ -206,9 +384,8 @@ function TimetableGrid({
           ))}
         </div>
 
-        {/* Day columns */}
         {days.map(d => {
-          const daySessions = active.filter(s => s.day_of_week === d);
+          const daySessions = sessions.filter(s => s.day_of_week === d);
           const laned = packLanes(daySessions);
           return (
             <div
@@ -216,7 +393,6 @@ function TimetableGrid({
               className="relative border-r border-white/10 last:border-r-0"
               style={{ height: `${GRID_H}px` }}
             >
-              {/* Hour grid lines */}
               {hourLabels.map(min => (
                 <div
                   key={min}
@@ -224,8 +400,6 @@ function TimetableGrid({
                   style={{ top: `${minToTop(min)}px` }}
                 />
               ))}
-
-              {/* Session cards */}
               {laned.map(s => (
                 <SessionCard
                   key={s.id}
@@ -234,7 +408,8 @@ function TimetableGrid({
                   room={s.room_id != null ? roomIdx.get(s.room_id) : undefined}
                   lecturer={s.lecturer_id != null ? lecturerIdx.get(s.lecturer_id) : undefined}
                   conflictTypes={sessionConflictTypes(s.id, conflicts)}
-                  isAdmin={isAdmin}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
                   onEdit={onEdit}
                   onDelete={onDelete}
                 />
@@ -250,7 +425,7 @@ function TimetableGrid({
 // ── Conflict panel ─────────────────────────────────────────────────────────────
 
 function ConflictPanel({
-  conflicts, sessions, rooms, cohorts, lecturers, onEdit,
+  conflicts, sessions, rooms, cohorts, lecturers, onEdit, canEdit,
 }: {
   conflicts: TConflict[];
   sessions: TSession[];
@@ -258,13 +433,18 @@ function ConflictPanel({
   cohorts: TCohort[];
   lecturers: TLecturer[];
   onEdit: (s: TSession) => void;
+  canEdit: boolean;
 }) {
   const sessionIdx  = useMemo(() => new Map(sessions.map(s => [s.id, s])), [sessions]);
   const roomIdx     = useMemo(() => new Map(rooms.map(r => [r.id, r])), [rooms]);
   const cohortIdx   = useMemo(() => new Map(cohorts.map(c => [c.id, c])), [cohorts]);
   const lecturerIdx = useMemo(() => new Map(lecturers.map(l => [l.id, l])), [lecturers]);
 
-  const unassigned = sessions.filter(s => !s.deleted && (s.lecturer_id == null || s.room_id == null));
+  const unassigned = sessions.filter(s => s.lecturer_id == null || s.room_id == null);
+
+  const CONFLICT_COLOURS: Record<string, string> = {
+    room: '#f87171', lecturer: '#fb923c', cohort: '#facc15',
+  };
 
   if (!conflicts.length && !unassigned.length) {
     return (
@@ -292,16 +472,12 @@ function ConflictPanel({
         return (
           <div key={i} className="rounded-2xl border border-white/10 bg-[var(--surface)] p-5">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span
-                className="rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide"
-                style={{ background: `${colour}25`, color: colour }}
-              >
+              <span className="rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide" style={{ background: `${colour}25`, color: colour }}>
                 {c.type}
               </span>
               <span className="text-sm font-medium text-white">{DAYS[c.day - 1]}</span>
               <span className="text-sm text-[var(--muted)]">— {resourceName(c)} double-booked</span>
             </div>
-
             <div className="grid gap-2 sm:grid-cols-2">
               {involved.map(s => {
                 const cohort   = cohortIdx.get(s.cohort_id);
@@ -316,9 +492,11 @@ function ConflictPanel({
                       {lecturer && <span className="rounded-md border border-white/10 px-1.5 py-0.5">{lecturer.name}</span>}
                       {room     && <span className="rounded-md border border-white/10 px-1.5 py-0.5">{room.name}</span>}
                     </div>
-                    <button onClick={() => onEdit(s)} className={`${btn()} mt-2 text-[10px]`}>
-                      <Edit2 size={10} /> Reschedule
-                    </button>
+                    {canEdit && (
+                      <button onClick={() => onEdit(s)} className={`${btn()} mt-2 text-[10px]`}>
+                        <Edit2 size={10} /> Reschedule
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -341,9 +519,11 @@ function ConflictPanel({
                     {s.room_id == null && ' · No room'}
                   </p>
                 </div>
-                <button onClick={() => onEdit(s)} className={btn()}>
-                  <Edit2 size={11} /> Assign
-                </button>
+                {canEdit && (
+                  <button onClick={() => onEdit(s)} className={btn()}>
+                    <Edit2 size={11} /> Assign
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -378,12 +558,12 @@ function SessionForm({
   onClose: () => void;
 }) {
   const [form, setForm] = useState<FormState>({
-    day_of_week: initial.day_of_week ?? 1,
-    start_min:   initial.start_min   ?? 480,
+    day_of_week:  initial.day_of_week  ?? 1,
+    start_min:    initial.start_min    ?? 480,
     duration_min: initial.duration_min ?? 120,
-    room_id:     initial.room_id     != null ? String(initial.room_id)     : '',
-    cohort_id:   initial.cohort_id   != null ? String(initial.cohort_id)   : '',
-    lecturer_id: initial.lecturer_id != null ? String(initial.lecturer_id) : '',
+    room_id:      initial.room_id      != null ? String(initial.room_id)     : '',
+    cohort_id:    initial.cohort_id    != null ? String(initial.cohort_id)   : '',
+    lecturer_id:  initial.lecturer_id  != null ? String(initial.lecturer_id) : '',
     module_code:  initial.module_code  ?? '',
     module_title: initial.module_title ?? '',
   });
@@ -393,7 +573,6 @@ function SessionForm({
   const set = (k: keyof FormState, v: string | number) =>
     setForm(f => ({ ...f, [k]: v }));
 
-  // Live conflict preview — pure in-memory, no network needed.
   const previewConflicts = useMemo(() => {
     const candidate: TSession = {
       id: initial.id ?? -1,
@@ -408,7 +587,8 @@ function SessionForm({
       deleted: false,
     };
     const others = existingSessions.filter(s => !s.deleted && s.id !== candidate.id);
-    return detectConflicts([...others, candidate]).filter(c => c.sessionIds.includes(-1) || c.sessionIds.includes(initial.id ?? -1));
+    const allConflicts = detectConflicts([...others, candidate]);
+    return allConflicts.filter(c => c.sessionIds.includes(candidate.id));
   }, [form, existingSessions, initial.id]);
 
   const handleSave = async () => {
@@ -424,8 +604,20 @@ function SessionForm({
     };
     const errs = validateDraft({ ...draft, room_id: draft.room_id });
     if (errs.length) { setErrors(errs); return; }
+    setErrors([]);
     setSaving(true);
-    try { await onSave(draft); } finally { setSaving(false); }
+    try {
+      await onSave(draft);
+    } catch (e: unknown) {
+      const msg = (e as { message?: string })?.message ?? 'Unknown error';
+      if (msg.includes('row-level security') || msg.includes('policy')) {
+        setErrors(['Admin sign-in required to save changes. This is a demo restriction.']);
+      } else {
+        setErrors([`Save failed: ${msg}`]);
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -444,41 +636,39 @@ function SessionForm({
         <div className="space-y-4">
           <div>
             <label className="mb-1.5 block text-xs text-[var(--muted)]">Module title</label>
-            <input className={input} value={form.module_title} onChange={e => set('module_title', e.target.value)} placeholder="e.g. Data Structures" />
+            <input className={inp} value={form.module_title} onChange={e => set('module_title', e.target.value)} placeholder="e.g. Data Structures" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-xs text-[var(--muted)]">Module code</label>
-              <input className={input} value={form.module_code} onChange={e => set('module_code', e.target.value)} placeholder="CS201" />
+              <input className={inp} value={form.module_code} onChange={e => set('module_code', e.target.value)} placeholder="CS201" />
             </div>
             <div>
               <label className="mb-1.5 block text-xs text-[var(--muted)]">Cohort</label>
-              <select className={select} value={form.cohort_id} onChange={e => set('cohort_id', e.target.value)}>
+              <select className={sel} value={form.cohort_id} onChange={e => set('cohort_id', e.target.value)}>
                 <option value="">— select —</option>
-                {cohorts.map(c => <option key={c.id} value={c.id}>{c.code} – {c.faculty}</option>)}
+                {cohorts.map(c => <option key={c.id} value={String(c.id)}>{c.code} – {c.faculty}</option>)}
               </select>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="mb-1.5 block text-xs text-[var(--muted)]">Day</label>
-              <select className={select} value={form.day_of_week} onChange={e => set('day_of_week', Number(e.target.value))}>
+              <select className={sel} value={form.day_of_week} onChange={e => set('day_of_week', Number(e.target.value))}>
                 {DAYS.map((d, i) => <option key={i + 1} value={i + 1}>{d}</option>)}
               </select>
             </div>
             <div>
               <label className="mb-1.5 block text-xs text-[var(--muted)]">Start time</label>
-              <select className={select} value={form.start_min} onChange={e => set('start_min', Number(e.target.value))}>
-                {ALLOWED_STARTS.map(m => {
-                  const end = m + Number(form.duration_min);
-                  if (end > 960) return null;
-                  return <option key={m} value={m}>{hhmm(m)}</option>;
-                })}
+              <select className={sel} value={form.start_min} onChange={e => set('start_min', Number(e.target.value))}>
+                {ALLOWED_STARTS.filter(m => m + Number(form.duration_min) <= 960).map(m => (
+                  <option key={m} value={m}>{hhmm(m)}</option>
+                ))}
               </select>
             </div>
             <div>
               <label className="mb-1.5 block text-xs text-[var(--muted)]">Duration</label>
-              <select className={select} value={form.duration_min} onChange={e => set('duration_min', Number(e.target.value))}>
+              <select className={sel} value={form.duration_min} onChange={e => set('duration_min', Number(e.target.value))}>
                 {DURATIONS.map(d => <option key={d} value={d}>{d === 60 ? '1h' : d === 90 ? '1h 30m' : d === 120 ? '2h' : '3h'}</option>)}
               </select>
             </div>
@@ -486,22 +676,21 @@ function SessionForm({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-xs text-[var(--muted)]">Room</label>
-              <select className={select} value={form.room_id} onChange={e => set('room_id', e.target.value)}>
+              <select className={sel} value={form.room_id} onChange={e => set('room_id', e.target.value)}>
                 <option value="">— unassigned —</option>
-                {rooms.map(r => <option key={r.id} value={r.id}>{r.name} ({r.capacity})</option>)}
+                {rooms.map(r => <option key={r.id} value={String(r.id)}>{r.name} ({r.capacity})</option>)}
               </select>
             </div>
             <div>
               <label className="mb-1.5 block text-xs text-[var(--muted)]">Lecturer</label>
-              <select className={select} value={form.lecturer_id} onChange={e => set('lecturer_id', e.target.value)}>
+              <select className={sel} value={form.lecturer_id} onChange={e => set('lecturer_id', e.target.value)}>
                 <option value="">— unassigned —</option>
-                {lecturers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {lecturers.map(l => <option key={l.id} value={String(l.id)}>{l.name}</option>)}
               </select>
             </div>
           </div>
         </div>
 
-        {/* Live conflict preview */}
         {previewConflicts.length > 0 && (
           <div className="mt-4 rounded-xl border border-orange-500/20 bg-orange-500/5 px-4 py-3">
             <p className="mb-1 text-xs font-medium text-orange-300">
@@ -534,12 +723,9 @@ function SessionForm({
   );
 }
 
-// ── Admin directory tab (rooms / cohorts / lecturers) ─────────────────────────
+// ── Directory panel ────────────────────────────────────────────────────────────
 
-function DirectoryPanel({
-  rooms, cohorts, lecturers, onAddRoom, onDeleteRoom, onAddCohort, onDeleteCohort,
-  onAddLecturer, onDeleteLecturer,
-}: {
+function DirectoryPanel({ rooms, cohorts, lecturers, onAddRoom, onDeleteRoom, onAddCohort, onDeleteCohort, onAddLecturer, onDeleteLecturer }: {
   rooms: TRoom[]; cohorts: TCohort[]; lecturers: TLecturer[];
   onAddRoom: (r: Omit<TRoom, 'id'>) => Promise<void>;
   onDeleteRoom: (id: number) => Promise<void>;
@@ -549,25 +735,21 @@ function DirectoryPanel({
   onDeleteLecturer: (id: number) => Promise<void>;
 }) {
   const [subTab, setSubTab] = useState<'rooms' | 'cohorts' | 'lecturers'>('rooms');
-  const tabBtn = (t: typeof subTab) =>
-    `px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-      subTab === t ? 'bg-white/10 text-white' : 'text-[var(--muted)] hover:text-white'
-    }`;
-
-  // ── quick-add forms ─────────────────────────────────────────────────────────
-  const [roomForm, setRoomForm] = useState({ name: '', type: 'lecture', capacity: '', floor: '' });
-  const [cohortForm, setCohortForm] = useState({ code: '', title: '', faculty: 'ICT', year: '1', level: 'Undergraduate' });
-  const [lectForm, setLectForm] = useState({ name: '', faculty: 'ICT', email: '' });
   const [saving, setSaving] = useState(false);
+  const [roomForm, setRoomForm]   = useState({ name: '', type: 'lecture', capacity: '', floor: '' });
+  const [cohortForm, setCohortForm] = useState({ code: '', title: '', faculty: 'ICT', year: '1', level: 'Undergraduate' });
+  const [lectForm, setLectForm]   = useState({ name: '', faculty: 'ICT', email: '' });
+
+  const tabCls = (t: typeof subTab) =>
+    `px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${subTab === t ? 'bg-white/10 text-white' : 'text-[var(--muted)] hover:text-white'}`;
 
   return (
     <div className="rounded-2xl border border-white/10 bg-[var(--surface)]">
       <div className="flex gap-1 border-b border-white/10 p-3">
-        <button className={tabBtn('rooms')}     onClick={() => setSubTab('rooms')}>     <DoorOpen    size={12} className="mr-1 inline" />Rooms</button>
-        <button className={tabBtn('cohorts')}   onClick={() => setSubTab('cohorts')}>   <GraduationCap size={12} className="mr-1 inline" />Cohorts</button>
-        <button className={tabBtn('lecturers')} onClick={() => setSubTab('lecturers')}> <UserSquare2 size={12} className="mr-1 inline" />Lecturers</button>
+        <button className={tabCls('rooms')}     onClick={() => setSubTab('rooms')}><DoorOpen size={12} className="mr-1 inline" />Rooms</button>
+        <button className={tabCls('cohorts')}   onClick={() => setSubTab('cohorts')}><GraduationCap size={12} className="mr-1 inline" />Cohorts</button>
+        <button className={tabCls('lecturers')} onClick={() => setSubTab('lecturers')}><UserSquare2 size={12} className="mr-1 inline" />Lecturers</button>
       </div>
-
       <div className="p-4">
         {subTab === 'rooms' && (
           <>
@@ -576,80 +758,62 @@ function DirectoryPanel({
               <tbody>
                 {rooms.map(r => (
                   <tr key={r.id} className="border-b border-white/5">
-                    <td className="py-1.5 text-white">{r.name}</td>
-                    <td className="py-1.5">{r.type}</td>
-                    <td className="py-1.5">{r.capacity}</td>
-                    <td className="py-1.5">{r.floor}</td>
-                    <td className="py-1.5 text-right">
-                      <button onClick={() => onDeleteRoom(r.id)} className={btn('danger')}><Trash2 size={10} /></button>
-                    </td>
+                    <td className="py-1.5 text-white">{r.name}</td><td>{r.type}</td><td>{r.capacity}</td><td>{r.floor}</td>
+                    <td className="py-1.5 text-right"><button onClick={() => onDeleteRoom(r.id)} className={btn('danger')}><Trash2 size={10} /></button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <div className="mt-4 grid grid-cols-4 gap-2">
-              <input className={input} placeholder="Name" value={roomForm.name} onChange={e => setRoomForm(f => ({ ...f, name: e.target.value }))} />
-              <select className={select} value={roomForm.type} onChange={e => setRoomForm(f => ({ ...f, type: e.target.value }))}>
+              <input className={inp} placeholder="Name" value={roomForm.name} onChange={e => setRoomForm(f => ({ ...f, name: e.target.value }))} />
+              <select className={sel} value={roomForm.type} onChange={e => setRoomForm(f => ({ ...f, type: e.target.value }))}>
                 {['lecture','lab','studio','seminar'].map(t => <option key={t}>{t}</option>)}
               </select>
-              <input className={input} placeholder="Capacity" type="number" value={roomForm.capacity} onChange={e => setRoomForm(f => ({ ...f, capacity: e.target.value }))} />
-              <input className={input} placeholder="Floor" value={roomForm.floor} onChange={e => setRoomForm(f => ({ ...f, floor: e.target.value }))} />
+              <input className={inp} placeholder="Capacity" type="number" value={roomForm.capacity} onChange={e => setRoomForm(f => ({ ...f, capacity: e.target.value }))} />
+              <input className={inp} placeholder="Floor" value={roomForm.floor} onChange={e => setRoomForm(f => ({ ...f, floor: e.target.value }))} />
             </div>
-            <button
-              className={`${btn('primary')} mt-2`}
-              onClick={async () => {
-                if (!roomForm.name) return;
-                setSaving(true);
-                await onAddRoom({ name: roomForm.name, type: roomForm.type as TRoom['type'], capacity: Number(roomForm.capacity) || 0, floor: roomForm.floor });
-                setRoomForm({ name: '', type: 'lecture', capacity: '', floor: '' });
-                setSaving(false);
-              }}
-            >
+            <button className={`${btn('primary')} mt-2`} onClick={async () => {
+              if (!roomForm.name) return;
+              setSaving(true);
+              await onAddRoom({ name: roomForm.name, type: roomForm.type as TRoom['type'], capacity: Number(roomForm.capacity) || 0, floor: roomForm.floor });
+              setRoomForm({ name: '', type: 'lecture', capacity: '', floor: '' });
+              setSaving(false);
+            }}>
               {saving ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Add room
             </button>
           </>
         )}
-
         {subTab === 'cohorts' && (
           <>
             <table className="w-full text-xs text-[var(--muted)]">
-              <thead><tr className="border-b border-white/5 text-left"><th className="pb-1.5">Code</th><th className="pb-1.5">Faculty</th><th className="pb-1.5">Year</th><th className="pb-1.5">Level</th><th /></tr></thead>
+              <thead><tr className="border-b border-white/5 text-left"><th className="pb-1.5">Code</th><th className="pb-1.5">Faculty</th><th className="pb-1.5">Year</th><th /></tr></thead>
               <tbody>
                 {cohorts.map(c => (
                   <tr key={c.id} className="border-b border-white/5">
-                    <td className="py-1.5 text-white">{c.code}</td>
-                    <td className="py-1.5">{c.faculty}</td>
-                    <td className="py-1.5">{c.year}</td>
-                    <td className="py-1.5">{c.level}</td>
-                    <td className="py-1.5 text-right">
-                      <button onClick={() => onDeleteCohort(c.id)} className={btn('danger')}><Trash2 size={10} /></button>
-                    </td>
+                    <td className="py-1.5 text-white">{c.code}</td><td>{c.faculty}</td><td>{c.year}</td>
+                    <td className="py-1.5 text-right"><button onClick={() => onDeleteCohort(c.id)} className={btn('danger')}><Trash2 size={10} /></button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <div className="mt-4 grid grid-cols-3 gap-2">
-              <input className={input} placeholder="Code (BSSE3)" value={cohortForm.code} onChange={e => setCohortForm(f => ({ ...f, code: e.target.value }))} />
-              <input className={input} placeholder="Title" value={cohortForm.title} onChange={e => setCohortForm(f => ({ ...f, title: e.target.value }))} />
-              <select className={select} value={cohortForm.faculty} onChange={e => setCohortForm(f => ({ ...f, faculty: e.target.value }))}>
+              <input className={inp} placeholder="Code (BSSE3)" value={cohortForm.code} onChange={e => setCohortForm(f => ({ ...f, code: e.target.value }))} />
+              <input className={inp} placeholder="Title" value={cohortForm.title} onChange={e => setCohortForm(f => ({ ...f, title: e.target.value }))} />
+              <select className={sel} value={cohortForm.faculty} onChange={e => setCohortForm(f => ({ ...f, faculty: e.target.value }))}>
                 {['ICT','Business','Design','Communication'].map(x => <option key={x}>{x}</option>)}
               </select>
             </div>
-            <button
-              className={`${btn('primary')} mt-2`}
-              onClick={async () => {
-                if (!cohortForm.code) return;
-                setSaving(true);
-                await onAddCohort({ code: cohortForm.code, title: cohortForm.title, faculty: cohortForm.faculty, year: Number(cohortForm.year) || 1, level: cohortForm.level });
-                setCohortForm({ code: '', title: '', faculty: 'ICT', year: '1', level: 'Undergraduate' });
-                setSaving(false);
-              }}
-            >
+            <button className={`${btn('primary')} mt-2`} onClick={async () => {
+              if (!cohortForm.code) return;
+              setSaving(true);
+              await onAddCohort({ code: cohortForm.code, title: cohortForm.title, faculty: cohortForm.faculty, year: Number(cohortForm.year) || 1, level: cohortForm.level });
+              setCohortForm({ code: '', title: '', faculty: 'ICT', year: '1', level: 'Undergraduate' });
+              setSaving(false);
+            }}>
               {saving ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Add cohort
             </button>
           </>
         )}
-
         {subTab === 'lecturers' && (
           <>
             <table className="w-full text-xs text-[var(--muted)]">
@@ -657,33 +821,26 @@ function DirectoryPanel({
               <tbody>
                 {lecturers.map(l => (
                   <tr key={l.id} className="border-b border-white/5">
-                    <td className="py-1.5 text-white">{l.name}</td>
-                    <td className="py-1.5">{l.faculty}</td>
-                    <td className="py-1.5">{l.email}</td>
-                    <td className="py-1.5 text-right">
-                      <button onClick={() => onDeleteLecturer(l.id)} className={btn('danger')}><Trash2 size={10} /></button>
-                    </td>
+                    <td className="py-1.5 text-white">{l.name}</td><td>{l.faculty}</td><td>{l.email}</td>
+                    <td className="py-1.5 text-right"><button onClick={() => onDeleteLecturer(l.id)} className={btn('danger')}><Trash2 size={10} /></button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <div className="mt-4 grid grid-cols-3 gap-2">
-              <input className={input} placeholder="Name" value={lectForm.name} onChange={e => setLectForm(f => ({ ...f, name: e.target.value }))} />
-              <select className={select} value={lectForm.faculty} onChange={e => setLectForm(f => ({ ...f, faculty: e.target.value }))}>
+              <input className={inp} placeholder="Name" value={lectForm.name} onChange={e => setLectForm(f => ({ ...f, name: e.target.value }))} />
+              <select className={sel} value={lectForm.faculty} onChange={e => setLectForm(f => ({ ...f, faculty: e.target.value }))}>
                 {['ICT','Business','Design','Communication'].map(x => <option key={x}>{x}</option>)}
               </select>
-              <input className={input} placeholder="Email" value={lectForm.email} onChange={e => setLectForm(f => ({ ...f, email: e.target.value }))} />
+              <input className={inp} placeholder="Email" value={lectForm.email} onChange={e => setLectForm(f => ({ ...f, email: e.target.value }))} />
             </div>
-            <button
-              className={`${btn('primary')} mt-2`}
-              onClick={async () => {
-                if (!lectForm.name) return;
-                setSaving(true);
-                await onAddLecturer({ name: lectForm.name, faculty: lectForm.faculty, email: lectForm.email });
-                setLectForm({ name: '', faculty: 'ICT', email: '' });
-                setSaving(false);
-              }}
-            >
+            <button className={`${btn('primary')} mt-2`} onClick={async () => {
+              if (!lectForm.name) return;
+              setSaving(true);
+              await onAddLecturer({ name: lectForm.name, faculty: lectForm.faculty, email: lectForm.email });
+              setLectForm({ name: '', faculty: 'ICT', email: '' });
+              setSaving(false);
+            }}>
               {saving ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Add lecturer
             </button>
           </>
@@ -712,8 +869,7 @@ export default function TimetablePage() {
 
   const load = useCallback(async () => {
     if (!supabase) { setError('Supabase not configured.'); setLoading(false); return; }
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     const [r, co, l, s] = await Promise.all([
       supabase.from('tt_rooms').select('*').order('id'),
       supabase.from('tt_cohorts').select('*').order('id'),
@@ -733,23 +889,72 @@ export default function TimetablePage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // ── Computed ────────────────────────────────────────────────────────────────
+  // ── Role system ────────────────────────────────────────────────────────────
+  const [demoRole, setDemoRole]           = useState<DemoRole>('viewer');
+  const [demoLecturerId, setDemoLecturer] = useState<number | null>(null);
+  const [demoCohortId, setDemoCohort]     = useState<number | null>(null);
+
+  const perms = useMemo(() => {
+    if (isAdmin) return { canAdd: true, canEdit: true, canDelete: true, canDirectory: true, canConflicts: true };
+    const r = ROLES[demoRole];
+    return { canAdd: r.canAdd, canEdit: r.canEdit, canDelete: false, canDirectory: false, canConflicts: r.canConflicts };
+  }, [isAdmin, demoRole]);
+
+  // ── Computed ───────────────────────────────────────────────────────────────
   const activeSessions = useMemo(() => sessions.filter(s => !s.deleted), [sessions]);
-  const conflicts      = useMemo(() => detectConflicts(activeSessions), [activeSessions]);
+
+  const visibleSessions = useMemo(() => {
+    if (!isAdmin && demoRole === 'lecturer' && demoLecturerId) {
+      return activeSessions.filter(s => s.lecturer_id === demoLecturerId);
+    }
+    if (!isAdmin && demoRole === 'student' && demoCohortId) {
+      return activeSessions.filter(s => s.cohort_id === demoCohortId);
+    }
+    return activeSessions;
+  }, [isAdmin, demoRole, demoLecturerId, demoCohortId, activeSessions]);
+
+  const conflicts = useMemo(() => detectConflicts(visibleSessions), [visibleSessions]);
 
   // ── View state ─────────────────────────────────────────────────────────────
-  const [tab, setTab]           = useState<Tab>('grid');
+  const [tab, setTab]             = useState<Tab>('grid');
   const [dayFilter, setDayFilter] = useState<number | null>(null);
 
   // ── Session form ────────────────────────────────────────────────────────────
-  const [formOpen,     setFormOpen]     = useState(false);
-  const [editTarget,   setEditTarget]   = useState<Partial<TSession>>({});
+  const [formOpen,   setFormOpen]   = useState(false);
+  const [editTarget, setEditTarget] = useState<Partial<TSession>>({});
 
   const openAdd  = (day?: number) => { setEditTarget({ day_of_week: day ?? 1 }); setFormOpen(true); };
-  const openEdit = (s: TSession)  => { setEditTarget(s); setFormOpen(true); };
+  const openEdit = (s: TSession)  => { setEditTarget({ ...s }); setFormOpen(true); };
   const closeForm = ()            => { setFormOpen(false); setEditTarget({}); };
 
-  const handleSave = async (d: Omit<TSession, 'id' | 'deleted'>) => {
+  // ── Delete confirm ─────────────────────────────────────────────────────────
+  const [deleteTarget, setDeleteTarget] = useState<TSession | null>(null);
+  const [deleting, setDeleting]         = useState(false);
+  const [deleteError, setDeleteError]   = useState<string | null>(null);
+
+  const confirmDelete = (id: number) => {
+    const s = activeSessions.find(x => x.id === id);
+    if (s) { setDeleteTarget(s); setDeleteError(null); }
+  };
+
+  const executeDelete = async () => {
+    if (!supabase || !deleteTarget) return;
+    setDeleting(true);
+    const { error } = await supabase.from('tt_sessions').update({ deleted: true }).eq('id', deleteTarget.id);
+    if (error) {
+      const msg = error.message.includes('row-level security') || error.message.includes('policy')
+        ? 'Admin sign-in required to delete sessions.'
+        : `Delete failed: ${error.message}`;
+      setDeleteError(msg);
+      setDeleting(false);
+      return;
+    }
+    await load();
+    setDeleteTarget(null);
+    setDeleting(false);
+  };
+
+  const handleSave = async (d: Omit<TSession, 'id' | 'deleted' | 'created_at'>) => {
     if (!supabase) return;
     if (editTarget.id) {
       const { error } = await supabase.from('tt_sessions').update(d).eq('id', editTarget.id);
@@ -762,13 +967,7 @@ export default function TimetablePage() {
     closeForm();
   };
 
-  const handleDelete = async (id: number) => {
-    if (!supabase || !confirm('Delete this session?')) return;
-    await supabase.from('tt_sessions').update({ deleted: true }).eq('id', id);
-    setSessions(prev => prev.map(s => s.id === id ? { ...s, deleted: true } : s));
-  };
-
-  // ── Directory handlers ──────────────────────────────────────────────────────
+  // ── Directory handlers ─────────────────────────────────────────────────────
   const addRoom     = async (r: Omit<TRoom,'id'>)     => { if (!supabase) return; await supabase.from('tt_rooms').insert(r); await load(); };
   const delRoom     = async (id: number)               => { if (!supabase) return; await supabase.from('tt_rooms').delete().eq('id', id); await load(); };
   const addCohort   = async (c: Omit<TCohort,'id'>)   => { if (!supabase) return; await supabase.from('tt_cohorts').insert(c); await load(); };
@@ -776,36 +975,55 @@ export default function TimetablePage() {
   const addLecturer = async (l: Omit<TLecturer,'id'>) => { if (!supabase) return; await supabase.from('tt_lecturers').insert(l); await load(); };
   const delLecturer = async (id: number)               => { if (!supabase) return; await supabase.from('tt_lecturers').delete().eq('id', id); await load(); };
 
-  // ── KPIs ────────────────────────────────────────────────────────────────────
+  // ── KPIs ───────────────────────────────────────────────────────────────────
   const kpis = [
-    { label: 'Sessions',  value: activeSessions.length },
+    { label: 'Sessions',  value: visibleSessions.length },
     { label: 'Rooms',     value: rooms.length },
     { label: 'Cohorts',   value: cohorts.length },
     { label: 'Lecturers', value: lecturers.length },
-    { label: 'Conflicts', value: conflicts.length, warn: conflicts.length > 0 },
+    ...(perms.canConflicts ? [{ label: 'Conflicts', value: conflicts.length, warn: conflicts.length > 0 }] : []),
   ];
 
-  // ── Tab bar ──────────────────────────────────────────────────────────────────
-  const tabBtn2 = (t: Tab) =>
+  const tabBtn = (t: Tab) =>
     `flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-xl transition-colors ${
       tab === t ? 'bg-white/10 text-white' : 'text-[var(--muted)] hover:text-white'
     }`;
+
+  // Role banner message
+  const roleBanner = !isAdmin ? (
+    demoRole === 'lecturer' && !demoLecturerId
+      ? 'Select a lecturer in the role switcher to filter the schedule.'
+      : demoRole === 'student' && !demoCohortId
+        ? 'Select your cohort in the role switcher to see your timetable.'
+        : null
+  ) : null;
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[var(--bg)]/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link to="/" className="font-display text-lg font-semibold tracking-tight text-white">
-            Andrew<span className="text-[var(--brand-bright)]">.</span>Langeveldt
-          </Link>
-          <div className="flex items-center gap-3">
-            {isAdmin && (
-              <span className="hidden items-center gap-1.5 rounded-full border border-[var(--brand-bright)]/30 bg-[var(--brand-bright)]/10 px-2.5 py-1 text-xs text-[var(--brand-bright)] sm:flex">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Link to="/" className="font-display text-lg font-semibold tracking-tight text-white">
+              Andrew<span className="text-[var(--brand-bright)]">.</span>Langeveldt
+            </Link>
+            <span className="hidden h-4 w-px bg-white/10 sm:block" />
+            <span className="hidden text-xs text-[var(--muted)] sm:block">University Timetable System</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {isAdmin ? (
+              <span className="flex items-center gap-1.5 rounded-full border border-[var(--brand-bright)]/30 bg-[var(--brand-bright)]/10 px-2.5 py-1 text-xs text-[var(--brand-bright)]">
                 <ShieldCheck size={11} /> Admin
               </span>
+            ) : (
+              <RoleSwitcher
+                role={demoRole} setRole={setDemoRole}
+                lecturerId={demoLecturerId} setLecturerId={setDemoLecturer}
+                cohortId={demoCohortId} setCohortId={setDemoCohort}
+                lecturers={lecturers} cohorts={cohorts}
+              />
             )}
-            <Link to="/#work" className="inline-flex items-center gap-2 text-sm text-[var(--muted)] transition-colors hover:text-white">
+            <Link to="/#work" className="inline-flex items-center gap-1.5 text-sm text-[var(--muted)] hover:text-white">
               <ArrowLeft size={15} /> Portfolio
             </Link>
           </div>
@@ -821,28 +1039,31 @@ export default function TimetablePage() {
           Class Timetable <span className="text-[var(--brand-bright)]">Scheduler</span>
         </h1>
         <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          University timetable management with real-time conflict detection — room, lecturer, and cohort clashes surfaced instantly. Sessions persist to Supabase; changes are live for every visitor.
+          Multi-role university timetable management with real-time conflict detection. Switch roles above to explore viewer, coordinator, lecturer, and student permission levels.
         </p>
-
-        {/* Faculty legend */}
         <div className="mt-4 flex flex-wrap gap-3">
           {Object.entries(FACULTY_COLOURS).map(([fac, col]) => (
             <span key={fac} className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
-              <span className="h-2 w-2 rounded-full" style={{ background: col }} /> {fac}
+              <span className="h-2 w-2 rounded-sm" style={{ background: col }} /> {fac}
             </span>
           ))}
         </div>
       </section>
 
       <main className="mx-auto max-w-7xl px-6 pb-20">
+        {/* Role banner */}
+        {roleBanner && (
+          <div className="mb-4 rounded-xl border border-[var(--brand-bright)]/20 bg-[var(--brand-bright)]/5 px-4 py-2.5 text-sm text-[var(--brand-bright)]">
+            {roleBanner}
+          </div>
+        )}
+
         {/* KPIs */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
           {kpis.map(k => (
             <div key={k.label} className="rounded-xl border border-white/10 bg-[var(--surface)] px-4 py-3">
               <p className="text-xs text-[var(--muted)]">{k.label}</p>
-              <p className={`mt-0.5 font-display text-2xl ${k.warn ? 'text-red-400' : 'text-white'}`}>
-                {k.value}
-              </p>
+              <p className={`mt-0.5 font-display text-2xl ${k.warn ? 'text-red-400' : 'text-white'}`}>{k.value}</p>
             </div>
           ))}
         </div>
@@ -850,19 +1071,20 @@ export default function TimetablePage() {
         {/* Tab bar + actions */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-1 rounded-2xl border border-white/10 bg-[var(--surface)] p-1">
-            <button className={tabBtn2('grid')}      onClick={() => setTab('grid')}>
+            <button className={tabBtn('grid')} onClick={() => setTab('grid')}>
               <LayoutGrid size={14} /> Schedule
             </button>
-            <button className={tabBtn2('conflicts')} onClick={() => setTab('conflicts')}>
-              <AlertTriangle size={14} />
-              Conflicts {conflicts.length > 0 && (
-                <span className="ml-0.5 rounded-full bg-red-500 px-1.5 text-[10px] text-white">
-                  {conflicts.length}
-                </span>
-              )}
-            </button>
-            {isAdmin && (
-              <button className={tabBtn2('directory')} onClick={() => setTab('directory')}>
+            {perms.canConflicts && (
+              <button className={tabBtn('conflicts')} onClick={() => setTab('conflicts')}>
+                <AlertTriangle size={14} />
+                Conflicts
+                {conflicts.length > 0 && (
+                  <span className="ml-0.5 rounded-full bg-red-500 px-1.5 text-[10px] text-white">{conflicts.length}</span>
+                )}
+              </button>
+            )}
+            {perms.canDirectory && (
+              <button className={tabBtn('directory')} onClick={() => setTab('directory')}>
                 <BookOpen size={14} /> Directory
               </button>
             )}
@@ -876,12 +1098,10 @@ export default function TimetablePage() {
                 onChange={e => setDayFilter(e.target.value === '' ? null : Number(e.target.value))}
               >
                 <option value="">All days</option>
-                {['Monday','Tuesday','Wednesday','Thursday','Friday'].map((d, i) => (
-                  <option key={i + 1} value={i + 1}>{d}</option>
-                ))}
+                {DAYS.map((d, i) => <option key={i + 1} value={i + 1}>{d}</option>)}
               </select>
             )}
-            {isAdmin && tab === 'grid' && (
+            {perms.canAdd && tab === 'grid' && (
               <button onClick={() => openAdd()} className={btn('primary')}>
                 <Plus size={13} /> Add session
               </button>
@@ -901,25 +1121,17 @@ export default function TimetablePage() {
           <div className="py-24 text-center text-sm text-red-400">{error}</div>
         ) : tab === 'grid' ? (
           <TimetableGrid
-            sessions={activeSessions}
-            rooms={rooms}
-            cohorts={cohorts}
-            lecturers={lecturers}
-            conflicts={conflicts}
-            dayFilter={dayFilter}
-            isAdmin={isAdmin}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-            onAdd={openAdd}
+            sessions={visibleSessions}
+            rooms={rooms} cohorts={cohorts} lecturers={lecturers}
+            conflicts={conflicts} dayFilter={dayFilter}
+            canAdd={perms.canAdd} canEdit={perms.canEdit} canDelete={perms.canDelete}
+            onEdit={openEdit} onDelete={confirmDelete} onAdd={openAdd}
           />
         ) : tab === 'conflicts' ? (
           <ConflictPanel
-            conflicts={conflicts}
-            sessions={activeSessions}
-            rooms={rooms}
-            cohorts={cohorts}
-            lecturers={lecturers}
-            onEdit={openEdit}
+            conflicts={conflicts} sessions={visibleSessions}
+            rooms={rooms} cohorts={cohorts} lecturers={lecturers}
+            onEdit={openEdit} canEdit={perms.canEdit}
           />
         ) : (
           <DirectoryPanel
@@ -931,20 +1143,36 @@ export default function TimetablePage() {
         )}
 
         <p className="mt-8 text-center text-xs text-[var(--muted)]/60">
-          Self-hosted · Supabase PostgreSQL · TypeScript conflict detection · No external analytics
+          Self-hosted · Supabase PostgreSQL · TypeScript conflict detection · Role-based access control
         </p>
       </main>
 
+      {/* Session form modal */}
       {formOpen && (
         <SessionForm
           initial={editTarget}
-          rooms={rooms}
-          cohorts={cohorts}
-          lecturers={lecturers}
+          rooms={rooms} cohorts={cohorts} lecturers={lecturers}
           existingSessions={sessions}
           onSave={handleSave}
           onClose={closeForm}
         />
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <>
+          <DeleteConfirm
+            session={deleteTarget}
+            onConfirm={executeDelete}
+            onCancel={() => { setDeleteTarget(null); setDeleteError(null); }}
+            loading={deleting}
+          />
+          {deleteError && (
+            <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-xl border border-red-500/20 bg-[var(--surface)] px-4 py-2 text-xs text-red-400 shadow-xl">
+              {deleteError}
+            </div>
+          )}
+        </>
       )}
 
       <Footer />
