@@ -517,7 +517,14 @@ function PersonForm({
       {error && <p className="text-xs text-red-400 rounded-xl bg-red-500/10 px-3 py-2">{error}</p>}
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" className={btn('ghost')} onClick={onCancel}>Cancel</button>
-        <button type="button" className={btn('primary')} onClick={() => onSave(form)} disabled={saving || !form.name.trim()}>
+        <button type="button" className={btn('primary')} onClick={() => {
+          // flush any pending hobby text before saving
+          const pending = hobbyInput.trim();
+          const finalHobbies = pending && !form.hobbies.includes(pending)
+            ? [...form.hobbies, pending]
+            : form.hobbies;
+          onSave({ ...form, hobbies: finalHobbies });
+        }} disabled={saving || !form.name.trim()}>
           {saving ? <Loader2 size={14} className="animate-spin" /> : null}
           Save Person
         </button>
@@ -1191,6 +1198,7 @@ export default function FamilyTreePage() {
                     <div className="mb-6 rounded-2xl border border-white/10 bg-[var(--bg-card)] p-5">
                       <h2 className="text-sm font-semibold mb-4">{editingPerson === 'new' ? 'New Person' : `Edit: ${editingPerson.name}`}</h2>
                       <PersonForm
+                        key={editingPerson === 'new' ? 'new' : (editingPerson as FamilyPerson).id}
                         initial={editingPerson === 'new' ? blankPerson() : editingPerson}
                         people={people}
                         photos={editingPerson === 'new' ? [] : photos.filter(ph => ph.person_id === (editingPerson as FamilyPerson).id)}
