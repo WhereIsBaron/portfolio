@@ -15,8 +15,9 @@ import Footer from '@/components/Footer';
 import {
   FamilyPerson, FamilyRelationship, FamilyPhoto, FamilySubmission,
   buildLayout, computeGenerations, getRelationshipLabel, generationLabel,
+  computeFamilies, statusLabel, UNION_STATUSES, CHILD_LINK_KINDS,
   flagUrl, COUNTRY_NAMES, NODE_W, NODE_H,
-  type SubmissionData, type SubmissionMember,
+  type SubmissionData, type SubmissionMember, type FamilyGroup,
 } from '@/lib/familyTree';
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -176,6 +177,28 @@ function TreeNodeCard({
 
 // ── SVG connectors ────────────────────────────────────────────────────────────
 
+// Line style for a parent→child link, by child-link kind
+function childLinkStyle(status: string | null): { stroke: string; width: number; dash?: string } {
+  switch (status) {
+    case 'adopted': return { stroke: 'rgba(120,200,255,0.45)', width: 1.5, dash: '6,4' };
+    case 'foster':  return { stroke: 'rgba(120,200,255,0.4)',  width: 1.5, dash: '1,4' };
+    case 'step':    return { stroke: 'rgba(255,255,255,0.16)', width: 1,   dash: '2,4' };
+    default:        return { stroke: 'rgba(255,255,255,0.16)', width: 1.5 }; // biological
+  }
+}
+
+// Line style for a union link, by union status
+function unionStyle(status: string | null): { stroke: string; width: number; dash?: string } {
+  switch (status) {
+    case 'partner':   return { stroke: 'rgba(255,180,0,0.5)',  width: 1.75, dash: '6,4' };
+    case 'engaged':   return { stroke: 'rgba(255,180,0,0.5)',  width: 1.75, dash: '1,4' };
+    case 'separated': return { stroke: 'rgba(255,255,255,0.28)', width: 1.5, dash: '7,6' };
+    case 'divorced':  return { stroke: 'rgba(255,255,255,0.2)',  width: 1.5, dash: '3,5' };
+    case 'widowed':   return { stroke: 'rgba(255,180,0,0.3)',  width: 1.5, dash: '5,4' };
+    default:          return { stroke: 'rgba(255,180,0,0.5)',  width: 1.75 }; // married
+  }
+}
+
 function Connectors({
   nodes, rels,
 }: {
@@ -188,7 +211,6 @@ function Connectors({
   const drawn = new Set<string>();
   for (const r of rels) {
     if (r.relationship_type !== 'parent' && r.relationship_type !== 'child') continue;
-    // draw line between parent and child
     const parentId = r.relationship_type === 'parent' ? r.person_a_id : r.person_b_id;
     const childId  = r.relationship_type === 'parent' ? r.person_b_id : r.person_a_id;
     const key = `${parentId}-${childId}`;
@@ -204,18 +226,20 @@ function Connectors({
     const x2 = c.x + NODE_W / 2;
     const y2 = c.y;
     const my = (y1 + y2) / 2;
+    const st = childLinkStyle(r.status);
     lines.push(
       <path
         key={key}
         d={`M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`}
         fill="none"
-        stroke="rgba(255,255,255,0.12)"
-        strokeWidth={1.5}
+        stroke={st.stroke}
+        strokeWidth={st.width}
+        strokeDasharray={st.dash}
       />
     );
   }
 
-  // spouse lines (horizontal dashes)
+  // union lines (horizontal)
   const drawnS = new Set<string>();
   for (const r of rels) {
     if (r.relationship_type !== 'spouse') continue;
@@ -225,21 +249,59 @@ function Connectors({
     const a = nodeById.get(r.person_a_id);
     const b = nodeById.get(r.person_b_id);
     if (!a || !b) continue;
-    const x1 = a.x + NODE_W;
-    const x2 = b.x;
-    const y = a.y + NODE_H / 2;
+    const [left, right] = a.x <= b.x ? [a, b] : [b, a];
+    const x1 = left.x + NODE_W;
+    const x2 = right.x;
+    const y = left.y + NODE_H / 2;
+    const st = unionStyle(r.status);
     lines.push(
       <line
         key={key}
         x1={x1} y1={y} x2={x2} y2={y}
-        stroke="rgba(255,180,0,0.3)"
-        strokeWidth={1.5}
-        strokeDasharray="4,3"
+        stroke={st.stroke}
+        strokeWidth={st.width}
+        strokeDasharray={st.dash}
       />
     );
   }
 
   return <>{lines}</>;
+}
+
+// Soft tinted panels behind each nuclear family
+function FamilyHighlights({
+  families, nodeById,
+}: {
+  families: FamilyGroup[];
+  nodeById: Map<string, { x: number; y: number }>;
+}) {
+  const PAD = 16;
+  return (
+    <>
+      {families.map(fam => {
+        const pts = fam.memberIds.map(id => nodeById.get(id)).filter(Boolean) as { x: number; y: number }[];
+        if (pts.length < 2) return null; // skip lone/single-member groups
+        const minX = Math.min(...pts.map(p => p.x)) - PAD;
+        const minY = Math.min(...pts.map(p => p.y)) - PAD;
+        const maxX = Math.max(...pts.map(p => p.x)) + NODE_W + PAD;
+        const maxY = Math.max(...pts.map(p => p.y)) + NODE_H + PAD;
+        return (
+          <div
+            key={fam.id}
+            style={{
+              position: 'absolute',
+              left: minX, top: minY,
+              width: maxX - minX, height: maxY - minY,
+              borderRadius: 24,
+              background: `hsla(${fam.hue}, 70%, 55%, 0.07)`,
+              border: `1px solid hsla(${fam.hue}, 70%, 60%, 0.22)`,
+              pointerEvents: 'none',
+            }}
+          />
+        );
+      })}
+    </>
+  );
 }
 
 // ── Profile modal ─────────────────────────────────────────────────────────────
@@ -540,13 +602,17 @@ function RelPanel({
 }: {
   people: FamilyPerson[];
   rels: FamilyRelationship[];
-  onAdd: (a: string, b: string, type: FamilyRelationship['relationship_type']) => void;
+  onAdd: (a: string, b: string, type: FamilyRelationship['relationship_type'], status: string | null) => void;
   onDelete: (id: string) => void;
 }) {
   const [a, setA] = useState('');
   const [b, setB] = useState('');
   const [type, setType] = useState<FamilyRelationship['relationship_type']>('child');
+  const [status, setStatus] = useState<string>('');
   const nameOf = (id: string) => people.find(p => p.id === id)?.name ?? id;
+
+  const showStatus = type === 'spouse' || type === 'parent' || type === 'child';
+  const statusOptions = type === 'spouse' ? UNION_STATUSES : CHILD_LINK_KINDS;
 
   return (
     <div className="space-y-4">
@@ -557,10 +623,10 @@ function RelPanel({
             <option value="">Person A</option>
             {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
-          <select className={sel} value={type} onChange={e => setType(e.target.value as FamilyRelationship['relationship_type'])}>
+          <select className={sel} value={type} onChange={e => { setType(e.target.value as FamilyRelationship['relationship_type']); setStatus(''); }}>
             <option value="parent">is parent of →</option>
             <option value="child">is child of →</option>
-            <option value="spouse">is spouse of →</option>
+            <option value="spouse">is partner of →</option>
             <option value="sibling">is sibling of →</option>
           </select>
           <select className={sel} value={b} onChange={e => setB(e.target.value)}>
@@ -568,10 +634,21 @@ function RelPanel({
             {people.filter(p => p.id !== a).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
+        {showStatus && (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[var(--muted)] whitespace-nowrap">
+              {type === 'spouse' ? 'Union status' : 'Link type'}
+            </span>
+            <select className={sel} value={status} onChange={e => setStatus(e.target.value)}>
+              <option value="">{type === 'spouse' ? 'Married (default)' : 'Biological (default)'}</option>
+              {statusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        )}
         <button
           className={btn('primary')}
           disabled={!a || !b}
-          onClick={() => { onAdd(a, b, type); setA(''); setB(''); }}
+          onClick={() => { onAdd(a, b, type, status || null); setA(''); setB(''); setStatus(''); }}
         >
           <Link2 size={12} /> Add Link
         </button>
@@ -582,8 +659,11 @@ function RelPanel({
           <div key={r.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-[var(--bg-soft)] px-3 py-2 text-xs text-[var(--muted)]">
             <span>
               <span className="text-white font-medium">{nameOf(r.person_a_id)}</span>
-              {' '}is {r.relationship_type} of{' '}
+              {' '}is {r.relationship_type === 'spouse' ? statusLabel('spouse', r.status) : r.relationship_type} of{' '}
               <span className="text-white font-medium">{nameOf(r.person_b_id)}</span>
+              {(r.relationship_type === 'parent' || r.relationship_type === 'child') && r.status && r.status !== 'biological' && (
+                <span className="ml-1 rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/60">{statusLabel(r.relationship_type, r.status)}</span>
+              )}
             </span>
             <button className={btn('danger')} onClick={() => onDelete(r.id)}><Trash2 size={12} /></button>
           </div>
@@ -930,6 +1010,8 @@ export default function FamilyTreePage() {
 
   // ── Layout ──────────────────────────────────────────────────────────────────
   const { nodes, width, height } = buildLayout(people, rels);
+  const families = computeFamilies(people, rels);
+  const nodePosById = new Map(nodes.map(n => [n.person.id, { x: n.x, y: n.y }]));
   const genMap = computeGenerations(people, rels);
 
   // ── Admin CRUD ──────────────────────────────────────────────────────────────
@@ -955,9 +1037,9 @@ export default function FamilyTreePage() {
     await load();
   };
 
-  const addRel = async (a: string, b: string, type: FamilyRelationship['relationship_type']) => {
+  const addRel = async (a: string, b: string, type: FamilyRelationship['relationship_type'], status: string | null) => {
     if (!supabase) return;
-    await supabase.from('family_relationships').insert({ person_a_id: a, person_b_id: b, relationship_type: type });
+    await supabase.from('family_relationships').insert({ person_a_id: a, person_b_id: b, relationship_type: type, status });
     await load();
   };
 
@@ -1124,6 +1206,28 @@ export default function FamilyTreePage() {
                   ))}
                 </div>
 
+                {/* Line-style legend */}
+                <div className="absolute left-3 bottom-3 z-10 rounded-lg bg-black/55 backdrop-blur-sm px-2.5 py-2 pointer-events-none">
+                  <p className="text-[9px] uppercase tracking-wide text-[var(--muted)] mb-1">Key</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                    {[
+                      { c: 'rgba(255,180,0,0.8)', d: '', t: 'Married' },
+                      { c: 'rgba(255,180,0,0.8)', d: '6,4', t: 'Partners' },
+                      { c: 'rgba(255,255,255,0.4)', d: '7,6', t: 'Separated' },
+                      { c: 'rgba(255,255,255,0.35)', d: '3,5', t: 'Divorced' },
+                      { c: 'rgba(255,255,255,0.5)', d: '', t: 'Biological' },
+                      { c: 'rgba(120,200,255,0.8)', d: '6,4', t: 'Adopted' },
+                      { c: 'rgba(120,200,255,0.7)', d: '1,4', t: 'Foster' },
+                      { c: 'rgba(255,255,255,0.4)', d: '2,4', t: 'Step' },
+                    ].map(k => (
+                      <div key={k.t} className="flex items-center gap-1.5">
+                        <svg width={18} height={6}><line x1={0} y1={3} x2={18} y2={3} stroke={k.c} strokeWidth={1.5} strokeDasharray={k.d || undefined} /></svg>
+                        <span className="text-[9px] text-white/70">{k.t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Zoom controls */}
                 <div className="absolute right-3 bottom-16 z-10 flex flex-col gap-1">
                   <button className={btn('ghost')} onClick={() => setScale(s => Math.min(2, s + 0.1))}>+</button>
@@ -1150,6 +1254,9 @@ export default function FamilyTreePage() {
                       height: height + 80,
                     }}
                   >
+                    {/* Nuclear family highlight panels (behind everything) */}
+                    <FamilyHighlights families={families} nodeById={nodePosById} />
+
                     {/* SVG connector lines */}
                     <svg
                       style={{ position: 'absolute', top: 0, left: 0, width: width + 80, height: height + 80, overflow: 'visible' }}

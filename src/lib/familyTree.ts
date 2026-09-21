@@ -16,11 +16,37 @@ export interface FamilyPerson {
   created_at: string;
 }
 
+export type UnionStatus = 'married' | 'partner' | 'engaged' | 'separated' | 'divorced' | 'widowed';
+export type ChildLinkKind = 'biological' | 'adopted' | 'foster' | 'step';
+
 export interface FamilyRelationship {
   id: string;
   person_a_id: string;
   person_b_id: string;
   relationship_type: 'parent' | 'child' | 'spouse' | 'sibling';
+  status: string | null; // union status (spouse) or child-link kind (parent/child)
+}
+
+export const UNION_STATUSES: { value: UnionStatus; label: string }[] = [
+  { value: 'married',   label: 'Married' },
+  { value: 'partner',   label: 'Partners (unmarried)' },
+  { value: 'engaged',   label: 'Engaged' },
+  { value: 'separated', label: 'Separated' },
+  { value: 'divorced',  label: 'Divorced' },
+  { value: 'widowed',   label: 'Widowed' },
+];
+
+export const CHILD_LINK_KINDS: { value: ChildLinkKind; label: string }[] = [
+  { value: 'biological', label: 'Biological' },
+  { value: 'adopted',    label: 'Adopted' },
+  { value: 'foster',     label: 'Foster' },
+  { value: 'step',       label: 'Step' },
+];
+
+export function statusLabel(type: FamilyRelationship['relationship_type'], status: string | null): string {
+  if (!status) return type === 'spouse' ? 'married' : type === 'parent' || type === 'child' ? 'biological' : '';
+  const src = type === 'spouse' ? UNION_STATUSES : CHILD_LINK_KINDS;
+  return (src as { value: string; label: string }[]).find(s => s.value === status)?.label.toLowerCase() ?? status;
 }
 
 export interface FamilyPhoto {
@@ -282,6 +308,16 @@ export function buildLayout(
   }
   const gens = [...genRows.keys()].sort((a, b) => a - b);
 
+  // Birth ordering value (eldest = smallest). Unknown births sort last.
+  const birthVal = new Map<string, number>();
+  for (const p of people) {
+    const v = p.birth_date
+      ? Date.parse(p.birth_date)
+      : (p.birth_year != null ? p.birth_year * 10000 : Number.MAX_SAFE_INTEGER);
+    birthVal.set(p.id, Number.isNaN(v) ? Number.MAX_SAFE_INTEGER : v);
+  }
+  const byAge = (x: string, y: string) => (birthVal.get(x)! - birthVal.get(y)!);
+
   // Keep spouses next to each other, preserving the incoming order otherwise
   const withSpousesAdjacent = (ids: string[]): string[] => {
     const set = new Set(ids);
@@ -303,8 +339,10 @@ export function buildLayout(
   gens.forEach((g, gi) => {
     let ids = genRows.get(g)!;
     if (gi === 0) {
-      ids = withSpousesAdjacent(ids);
+      // top row: eldest → left
+      ids = withSpousesAdjacent([...ids].sort(byAge));
     } else {
+      // cluster under parents; break ties (same parents = siblings) by age, eldest → left
       const keyed = ids.map(id => {
         const ps = [...(parentsOf.get(id) ?? [])].filter(pid => orderIndex.has(pid));
         const key = ps.length
@@ -312,7 +350,7 @@ export function buildLayout(
           : Number.MAX_SAFE_INTEGER;
         return { id, key };
       });
-      keyed.sort((a, b) => a.key - b.key);
+      keyed.sort((a, b) => (a.key - b.key) || byAge(a.id, b.id));
       ids = withSpousesAdjacent(keyed.map(k => k.id));
     }
     genRows.set(g, ids);
@@ -348,6 +386,55 @@ export function buildLayout(
   const width = Math.max(...nodes.map(n => n.x)) + NODE_W;
   const height = (maxGen - minGen + 1) * (NODE_H + GEN_GAP);
   return { nodes, width, height };
+}
+
+// ── Nuclear families ──────────────────────────────────────────────────────────
+// A nuclear family = a set of parents who share one or more children, plus those
+// children. Each unique parent-set forms one group (single-parent sets included).
+
+export interface FamilyGroup {
+  id: string;
+  parentIds: string[];
+  childIds: string[];
+  memberIds: string[];
+  hue: number;
+}
+
+export function computeFamilies(
+  people: FamilyPerson[],
+  rels: FamilyRelationship[],
+): FamilyGroup[] {
+  const ids = new Set(people.map(p => p.id));
+  // child → set of parents
+  const parentsOf = new Map<string, Set<string>>();
+  const addParent = (child: string, parent: string) => {
+    if (!ids.has(child) || !ids.has(parent)) return;
+    if (!parentsOf.has(child)) parentsOf.set(child, new Set());
+    parentsOf.get(child)!.add(parent);
+  };
+  for (const r of rels) {
+    if (r.relationship_type === 'parent') addParent(r.person_b_id, r.person_a_id);
+    else if (r.relationship_type === 'child') addParent(r.person_a_id, r.person_b_id);
+  }
+
+  // group children by identical parent-set
+  const groups = new Map<string, { parents: string[]; children: string[] }>();
+  for (const [child, parents] of parentsOf) {
+    const parentIds = [...parents].sort();
+    const key = parentIds.join('|');
+    if (!groups.has(key)) groups.set(key, { parents: parentIds, children: [] });
+    groups.get(key)!.children.push(child);
+  }
+
+  let i = 0;
+  const total = groups.size || 1;
+  return [...groups.entries()].map(([key, g]) => ({
+    id: key,
+    parentIds: g.parents,
+    childIds: g.children,
+    memberIds: [...g.parents, ...g.children],
+    hue: Math.round((360 / total) * i++),
+  }));
 }
 
 export const GENERATION_LABELS: Record<number, string> = {
