@@ -251,74 +251,102 @@ export function buildLayout(
   const minGen = Math.min(...genValues);
   const maxGen = Math.max(...genValues);
 
-  // Build spouse pairs so they sit adjacent in the same generation row
-  const spousePairs = new Set<string>();
+  // Relationship maps
+  const childrenOf = new Map<string, Set<string>>();
+  const parentsOf = new Map<string, Set<string>>();
   const spouseOf = new Map<string, string>();
+  const link = (m: Map<string, Set<string>>, k: string, v: string) => {
+    if (!m.has(k)) m.set(k, new Set());
+    m.get(k)!.add(v);
+  };
   for (const r of rels) {
-    if (r.relationship_type === 'spouse') {
-      const key = [r.person_a_id, r.person_b_id].sort().join('|');
-      spousePairs.add(key);
+    if (r.relationship_type === 'parent') {
+      link(childrenOf, r.person_a_id, r.person_b_id);
+      link(parentsOf, r.person_b_id, r.person_a_id);
+    } else if (r.relationship_type === 'child') {
+      link(childrenOf, r.person_b_id, r.person_a_id);
+      link(parentsOf, r.person_a_id, r.person_b_id);
+    } else if (r.relationship_type === 'spouse') {
       spouseOf.set(r.person_a_id, r.person_b_id);
       spouseOf.set(r.person_b_id, r.person_a_id);
     }
   }
 
-  // Group by generation, ordering spouses consecutively
-  const byGen = new Map<number, FamilyPerson[]>();
+  // Rows of person ids grouped by generation
+  const genRows = new Map<number, string[]>();
   for (const p of people) {
     const g = genMap.get(p.id) ?? 0;
-    if (!byGen.has(g)) byGen.set(g, []);
+    if (!genRows.has(g)) genRows.set(g, []);
+    genRows.get(g)!.push(p.id);
   }
+  const gens = [...genRows.keys()].sort((a, b) => a - b);
 
-  for (const [g, row] of byGen) {
-    const genPeople = people.filter(p => (genMap.get(p.id) ?? 0) === g);
+  // Keep spouses next to each other, preserving the incoming order otherwise
+  const withSpousesAdjacent = (ids: string[]): string[] => {
+    const set = new Set(ids);
     const placed = new Set<string>();
-    const ordered: FamilyPerson[] = [];
-    for (const p of genPeople) {
-      if (placed.has(p.id)) continue;
-      ordered.push(p);
-      placed.add(p.id);
-      const sp = spouseOf.get(p.id);
-      if (sp && !placed.has(sp)) {
-        const spPerson = genPeople.find(x => x.id === sp);
-        if (spPerson) { ordered.push(spPerson); placed.add(sp); }
+    const out: string[] = [];
+    for (const id of ids) {
+      if (placed.has(id)) continue;
+      out.push(id); placed.add(id);
+      const sp = spouseOf.get(id);
+      if (sp && set.has(sp) && !placed.has(sp) && genMap.get(sp) === genMap.get(id)) {
+        out.push(sp); placed.add(sp);
       }
     }
-    byGen.set(g, ordered);
-    row.length = 0;
-  }
+    return out;
+  };
 
-  // Assign x positions per row, track maxWidth
+  // ── Pass 1 (top-down): order each row so children cluster under their parents ──
+  const orderIndex = new Map<string, number>();
+  gens.forEach((g, gi) => {
+    let ids = genRows.get(g)!;
+    if (gi === 0) {
+      ids = withSpousesAdjacent(ids);
+    } else {
+      const keyed = ids.map(id => {
+        const ps = [...(parentsOf.get(id) ?? [])].filter(pid => orderIndex.has(pid));
+        const key = ps.length
+          ? ps.reduce((s, pid) => s + orderIndex.get(pid)!, 0) / ps.length
+          : Number.MAX_SAFE_INTEGER;
+        return { id, key };
+      });
+      keyed.sort((a, b) => a.key - b.key);
+      ids = withSpousesAdjacent(keyed.map(k => k.id));
+    }
+    genRows.set(g, ids);
+    ids.forEach((id, i) => orderIndex.set(id, i));
+  });
+
+  // ── Pass 2 (bottom-up): center each parent over its children, keep row order ──
+  const SPAN = NODE_W + NODE_GAP;
   const xMap = new Map<string, number>();
-  let maxWidth = 0;
-
-  for (const [gen, members] of byGen) {
-    const rowW = members.length * NODE_W + (members.length - 1) * NODE_GAP;
-    if (rowW > maxWidth) maxWidth = rowW;
-    members.forEach((p, i) => {
-      xMap.set(p.id, i * (NODE_W + NODE_GAP));
-    });
-  }
-
-  // Center each row around maxWidth
-  for (const [gen, members] of byGen) {
-    const rowW = members.length * NODE_W + (members.length - 1) * NODE_GAP;
-    const offset = (maxWidth - rowW) / 2;
-    for (const p of members) {
-      xMap.set(p.id, (xMap.get(p.id) ?? 0) + offset);
+  for (let gi = gens.length - 1; gi >= 0; gi--) {
+    const ids = genRows.get(gens[gi])!;
+    let cursor = -Infinity;
+    for (const id of ids) {
+      const kids = [...(childrenOf.get(id) ?? [])].filter(c => xMap.has(c));
+      const desired = kids.length
+        ? kids.reduce((s, c) => s + xMap.get(c)!, 0) / kids.length
+        : (cursor === -Infinity ? 0 : cursor + SPAN);
+      const x = cursor === -Infinity ? desired : Math.max(desired, cursor + SPAN);
+      xMap.set(id, x);
+      cursor = x;
     }
   }
 
-  // Build final node list
+  // Normalise so the leftmost node sits at x = 0
+  const shift = -Math.min(...xMap.values());
   const nodes: TreeNode[] = people.map(p => ({
     person: p,
     generation: genMap.get(p.id) ?? 0,
-    x: xMap.get(p.id) ?? 0,
+    x: (xMap.get(p.id) ?? 0) + shift,
     y: ((genMap.get(p.id) ?? 0) - minGen) * (NODE_H + GEN_GAP),
   }));
 
+  const width = Math.max(...nodes.map(n => n.x)) + NODE_W;
   const height = (maxGen - minGen + 1) * (NODE_H + GEN_GAP);
-  return { nodes, width: Math.max(maxWidth, NODE_W), height };
+  return { nodes, width, height };
 }
 
 export const GENERATION_LABELS: Record<number, string> = {
