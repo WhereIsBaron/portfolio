@@ -15,7 +15,7 @@ import Footer from '@/components/Footer';
 import {
   FamilyPerson, FamilyRelationship, FamilyPhoto, FamilySubmission,
   buildLayout, computeGenerations, getRelationshipLabel, generationLabel,
-  flagUrl, COUNTRY_NAMES,
+  flagUrl, COUNTRY_NAMES, NODE_W, NODE_H,
   type SubmissionData, type SubmissionMember,
 } from '@/lib/familyTree';
 
@@ -109,10 +109,6 @@ function TreeNodeCard({
 }
 
 // ── SVG connectors ────────────────────────────────────────────────────────────
-
-const NODE_W = 160;
-const NODE_H = 80;
-const GEN_GAP = 130;
 
 function Connectors({
   nodes, rels,

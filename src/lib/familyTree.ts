@@ -81,18 +81,39 @@ function buildAdjacency(rels: FamilyRelationship[]): RelMap {
   return map;
 }
 
-// BFS from root; returns generation number for each person (root = 0)
+// Find people who have no parents in the relationship list (natural tree tops)
+function findNaturalRootIds(people: FamilyPerson[], rels: FamilyRelationship[]): string[] {
+  const hasParent = new Set<string>();
+  for (const r of rels) {
+    if (r.relationship_type === 'parent') hasParent.add(r.person_b_id);
+    if (r.relationship_type === 'child')  hasParent.add(r.person_a_id);
+  }
+  const topPeople = people.filter(p => !hasParent.has(p.id));
+  // Prefer the marked root; otherwise all people with no parent
+  return topPeople.length > 0 ? topPeople.map(p => p.id) : [people[0].id];
+}
+
+// BFS from root(s); returns generation number for each person (root = 0)
 export function computeGenerations(
   people: FamilyPerson[],
   rels: FamilyRelationship[],
 ): Map<string, number> {
-  const root = people.find(p => p.is_root);
-  if (!root) return new Map();
+  if (people.length === 0) return new Map();
 
   const adj = buildAdjacency(rels);
   const gen = new Map<string, number>();
-  const queue: string[] = [root.id];
-  gen.set(root.id, 0);
+
+  // Prefer explicitly marked root; otherwise auto-detect top of tree
+  const explicitRoot = people.find(p => p.is_root);
+  const startIds = explicitRoot
+    ? [explicitRoot.id]
+    : findNaturalRootIds(people, rels);
+
+  const queue: string[] = [];
+  for (const id of startIds) {
+    gen.set(id, 0);
+    queue.push(id);
+  }
 
   while (queue.length) {
     const cur = queue.shift()!;
@@ -108,7 +129,7 @@ export function computeGenerations(
     }
   }
 
-  // any remaining unvisited people get gen 0 (no path from root yet)
+  // Any disconnected people land at generation 0
   for (const p of people) {
     if (!gen.has(p.id)) gen.set(p.id, 0);
   }
@@ -212,10 +233,10 @@ export interface TreeNode {
   y: number;
 }
 
-const NODE_W = 160;
-const NODE_H = 80;
-const GEN_GAP = 130; // vertical gap between generations
-const SIBLING_GAP = 20; // horizontal gap between nodes
+export const NODE_W = 160;
+export const NODE_H = 80;
+export const GEN_GAP = 140;
+const NODE_GAP = 24; // horizontal gap between nodes in the same row
 
 export function buildLayout(
   people: FamilyPerson[],
@@ -224,43 +245,78 @@ export function buildLayout(
   if (people.length === 0) return { nodes: [], width: 0, height: 0 };
 
   const genMap = computeGenerations(people, rels);
-  const minGen = Math.min(...genMap.values());
-  const maxGen = Math.max(...genMap.values());
+  const genValues = [...genMap.values()];
+  const minGen = Math.min(...genValues);
+  const maxGen = Math.max(...genValues);
 
-  // Group people by generation
+  // Build spouse pairs so they sit adjacent in the same generation row
+  const spousePairs = new Set<string>();
+  const spouseOf = new Map<string, string>();
+  for (const r of rels) {
+    if (r.relationship_type === 'spouse') {
+      const key = [r.person_a_id, r.person_b_id].sort().join('|');
+      spousePairs.add(key);
+      spouseOf.set(r.person_a_id, r.person_b_id);
+      spouseOf.set(r.person_b_id, r.person_a_id);
+    }
+  }
+
+  // Group by generation, ordering spouses consecutively
   const byGen = new Map<number, FamilyPerson[]>();
   for (const p of people) {
     const g = genMap.get(p.id) ?? 0;
     if (!byGen.has(g)) byGen.set(g, []);
-    byGen.get(g)!.push(p);
   }
 
-  const nodes: TreeNode[] = [];
+  for (const [g, row] of byGen) {
+    const genPeople = people.filter(p => (genMap.get(p.id) ?? 0) === g);
+    const placed = new Set<string>();
+    const ordered: FamilyPerson[] = [];
+    for (const p of genPeople) {
+      if (placed.has(p.id)) continue;
+      ordered.push(p);
+      placed.add(p.id);
+      const sp = spouseOf.get(p.id);
+      if (sp && !placed.has(sp)) {
+        const spPerson = genPeople.find(x => x.id === sp);
+        if (spPerson) { ordered.push(spPerson); placed.add(sp); }
+      }
+    }
+    byGen.set(g, ordered);
+    row.length = 0;
+  }
+
+  // Assign x positions per row, track maxWidth
+  const xMap = new Map<string, number>();
   let maxWidth = 0;
 
   for (const [gen, members] of byGen) {
-    const rowWidth = members.length * NODE_W + (members.length - 1) * SIBLING_GAP;
-    if (rowWidth > maxWidth) maxWidth = rowWidth;
-    const rowY = (gen - minGen) * (NODE_H + GEN_GAP);
+    const rowW = members.length * NODE_W + (members.length - 1) * NODE_GAP;
+    if (rowW > maxWidth) maxWidth = rowW;
     members.forEach((p, i) => {
-      nodes.push({
-        person: p,
-        generation: gen,
-        x: i * (NODE_W + SIBLING_GAP),
-        y: rowY,
-      });
+      xMap.set(p.id, i * (NODE_W + NODE_GAP));
     });
   }
 
   // Center each row around maxWidth
-  for (const node of nodes) {
-    const rowMembers = byGen.get(node.generation)!;
-    const rowWidth = rowMembers.length * NODE_W + (rowMembers.length - 1) * SIBLING_GAP;
-    node.x += (maxWidth - rowWidth) / 2;
+  for (const [gen, members] of byGen) {
+    const rowW = members.length * NODE_W + (members.length - 1) * NODE_GAP;
+    const offset = (maxWidth - rowW) / 2;
+    for (const p of members) {
+      xMap.set(p.id, (xMap.get(p.id) ?? 0) + offset);
+    }
   }
 
+  // Build final node list
+  const nodes: TreeNode[] = people.map(p => ({
+    person: p,
+    generation: genMap.get(p.id) ?? 0,
+    x: xMap.get(p.id) ?? 0,
+    y: ((genMap.get(p.id) ?? 0) - minGen) * (NODE_H + GEN_GAP),
+  }));
+
   const height = (maxGen - minGen + 1) * (NODE_H + GEN_GAP);
-  return { nodes, width: maxWidth, height };
+  return { nodes, width: Math.max(maxWidth, NODE_W), height };
 }
 
 export const GENERATION_LABELS: Record<number, string> = {
