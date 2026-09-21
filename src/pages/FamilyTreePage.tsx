@@ -346,7 +346,7 @@ function ProfileModal({
 // ── Admin: Edit person form ────────────────────────────────────────────────────
 
 function PersonForm({
-  initial, people, photos, onSave, onCancel, onDeletePhoto, onUploadPhoto, saving, uploading,
+  initial, people, photos, onSave, onCancel, onDeletePhoto, onUploadPhoto, saving, uploading, error,
 }: {
   initial: Partial<FamilyPerson>;
   people: FamilyPerson[];
@@ -357,6 +357,7 @@ function PersonForm({
   onUploadPhoto: (file: File) => void;
   saving: boolean;
   uploading: boolean;
+  error?: string;
 }) {
   const [form, setForm] = useState<Omit<FamilyPerson, 'id' | 'created_at'>>({
     name: initial.name ?? '',
@@ -513,6 +514,7 @@ function PersonForm({
         />
       </div>
 
+      {error && <p className="text-xs text-red-400 rounded-xl bg-red-500/10 px-3 py-2">{error}</p>}
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" className={btn('ghost')} onClick={onCancel}>Cancel</button>
         <button type="button" className={btn('primary')} onClick={() => onSave(form)} disabled={saving || !form.name.trim()}>
@@ -882,6 +884,7 @@ export default function FamilyTreePage() {
   const [selectedPerson, setSelectedPerson] = useState<FamilyPerson | null>(null);
   const [editingPerson, setEditingPerson] = useState<FamilyPerson | null | 'new'>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
 
@@ -926,12 +929,15 @@ export default function FamilyTreePage() {
   const savePerson = async (data: Omit<FamilyPerson, 'id' | 'created_at'>) => {
     if (!supabase) return;
     setSaving(true);
+    setSaveError('');
+    let err;
     if (editingPerson === 'new') {
-      await supabase.from('family_people').insert(data);
+      ({ error: err } = await supabase.from('family_people').insert(data));
     } else if (editingPerson) {
-      await supabase.from('family_people').update(data).eq('id', editingPerson.id);
+      ({ error: err } = await supabase.from('family_people').update(data).eq('id', (editingPerson as FamilyPerson).id));
     }
     setSaving(false);
+    if (err) { setSaveError(err.message); return; }
     setEditingPerson(null);
     await load();
   };
@@ -1196,6 +1202,7 @@ export default function FamilyTreePage() {
                         }}
                         saving={saving}
                         uploading={uploading}
+                        error={saveError}
                       />
                     </div>
                   )}
