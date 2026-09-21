@@ -81,60 +81,61 @@ function buildAdjacency(rels: FamilyRelationship[]): RelMap {
   return map;
 }
 
-// Find people who have no parents in the relationship list (natural tree tops)
-function findNaturalRootIds(people: FamilyPerson[], rels: FamilyRelationship[]): string[] {
-  const hasParent = new Set<string>();
-  for (const r of rels) {
-    if (r.relationship_type === 'parent') hasParent.add(r.person_b_id);
-    if (r.relationship_type === 'child')  hasParent.add(r.person_a_id);
-  }
-  const topPeople = people.filter(p => !hasParent.has(p.id));
-  // Prefer the marked root; otherwise all people with no parent
-  return topPeople.length > 0 ? topPeople.map(p => p.id) : [people[0].id];
-}
-
-// BFS from root(s); returns generation number for each person (root = 0)
+// Generation number for each person via longest parent-chain (topological depth).
+// Top ancestors = 0, each child sits strictly below ALL of its parents. Spouse and
+// sibling edges only pull married-in (parentless) people onto their blood relative's row.
+// If a person is marked is_root, generations are shifted so that person is 0 (ancestors
+// become negative), which keeps the "You / Parents / Children" labels meaningful.
 export function computeGenerations(
   people: FamilyPerson[],
   rels: FamilyRelationship[],
 ): Map<string, number> {
   if (people.length === 0) return new Map();
 
-  const adj = buildAdjacency(rels);
+  const ids = new Set(people.map(p => p.id));
+  const parentEdges: [string, string][] = []; // [parent, child]
+  const spousePairs: [string, string][] = [];
+  const siblingPairs: [string, string][] = [];
+  for (const r of rels) {
+    if (r.relationship_type === 'parent') parentEdges.push([r.person_a_id, r.person_b_id]);
+    else if (r.relationship_type === 'child') parentEdges.push([r.person_b_id, r.person_a_id]);
+    else if (r.relationship_type === 'spouse') spousePairs.push([r.person_a_id, r.person_b_id]);
+    else if (r.relationship_type === 'sibling') siblingPairs.push([r.person_a_id, r.person_b_id]);
+  }
+
+  // Relax three constraints together until stable: child > every parent,
+  // spouses equal, siblings equal. Values only rise, bounded by chain length,
+  // so this converges (cap guards against contradictory cycles).
   const gen = new Map<string, number>();
-
-  // Prefer explicitly marked root; otherwise auto-detect top of tree
-  const explicitRoot = people.find(p => p.is_root);
-  const startIds = explicitRoot
-    ? [explicitRoot.id]
-    : findNaturalRootIds(people, rels);
-
-  const queue: string[] = [];
-  for (const id of startIds) {
-    gen.set(id, 0);
-    queue.push(id);
-  }
-
-  while (queue.length) {
-    const cur = queue.shift()!;
-    const curGen = gen.get(cur)!;
-    for (const { id, type } of adj.get(cur) ?? []) {
-      if (gen.has(id)) continue;
-      let nextGen = curGen;
-      // 'parent' edge means "I am the parent of the target" → target is a child → one row below
-      // 'child'  edge means "I am a child of the target"   → target is a parent → one row above
-      if (type === 'parent') nextGen = curGen + 1;
-      else if (type === 'child') nextGen = curGen - 1;
-      // spouse / sibling stay in same generation
-      gen.set(id, nextGen);
-      queue.push(id);
+  for (const p of people) gen.set(p.id, 0);
+  const raiseEqual = (a: string, b: string) => {
+    if (!ids.has(a) || !ids.has(b)) return false;
+    const m = Math.max(gen.get(a)!, gen.get(b)!);
+    let ch = false;
+    if (gen.get(a)! !== m) { gen.set(a, m); ch = true; }
+    if (gen.get(b)! !== m) { gen.set(b, m); ch = true; }
+    return ch;
+  };
+  const cap = people.length * 2 + 10;
+  for (let iter = 0; iter < cap; iter++) {
+    let changed = false;
+    for (const [p, c] of parentEdges) {
+      if (!ids.has(p) || !ids.has(c)) continue;
+      const want = gen.get(p)! + 1;
+      if (gen.get(c)! < want) { gen.set(c, want); changed = true; }
     }
+    for (const [a, b] of spousePairs) if (raiseEqual(a, b)) changed = true;
+    for (const [a, b] of siblingPairs) if (raiseEqual(a, b)) changed = true;
+    if (!changed) break;
   }
 
-  // Any disconnected people land at generation 0
-  for (const p of people) {
-    if (!gen.has(p.id)) gen.set(p.id, 0);
+  // If an explicit root is marked, shift so they sit at generation 0.
+  const root = people.find(p => p.is_root);
+  if (root && gen.has(root.id)) {
+    const base = gen.get(root.id)!;
+    if (base !== 0) for (const [k, v] of gen) gen.set(k, v - base);
   }
+
   return gen;
 }
 
