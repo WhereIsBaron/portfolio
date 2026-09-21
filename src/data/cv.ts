@@ -244,6 +244,24 @@ export const projects: Project[] = [
     link: '#',
   },
   {
+    name: 'Family Tree',
+    category: 'Full-Stack Application',
+    description:
+      'An interactive family tree builder — admin-managed, publicly viewable. Drag-pannable canvas with SVG connectors, automatic relationship labels (uncle/aunt, 1st cousin, etc.), country flags, and click-through profile cards with photos. Family members submit branches via a form; the admin reviews and adds them to the main tree.',
+    year: '2026 - Present',
+    tags: ['React', 'TypeScript', 'Supabase', 'PostgreSQL', 'RLS', 'Tailwind'],
+    highlights: [
+      'BFS-based relationship calculator — derives uncle/aunt, 1st cousin, great-grandparent labels from the graph automatically.',
+      'Pannable, zoomable canvas with SVG cubic-bezier connectors for parent/child and dashed gold lines for spouses.',
+      'Photo gallery per person (up to 5 images) stored in Supabase Storage with public URLs.',
+      'Branch submission flow: family members fill a form, admin reviews pending submissions with approve/reject and notes.',
+      'Supabase RLS: public read on all nodes, authenticated-only writes, anonymous inserts for submissions.',
+    ],
+    route: '/family-tree',
+    wordmark: 'FAM',
+    link: '#',
+  },
+  {
     name: 'UN Coding4Integrity Hackathon',
     category: 'Hackathon',
     description:
