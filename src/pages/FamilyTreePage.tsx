@@ -46,6 +46,8 @@ const blankPerson = (): Omit<FamilyPerson, 'id' | 'created_at'> => ({
   name: '',
   birth_year: null,
   death_year: null,
+  birth_date: null,
+  death_date: null,
   country_code: null,
   city: null,
   profession: null,
@@ -240,12 +242,18 @@ function ProfileModal({
               </div>
             </div>
           )}
-          {(person.birth_year || person.death_year) && (
+          {(person.birth_date || person.birth_year || person.death_date || person.death_year) && (
             <div className="flex items-center gap-2 text-[var(--muted)]">
               <Info size={14} className="shrink-0" />
               <span>
-                {person.birth_year && `b. ${person.birth_year}`}
-                {person.death_year && ` – d. ${person.death_year}`}
+                {person.birth_date
+                  ? `b. ${new Date(person.birth_date).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}`
+                  : person.birth_year ? `b. ${person.birth_year}` : ''}
+                {(person.death_date || person.death_year) && (
+                  person.death_date
+                    ? ` – d. ${new Date(person.death_date).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}`
+                    : ` – d. ${person.death_year}`
+                )}
               </span>
             </div>
           )}
@@ -292,6 +300,8 @@ function PersonForm({
     name: initial.name ?? '',
     birth_year: initial.birth_year ?? null,
     death_year: initial.death_year ?? null,
+    birth_date: initial.birth_date ?? null,
+    death_date: initial.death_date ?? null,
     country_code: initial.country_code ?? null,
     city: initial.city ?? null,
     profession: initial.profession ?? null,
@@ -321,12 +331,30 @@ function PersonForm({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs text-[var(--muted)] mb-1">Birth Year</label>
-          <input type="number" className={inp} value={form.birth_year ?? ''} onChange={e => set('birth_year', e.target.value ? +e.target.value : null)} placeholder="1980" />
+          <label className="block text-xs text-[var(--muted)] mb-1">Birthday</label>
+          <input
+            type="date"
+            className={inp}
+            value={form.birth_date ?? ''}
+            onChange={e => {
+              const v = e.target.value || null;
+              set('birth_date', v);
+              set('birth_year', v ? new Date(v).getFullYear() : null);
+            }}
+          />
         </div>
         <div>
-          <label className="block text-xs text-[var(--muted)] mb-1">Death Year</label>
-          <input type="number" className={inp} value={form.death_year ?? ''} onChange={e => set('death_year', e.target.value ? +e.target.value : null)} placeholder="(if applicable)" />
+          <label className="block text-xs text-[var(--muted)] mb-1">Death Date</label>
+          <input
+            type="date"
+            className={inp}
+            value={form.death_date ?? ''}
+            onChange={e => {
+              const v = e.target.value || null;
+              set('death_date', v);
+              set('death_year', v ? new Date(v).getFullYear() : null);
+            }}
+          />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -573,8 +601,8 @@ function SubmitBranchForm({ onSubmitted }: { onSubmitted: () => void }) {
                   <input className={inp} value={m.name} onChange={e => updateMember(i, 'name', e.target.value)} placeholder="Full name" />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[var(--muted)] mb-1">Birth Year</label>
-                  <input type="number" className={inp} value={m.birth_year ?? ''} onChange={e => updateMember(i, 'birth_year', e.target.value ? +e.target.value : undefined)} placeholder="1990" />
+                  <label className="block text-[10px] text-[var(--muted)] mb-1">Birthday</label>
+                  <input type="date" className={inp} value={m.birth_date ?? ''} onChange={e => { updateMember(i, 'birth_date', e.target.value || undefined); updateMember(i, 'birth_year', e.target.value ? new Date(e.target.value).getFullYear() : undefined); }} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">

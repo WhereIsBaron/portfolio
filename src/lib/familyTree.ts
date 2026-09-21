@@ -5,6 +5,8 @@ export interface FamilyPerson {
   name: string;
   birth_year: number | null;
   death_year: number | null;
+  birth_date: string | null;  // ISO date "YYYY-MM-DD"
+  death_date: string | null;
   country_code: string | null;
   city: string | null;
   profession: string | null;
@@ -42,6 +44,7 @@ export interface FamilySubmission {
 export interface SubmissionMember {
   name: string;
   birth_year?: number;
+  birth_date?: string;
   country_code?: string;
   city?: string;
   profession?: string;
