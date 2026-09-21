@@ -40,6 +40,72 @@ const COUNTRY_OPTIONS = Object.entries(COUNTRY_NAMES).sort((a, b) =>
   a[1].localeCompare(b[1])
 );
 
+// ── City picker (fetches from CountriesNow API when country changes) ──────────
+
+const cityCache = new Map<string, string[]>();
+
+function CityPicker({
+  countryCode, value, onChange, id,
+}: {
+  countryCode: string | null;
+  value: string;
+  onChange: (v: string) => void;
+  id?: string;
+}) {
+  const [cities, setCities] = useState<string[]>([]);
+  const [fetching, setFetching] = useState(false);
+  const listId = id ?? 'city-list';
+
+  useEffect(() => {
+    if (!countryCode) { setCities([]); return; }
+    const countryName = COUNTRY_NAMES[countryCode];
+    if (!countryName) { setCities([]); return; }
+
+    if (cityCache.has(countryCode)) {
+      setCities(cityCache.get(countryCode)!);
+      return;
+    }
+
+    setFetching(true);
+    fetch('https://countriesnow.space/api/v0.1/countries/cities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ country: countryName }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        const list: string[] = Array.isArray(data?.data)
+          ? (data.data as string[]).sort()
+          : [];
+        cityCache.set(countryCode, list);
+        setCities(list);
+      })
+      .catch(() => setCities([]))
+      .finally(() => setFetching(false));
+  }, [countryCode]);
+
+  return (
+    <div className="relative">
+      <input
+        list={listId}
+        className={inp}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={fetching ? 'Loading cities…' : countryCode ? 'Type or choose a city' : 'Select a country first'}
+        disabled={!countryCode}
+      />
+      {cities.length > 0 && (
+        <datalist id={listId}>
+          {cities.map(c => <option key={c} value={c} />)}
+        </datalist>
+      )}
+      {fetching && (
+        <Loader2 size={13} className="animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
+      )}
+    </div>
+  );
+}
+
 // ── Blank person form ─────────────────────────────────────────────────────────
 
 const blankPerson = (): Omit<FamilyPerson, 'id' | 'created_at'> => ({
@@ -364,8 +430,13 @@ function PersonForm({
           </select>
         </div>
         <div>
-          <label className="block text-xs text-[var(--muted)] mb-1">City</label>
-          <input className={inp} value={form.city ?? ''} onChange={e => set('city', e.target.value || null)} placeholder="Cape Town" />
+          <label className="block text-xs text-[var(--muted)] mb-1">City / Town / Village</label>
+          <CityPicker
+            countryCode={form.country_code}
+            value={form.city ?? ''}
+            onChange={v => set('city', v || null)}
+            id="admin-city-list"
+          />
         </div>
       </div>
       <div>
@@ -612,8 +683,13 @@ function SubmitBranchForm({ onSubmitted }: { onSubmitted: () => void }) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[var(--muted)] mb-1">City</label>
-                  <input className={inp} value={m.city ?? ''} onChange={e => updateMember(i, 'city', e.target.value || undefined)} placeholder="City" />
+                  <label className="block text-[10px] text-[var(--muted)] mb-1">City / Town / Village</label>
+                  <CityPicker
+                    countryCode={m.country_code ?? null}
+                    value={m.city ?? ''}
+                    onChange={v => updateMember(i, 'city', v || undefined)}
+                    id={`sub-city-list-${i}`}
+                  />
                 </div>
               </div>
               <div>
