@@ -121,8 +121,10 @@ export function computeGenerations(
     for (const { id, type } of adj.get(cur) ?? []) {
       if (gen.has(id)) continue;
       let nextGen = curGen;
-      if (type === 'parent') nextGen = curGen - 1;
-      else if (type === 'child') nextGen = curGen + 1;
+      // 'parent' edge means "I am the parent of the target" → target is a child → one row below
+      // 'child'  edge means "I am a child of the target"   → target is a parent → one row above
+      if (type === 'parent') nextGen = curGen + 1;
+      else if (type === 'child') nextGen = curGen - 1;
       // spouse / sibling stay in same generation
       gen.set(id, nextGen);
       queue.push(id);
