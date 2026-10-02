@@ -12,9 +12,13 @@ import {
   GripVertical,
   Pencil,
   CalendarCheck,
+  CheckCircle2,
+  CircleDot,
+  ChevronDown,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { projects as allProjects, type Project } from '@/data/cv';
+import { toTicket, type Ticket } from '@/lib/ticket';
 import { useReveal } from '@/hooks/useReveal';
 import { useAuth } from '@/context/AuthContext';
 import { useLayout } from '@/context/LayoutContext';
@@ -33,6 +37,67 @@ const categoryIcon: Record<string, React.ReactNode> = {
   Product: <CalendarCheck size={16} />,
   'Community Platform': <Users size={16} />,
 };
+
+const fieldLabel = 'font-mono text-[11px] uppercase tracking-[0.15em] text-[var(--muted)]/70';
+const STEPS_PREVIEW = 3;
+
+// Issue / Steps taken / Resolution blocks of a project "ticket".
+function TicketFields({ ticket, isOwner }: { ticket: Ticket; isOwner: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const steps = expanded ? ticket.steps : ticket.steps.slice(0, STEPS_PREVIEW);
+  const hidden = ticket.steps.length - STEPS_PREVIEW;
+
+  return (
+    <>
+      {ticket.issue ? (
+        <div className="mt-4">
+          <p className={fieldLabel}>Issue</p>
+          <p className="mt-1.5 text-sm text-[var(--muted)]">{ticket.issue}</p>
+        </div>
+      ) : (
+        isOwner && (
+          <div className="mt-4 rounded-lg border border-dashed border-[var(--accent)]/50 p-3">
+            <p className={fieldLabel}>Issue</p>
+            <p className="mt-1.5 text-xs text-[var(--accent)]">
+              TODO: write the problem this project solved (<code>issue</code> in src/data/cv.ts).
+              Hidden from visitors until filled in.
+            </p>
+          </div>
+        )
+      )}
+
+      {ticket.steps.length > 0 && (
+        <div className="mt-4">
+          <p className={fieldLabel}>Steps taken</p>
+          <ol className="mt-1.5 space-y-1.5">
+            {steps.map((s, i) => (
+              <li key={s} className="flex gap-2 text-xs text-[var(--muted)]">
+                <span className="w-4 shrink-0 font-mono text-[var(--brand-bright)]">{i + 1}.</span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ol>
+          {hidden > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              className="mt-2 inline-flex items-center gap-1 text-xs text-[var(--brand-bright)] hover:underline"
+            >
+              {expanded ? 'Show fewer steps' : `Show ${hidden} more step${hidden > 1 ? 's' : ''}`}
+              <ChevronDown size={14} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="mt-4">
+        <p className={fieldLabel}>Resolution</p>
+        <p className="mt-1.5 text-sm text-[var(--muted)]">{ticket.resolution}</p>
+      </div>
+    </>
+  );
+}
 
 export default function Projects() {
   const [active, setActive] = useState('All');
@@ -120,6 +185,7 @@ export default function Projects() {
             const imgs = p.images ?? [];
             const hasGallery = imgs.length > 0;
             const hasRoute = Boolean(p.route);
+            const ticket = toTicket(p);
             return (
               <div
                 key={p.name}
@@ -191,7 +257,21 @@ export default function Projects() {
                   )}
 
                   <div className="flex flex-1 flex-col p-5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3 font-mono text-xs">
+                      <span className="text-[var(--muted)]">#{ticket.id}</span>
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-medium ${
+                          ticket.status === 'Resolved'
+                            ? 'ticket-resolved bg-emerald-500/15 text-emerald-400'
+                            : 'bg-[var(--accent)]/15 text-[var(--accent)]'
+                        }`}
+                      >
+                        {ticket.status === 'Resolved' ? <CheckCircle2 size={13} /> : <CircleDot size={13} />}
+                        {ticket.status}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between">
                       <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-[var(--brand-bright)]">
                         {categoryIcon[p.category]}
                         {p.category}
@@ -199,22 +279,13 @@ export default function Projects() {
                       <span className="text-xs text-[var(--muted)]/70">{p.year}</span>
                     </div>
 
-                    <h3 className="mt-4 font-display text-lg text-white">{p.name}</h3>
-                    <p className="mt-2 text-sm text-[var(--muted)]">{p.description}</p>
+                    <h3 className="mt-3 font-display text-lg text-white">{p.name}</h3>
 
-                    {p.highlights && (
-                      <ul className="mt-3 space-y-1.5">
-                        {p.highlights.map((h) => (
-                          <li key={h} className="flex gap-2 text-xs text-[var(--muted)]">
-                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--brand-bright)]" />
-                            <span>{h}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    <TicketFields ticket={ticket} isOwner={Boolean(user)} />
 
-                    <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
-                      {p.tags.map((t) => (
+                    <p className={`${fieldLabel} mt-auto pt-4`}>Stack</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {ticket.stack.map((t) => (
                         <span
                           key={t}
                           className="rounded-full border border-white/10 px-3 py-1 text-xs text-[var(--muted)]"

@@ -4,6 +4,7 @@ import {
   ArrowLeft, LayoutGrid, AlertTriangle, Plus, X, Edit2, Trash2,
   RefreshCw, Loader2, ShieldCheck, BookOpen, ChevronDown,
   DoorOpen, GraduationCap, UserSquare2, Eye, Users, ClipboardList,
+  type LucideIcon,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -39,7 +40,7 @@ type DemoRole = 'viewer' | 'coordinator' | 'lecturer' | 'student';
 const ROLES: Record<DemoRole, {
   label: string;
   desc: string;
-  Icon: React.ComponentType<{ size?: number; className?: string }>;
+  Icon: LucideIcon;
   canConflicts: boolean;
   canDirectory: boolean;
   filtered: boolean;

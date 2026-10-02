@@ -156,3 +156,6 @@ html[data-theme="light"] .cookie-bg {
     transform: translateX(0);
   }
 }
+
+/* Project tickets: darker "Resolved" green for contrast on the light surface */
+html[data-theme="light"] .ticket-resolved { color: #047857; }
