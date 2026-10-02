@@ -12,7 +12,8 @@ const PROMPT = 'guest@andrew:~$';
 const COMMANDS: { name: string; about: string }[] = [
   { name: 'help', about: 'list available commands' },
   { name: 'whoami', about: 'who I am, in one screen' },
-  { name: 'projects', about: 'everything I’ve built (try: projects 2)' },
+  { name: 'projects', about: 'everything I’ve built (try: projects 2, projects --stack react)' },
+  { name: 'cv', about: 'open my printable CV' },
   { name: 'skills', about: 'languages, frameworks & tools' },
   { name: 'education', about: 'degrees' },
   { name: 'contact', about: 'how to reach me' },
@@ -80,6 +81,40 @@ function run(input: string): ReactNode | 'clear' {
         </div>
       );
     case 'projects': {
+      if (args[0] === '--stack') {
+        const term = args.slice(1).join(' ').toLowerCase();
+        if (!term) {
+          const all = Array.from(new Set(projects.flatMap((p) => p.tags))).sort((a, b) => a.localeCompare(b));
+          return (
+            <div>
+              <div className={muted}>usage: projects --stack &lt;tech&gt;. Known stacks:</div>
+              <div className={hl}>{all.join(', ')}</div>
+            </div>
+          );
+        }
+        const hits = projects
+          .map((p, i) => ({ p, i }))
+          .filter(({ p }) => p.tags.some((t) => t.toLowerCase().includes(term)));
+        if (!hits.length) {
+          return <span className={muted}>no projects match “{term}”. Try <span className={hl}>projects --stack</span> for the list.</span>;
+        }
+        return (
+          <div>
+            {hits.map(({ p, i }) => (
+              <div key={p.name} className="flex gap-3">
+                <span className={`${muted} w-6 shrink-0 text-right`}>{i + 1}</span>
+                <span className="min-w-0">
+                  <span className="text-white">{p.name}</span>{' '}
+                  <span className={muted}>({p.tags.filter((t) => t.toLowerCase().includes(term)).join(', ')})</span>
+                </span>
+              </div>
+            ))}
+            <div className={`mt-2 ${muted}`}>
+              {hits.length} match{hits.length > 1 ? 'es' : ''}. Run <span className={hl}>projects &lt;n&gt;</span> for details.
+            </div>
+          </div>
+        );
+      }
       const n = Number(args[0]);
       if (args[0] && Number.isInteger(n) && n >= 1 && n <= projects.length) {
         const p = projects[n - 1];
@@ -172,6 +207,13 @@ function run(input: string): ReactNode | 'clear' {
             Or use the <TermLink href="#contact">contact form</TermLink>.
           </div>
         </div>
+      );
+    case 'cv':
+      return (
+        <span>
+          → <TermLink href={profile.resumeUrl}>open the printable CV</TermLink>{' '}
+          <span className={muted}>(use “Save as PDF” to download)</span>
+        </span>
       );
     case 'clear':
       return 'clear';

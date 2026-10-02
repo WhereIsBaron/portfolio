@@ -1,4 +1,5 @@
-import { ArrowDown, MapPin, Github, Linkedin } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowDown, MapPin, Github, Linkedin, FileText } from 'lucide-react';
 import { profile } from '@/data/cv';
 
 
@@ -84,6 +85,12 @@ export default function Hero() {
             >
               <Linkedin size={15} /> LinkedIn
             </a>
+            <Link
+              to={profile.resumeUrl}
+              className="inline-flex items-center gap-2 transition-colors hover:text-white"
+            >
+              <FileText size={15} /> CV
+            </Link>
           </div>
         </div>
 

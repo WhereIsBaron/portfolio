@@ -12,7 +12,7 @@ export const profile = {
   license: "Driver's License: Class B",
   availability: 'Available for full-time & freelance work',
   photo: '/andrew.jpg',
-  resumeUrl: '#',
+  resumeUrl: '/cv', // printable CV generated from this file (src/pages/CvPage.tsx)
   socials: [
     { label: 'GitHub', href: 'https://github.com/WhereIsBaron', icon: 'github' as const },
     { label: 'LinkedIn', href: 'https://www.linkedin.com/in/andrew-langeveldt-953789292/', icon: 'linkedin' as const },

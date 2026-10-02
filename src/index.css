@@ -159,3 +159,21 @@ html[data-theme="light"] .cookie-bg {
 
 /* Project tickets: darker "Resolved" green for contrast on the light surface */
 html[data-theme="light"] .ticket-resolved { color: #047857; }
+
+/* Printable CV (/cv): print only the paper sheet, not the toolbar or global widgets */
+@media print {
+  @page { margin: 12mm; }
+  body:has(.cv-sheet) { background: #fff; }
+  body:has(.cv-sheet) * { visibility: hidden; }
+  body:has(.cv-sheet) .cv-sheet,
+  body:has(.cv-sheet) .cv-sheet * { visibility: visible; }
+  .cv-sheet {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .cv-sheet a { text-decoration: none; }
+  .cv-avoid-break { break-inside: avoid; }
+}
