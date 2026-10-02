@@ -1,5 +1,5 @@
 import {
-  useCallback, useEffect, useRef, useState, ChangeEvent,
+  useCallback, useEffect, useRef, useState,
 } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -408,7 +408,7 @@ function ProfileModal({
 // ── Admin: Edit person form ────────────────────────────────────────────────────
 
 function PersonForm({
-  initial, people, photos, onSave, onCancel, onDeletePhoto, onUploadPhoto, saving, uploading, error,
+  initial, photos, onSave, onCancel, onDeletePhoto, onUploadPhoto, saving, uploading, error,
 }: {
   initial: Partial<FamilyPerson>;
   people: FamilyPerson[];

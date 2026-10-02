@@ -15,7 +15,9 @@ export function useTheme() {
     document.documentElement.setAttribute('data-theme', theme);
     try {
       localStorage.setItem('theme', theme);
-    } catch {}
+    } catch {
+      /* storage unavailable (private mode) */
+    }
   }, [theme]);
 
   const toggle = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));

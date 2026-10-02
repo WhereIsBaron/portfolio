@@ -843,6 +843,15 @@ function buildCrmData(people: Person[], source: CrmData['source']): CrmData {
 }
 
 // Live-load people from randomuser.me, falling back to the baked-in set.
+// Subset of the randomuser.me result shape we read (all fields may be missing).
+type RandomUser = {
+  name?: { first?: string; last?: string };
+  email?: string;
+  phone?: string;
+  picture?: { large?: string; medium?: string };
+  location?: { city?: string; country?: string };
+};
+
 export async function fetchCrmData(): Promise<CrmData> {
   try {
     const res = await fetch(
@@ -850,7 +859,7 @@ export async function fetchCrmData(): Promise<CrmData> {
     );
     if (!res.ok) throw new Error(`randomuser ${res.status}`);
     const json = await res.json();
-    const people: Person[] = (json.results ?? []).map((r: any) => ({
+    const people: Person[] = ((json.results ?? []) as RandomUser[]).map((r) => ({
       firstName: r.name?.first ?? 'Unknown',
       lastName: r.name?.last ?? '',
       email: r.email ?? 'unknown@example.com',

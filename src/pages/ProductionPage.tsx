@@ -68,17 +68,6 @@ const GLOSSARY: Record<string, GlossaryEntry> = {
   },
 };
 
-/* ─── Helper: clickable glossary term chip ──────────────────────────────── */
-function Term({ id, onOpen }: { id: keyof typeof GLOSSARY; onOpen: (id: string) => void }) {
-  return (
-    <button
-      onClick={() => onOpen(id)}
-      className="inline-flex items-center gap-0.5 rounded border border-[#00c9a7]/40 bg-[#00c9a7]/10 px-1.5 py-0.5 text-xs font-semibold text-[#00c9a7] hover:bg-[#00c9a7]/20 transition-colors cursor-pointer"
-    >
-      {GLOSSARY[id].term.split('—')[0].trim()} <Info size={10} />
-    </button>
-  );
-}
 
 /* ─── Scenario block ────────────────────────────────────────────────────── */
 function ScenarioBlock({ scenario }: { scenario: Scenario }) {
@@ -133,7 +122,7 @@ function ConceptCard({ icon, title, children }: { icon: React.ReactNode; title: 
 }
 
 /* ─── Module: Daily Production Management ───────────────────────────────── */
-function ModuleProduction({ openGlossary }: { openGlossary: (id: string) => void }) {
+function ModuleProduction() {
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] p-5">
@@ -394,7 +383,7 @@ function ModuleSafety({ openGlossary }: { openGlossary: (id: string) => void }) 
 }
 
 /* ─── Module: Team Leadership ───────────────────────────────────────────── */
-function ModuleLeadership({ openGlossary }: { openGlossary: (id: string) => void }) {
+function ModuleLeadership() {
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] p-5">
@@ -725,14 +714,16 @@ export default function ProductionPage() {
     try {
       const stored = localStorage.getItem('prodTraining_completed');
       if (stored) setCompleted(new Set(JSON.parse(stored)));
-    } catch {}
+    } catch {
+      /* storage unavailable or corrupt; start fresh */
+    }
   }, []);
 
   const markComplete = useCallback((id: ModuleId) => {
     setCompleted(prev => {
       const next = new Set(prev);
       next.add(id);
-      try { localStorage.setItem('prodTraining_completed', JSON.stringify([...next])); } catch {}
+      try { localStorage.setItem('prodTraining_completed', JSON.stringify([...next])); } catch { /* storage unavailable */ }
       return next;
     });
     const idx = MODULES.findIndex(m => m.id === id);
@@ -744,10 +735,10 @@ export default function ProductionPage() {
 
   const renderModule = () => {
     switch (active) {
-      case 'production':   return <ModuleProduction openGlossary={openGlossary} />;
+      case 'production':   return <ModuleProduction />;
       case 'quality':      return <ModuleQuality openGlossary={openGlossary} />;
       case 'safety':       return <ModuleSafety openGlossary={openGlossary} />;
-      case 'leadership':   return <ModuleLeadership openGlossary={openGlossary} />;
+      case 'leadership':   return <ModuleLeadership />;
       case 'inventory':    return <ModuleInventory openGlossary={openGlossary} />;
       case 'improvement':  return <ModuleImprovement openGlossary={openGlossary} />;
     }
@@ -801,7 +792,7 @@ export default function ProductionPage() {
             </div>
           </div>
           <nav className="space-y-1">
-            {MODULES.map((m, i) => {
+            {MODULES.map((m) => {
               const done = completed.has(m.id);
               const isCurrent = active === m.id;
               return (

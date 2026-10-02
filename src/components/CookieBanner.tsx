@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Cookie, X } from 'lucide-react';
+import { Cookie } from 'lucide-react';
 
 const STORAGE_KEY = 'cookie_consent';
 
@@ -21,7 +21,9 @@ export default function CookieBanner() {
   const accept = (choice: 'all' | 'essential') => {
     try {
       localStorage.setItem(STORAGE_KEY, choice);
-    } catch {}
+    } catch {
+      /* storage unavailable (private mode) */
+    }
     setConsent(choice);
   };
 

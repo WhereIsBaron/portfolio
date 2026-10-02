@@ -59,10 +59,12 @@ async function readTotal(url: string, key: string): Promise<number | null> {
   }
 }
 
+type FnContext = { geo?: { country?: { code?: string } } };
+
 // Netlify injects visitor geo on the function context (context.geo.country.code)
 // with no third party or extra request. Fall back to the x-nf-geo header (JSON)
 // or x-country. Returns '' when geo isn't available.
-function clientCountry(req: Request, context: any): string {
+function clientCountry(req: Request, context: FnContext): string {
   const code = context?.geo?.country?.code;
   if (typeof code === 'string' && code) return code;
   try {
@@ -77,7 +79,7 @@ function clientCountry(req: Request, context: any): string {
   return (req.headers.get('x-country') || '').trim();
 }
 
-export default async (req: Request, context: any): Promise<Response> => {
+export default async (req: Request, context: FnContext): Promise<Response> => {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
 
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -86,7 +88,7 @@ export default async (req: Request, context: any): Promise<Response> => {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return json(200, { total: null }); // not configured → no-op
 
-  let body: any = {};
+  let body: Record<string, unknown> = {};
   try {
     body = await req.json();
   } catch {

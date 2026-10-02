@@ -33,6 +33,8 @@ const RATE_LIMIT_MAX = 30;      // replies allowed per IP per window
 const RATE_LIMIT_WINDOW = 300;  // seconds
 
 type Msg = { from: 'me' | 'them'; body: string };
+type FnContext = { ip?: string };
+type Body = { contact?: Record<string, unknown>; history?: unknown };
 
 function json(status: number, data: unknown): Response {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -93,10 +95,10 @@ async function callProvider(name: ProviderName, messages: { role: string; conten
   }
 }
 
-export default async (req: Request, context: any): Promise<Response> => {
+export default async (req: Request, context: FnContext): Promise<Response> => {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' });
 
-  let body: any = {};
+  let body: Body = {};
   try { body = await req.json(); } catch { return json(400, { error: 'Bad JSON' }); }
 
   const contact = body.contact || {};

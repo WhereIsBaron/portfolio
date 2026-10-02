@@ -5,7 +5,7 @@ import { useEffect } from 'react';
  * scrolls into view. Re-runs when `deps` change so newly mounted nodes
  * (e.g. tabbed content) are observed too.
  */
-export function useReveal<T extends HTMLElement>(deps: unknown[] = []) {
+export function useReveal(deps: unknown[] = []) {
   useEffect(() => {
     const els = Array.from(document.querySelectorAll<HTMLElement>('.reveal'));
     if (!('IntersectionObserver' in window) || els.length === 0) {

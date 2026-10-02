@@ -1442,7 +1442,7 @@ function Contacts({
           <Search size={16} className="text-[var(--muted)]" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, company, email…" className="w-full bg-transparent text-sm text-white outline-none placeholder:text-[var(--muted)]" />
         </div>
-        <select value={status} onChange={(e) => setStatus(e.target.value as any)} className="rounded-xl border border-white/10 bg-[var(--surface)] px-3 py-2 text-sm text-white outline-none">
+        <select value={status} onChange={(e) => setStatus(e.target.value as 'All' | Status)} className="rounded-xl border border-white/10 bg-[var(--surface)] px-3 py-2 text-sm text-white outline-none">
           <option value="All">All statuses</option>
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>

@@ -485,12 +485,27 @@ function buildErpData(
 }
 
 // ── Live fetch ───────────────────────────────────────────────────────────────
+// Subsets of the public API shapes we read (all fields may be missing).
+type DummyProduct = {
+  title?: string;
+  price?: number;
+  stock?: number;
+  category?: string;
+  brand?: string;
+  thumbnail?: string;
+};
+type RandomUser = {
+  name?: { first?: string; last?: string };
+  email?: string;
+  picture?: { large?: string; medium?: string };
+};
+
 async function fetchProducts(): Promise<{ items: RawItem[]; source: ErpData['productsSource'] }> {
   try {
     const res = await fetch('https://dummyjson.com/products?limit=30&select=title,price,stock,category,brand,thumbnail');
     if (!res.ok) throw new Error(`dummyjson ${res.status}`);
     const json = await res.json();
-    const items: RawItem[] = (json.products ?? []).map((p: any) => ({
+    const items: RawItem[] = ((json.products ?? []) as DummyProduct[]).map((p) => ({
       title: p.title ?? 'Item',
       price: Number(p.price) || 10,
       stock: Number(p.stock) || 0,
@@ -510,7 +525,7 @@ async function fetchPeople(): Promise<{ people: RawPerson[]; source: ErpData['pe
     const res = await fetch('https://randomuser.me/api/?results=12&seed=langeveldt-erp&inc=name,email,picture');
     if (!res.ok) throw new Error(`randomuser ${res.status}`);
     const json = await res.json();
-    const people: RawPerson[] = (json.results ?? []).map((r: any) => ({
+    const people: RawPerson[] = ((json.results ?? []) as RandomUser[]).map((r) => ({
       first: r.name?.first ?? 'Unknown',
       last: r.name?.last ?? '',
       email: r.email ?? 'unknown@company.com',

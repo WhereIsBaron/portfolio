@@ -304,13 +304,13 @@ export default async (req: Request): Promise<Response> => {
   const raw = Array.isArray(payload.messages) ? payload.messages : [];
   const messages: ChatMessage[] = raw
     .filter(
-      (m: any) =>
+      (m: Partial<ChatMessage> | null) =>
         m &&
         (m.role === 'user' || m.role === 'assistant') &&
         typeof m.content === 'string'
     )
     .slice(-MAX_MESSAGES)
-    .map((m: any) => ({
+    .map((m: ChatMessage) => ({
       role: m.role as Role,
       content: String(m.content).slice(0, MAX_CHARS_PER_MSG),
     }));

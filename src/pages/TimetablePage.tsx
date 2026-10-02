@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowLeft, LayoutGrid, AlertTriangle, Plus, X, Edit2, Trash2,
   RefreshCw, Loader2, ShieldCheck, BookOpen, ChevronDown,
-  DoorOpen, GraduationCap, UserSquare2, Eye, Users, ClipboardList,
+  DoorOpen, GraduationCap, UserSquare2, Eye, ClipboardList,
   type LucideIcon,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';

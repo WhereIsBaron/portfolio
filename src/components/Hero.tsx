@@ -1,10 +1,6 @@
 import { ArrowDown, MapPin, Github, Linkedin } from 'lucide-react';
 import { profile } from '@/data/cv';
 
-const codeLines = [
-  { t: 'const ', v: 'andrew', c: 'text-[var(--brand-bright)]' },
-  { t: ' = ', v: 'engineer', c: 'text-[#e0b25c]' },
-];
 
 export default function Hero() {
   return (
