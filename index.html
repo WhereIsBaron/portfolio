@@ -24,10 +24,11 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="/andrew.jpg" />
     <script>
-      try {
-        var t = localStorage.getItem('theme');
-        if (t) document.documentElement.setAttribute('data-theme', t);
-      } catch (e) {}
+      (function () {
+        var t;
+        try { t = localStorage.getItem('theme'); } catch (e) {}
+        document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+      })();
     </script>
     <script type="application/ld+json">
     {
