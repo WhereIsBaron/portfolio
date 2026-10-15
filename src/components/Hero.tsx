@@ -1,187 +1,157 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowDown, MapPin, Github, Linkedin, FileText } from 'lucide-react';
-import { profile } from '@/data/cv';
+import { projects } from '@/data/cv';
 
+/**
+ * Contact-sheet hero (direction: "The contact sheet", seed 929611170).
+ * A plain text band at one small size, then a wall of the real interfaces
+ * Andrew has shipped, grouped into runs by project. Pointing at a run
+ * focuses it and dims the rest — the work is the navigation.
+ */
+
+// One-line descriptions shown when a run is focused.
+const blurb: Record<string, string> = {
+  limkonnect: 'University community platform — React + Firebase, trust-based access, moderated forums.',
+  'bhc-mobile-app': 'Flutter + Laravel mobile app, built at the Botswana Housing Corporation hackathon.',
+  scripts: 'Torn userscripts (BUSTR, FLIPR, MUGSHOT) — rate-limited API tooling, single-key security.',
+  'the-dying-forge': 'Blacksmith crafting & management game, built in Godot 4 with C#.',
+};
+
+const services = [
+  'Full-stack web',
+  'Mobile apps',
+  'Databases & APIs',
+  'Game development',
+  'Automation & scripting',
+  'UI / UX design',
+];
+
+const credentials = [
+  'UN Coding4Integrity — Top 13 of 547',
+  'BSc (Hons) Software Engineering',
+  'MBA, Project Management (in progress)',
+  '5+ languages shipped to production',
+];
+
+const sheet = projects.filter((p) => p.images && p.images.length > 0);
 
 export default function Hero() {
+  const [active, setActive] = useState<string | null>(null);
+
   return (
-    <section
-      id="top"
-      className="relative flex min-h-screen items-center overflow-hidden pt-28"
-    >
-      {/* Ambient background */}
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -left-40 top-10 h-[34rem] w-[34rem] rounded-full bg-[var(--brand)]/20 blur-[120px]" />
-        <div className="absolute -right-40 bottom-0 h-[30rem] w-[30rem] rounded-full bg-[var(--accent)]/10 blur-[120px]" />
-        <div className="grain absolute inset-0 opacity-[0.04]" />
-      </div>
-
-      <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-12 px-6 lg:grid-cols-12">
-        <div className="lg:col-span-7">
-          <div className="reveal mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-[var(--muted)]">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--brand-bright)] opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--brand-bright)]" />
-            </span>
-            {profile.availability}
-          </div>
-
-          <p className="reveal mb-3 font-display text-lg text-[var(--muted)]">
-            Hi, I’m {profile.shortName}.
+    <section id="top" className="relative px-4 pt-24 pb-16 sm:px-5">
+      {/* ── Text band ─────────────────────────────────────────────── */}
+      <div className="mx-auto grid max-w-[1600px] grid-cols-2 gap-x-6 gap-y-8 border-t border-[var(--border)] pt-6 text-[15px] leading-snug sm:grid-cols-4 lg:grid-cols-12">
+        <div className="col-span-2 lg:col-span-3">
+          <p className="font-bold text-[var(--ink)]">Andrew Langeveldt</p>
+          <p className="mt-1 max-w-[22ch] text-[var(--muted)]">
+            Junior software engineer &amp; full-stack web / mobile developer.
           </p>
-          <h1 className="reveal font-display text-5xl font-light leading-[1.05] text-white sm:text-6xl lg:text-7xl">
-            Software engineer
-            <br />
-            building
-            <span className="italic text-[var(--brand-bright)]">
-              {' '}
-              real solutions
-            </span>
-            <br />
-            across the stack.
-          </h1>
-
-          <p className="reveal mt-7 max-w-xl text-lg leading-relaxed text-[var(--muted)]">
-            {profile.tagline}
-          </p>
-
-          <div className="reveal mt-9 flex flex-wrap items-center gap-4">
-            <a
-              href="#work"
-              className="group inline-flex items-center gap-2 rounded-full bg-[var(--brand-bright)] px-6 py-3 text-sm font-medium text-[#0b0d10] transition-all hover:bg-white"
-            >
-              View projects
-              <ArrowDown
-                size={16}
-                className="transition-transform group-hover:translate-y-0.5"
-              />
-            </a>
-            <a
-              href="#contact"
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 px-6 py-3 text-sm font-medium text-white transition-colors hover:border-white/40"
-            >
-              Get in touch
-            </a>
-          </div>
-
-          <div className="reveal mt-8 flex flex-wrap items-center gap-5 text-sm text-[var(--muted)]">
-            <span className="inline-flex items-center gap-2">
-              <MapPin size={15} className="text-[var(--brand-bright)]" />
-              {profile.location}
-            </span>
-            <a
-              href={profile.socials[0].href}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 transition-colors hover:text-white"
-            >
-              <Github size={15} /> GitHub
-            </a>
-            <a
-              href={profile.socials[1].href}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 transition-colors hover:text-white"
-            >
-              <Linkedin size={15} /> LinkedIn
-            </a>
-            <Link
-              to={profile.resumeUrl}
-              className="inline-flex items-center gap-2 transition-colors hover:text-white"
-            >
-              <FileText size={15} /> CV
-            </Link>
-          </div>
         </div>
 
-        {/* Code window */}
-        <div className="lg:col-span-5">
-          <div className="reveal relative mx-auto max-w-md">
-            <div className="absolute -inset-3 rounded-[2rem] border border-white/10" />
-            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-[var(--accent)]/20 blur-2xl" />
-            <div className="preserve-dark overflow-hidden rounded-2xl border border-white/10 bg-[#0e1117] shadow-2xl">
-              {/* window bar */}
-              <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
-                <span className="h-3 w-3 rounded-full bg-[#ff5f56]" />
-                <span className="h-3 w-3 rounded-full bg-[#ffbd2e]" />
-                <span className="h-3 w-3 rounded-full bg-[#27c93f]" />
-                <span className="ml-3 text-xs text-[var(--muted)]">
-                  engineer.ts
-                </span>
+        <div className="col-span-2 lg:col-span-2">
+          <p className="text-[var(--ink)]">
+            <span className="mr-1.5 inline-block h-2 w-2 translate-y-[-1px] rounded-full bg-[var(--accent)]" />
+            Available
+          </p>
+          <p className="mt-1 text-[var(--muted)]">Full-time &amp; freelance</p>
+          <p className="text-[var(--muted)]">Gaborone, Botswana</p>
+        </div>
+
+        <div className="col-span-1 lg:col-span-3">
+          <ul className="space-y-0.5 text-[var(--muted)]">
+            {services.map((s) => (
+              <li key={s}>{s}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="col-span-1 lg:col-span-2">
+          <ul className="space-y-0.5 text-[var(--muted)]">
+            {credentials.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="col-span-2 flex flex-col items-start gap-1 lg:col-span-2 lg:items-end lg:text-right">
+          <a
+            href="https://github.com/WhereIsBaron"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[var(--muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
+          >
+            GitHub
+          </a>
+          <a
+            href="https://www.linkedin.com/in/andrew-langeveldt-953789292/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[var(--muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
+          >
+            LinkedIn
+          </a>
+          <Link
+            to="/cv"
+            className="text-[var(--muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline"
+          >
+            Curriculum vitae
+          </Link>
+          <a
+            href="#contact"
+            className="mt-1 bg-[var(--accent)] px-3 py-1.5 font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
+          >
+            Get in touch
+          </a>
+        </div>
+      </div>
+
+      {/* ── The sheet ─────────────────────────────────────────────── */}
+      <div className="mx-auto mt-12 max-w-[1600px] text-[13px]">
+        <div className="mb-3 flex items-baseline justify-between">
+          <p className="text-[var(--muted)]">Selected work — {sheet.length} projects, {sheet.reduce((n, p) => n + (p.images?.length ?? 0), 0)} frames</p>
+          <p className="h-4 text-[var(--ink)] transition-opacity">
+            {active ? blurb[active] : <span className="text-[var(--muted)]">Point at a project to read what it is.</span>}
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          {sheet.map((p) => {
+            const slug = p.slug!;
+            const dim = active && active !== slug;
+            return (
+              <div
+                key={slug}
+                onMouseEnter={() => setActive(slug)}
+                onMouseLeave={() => setActive(null)}
+                className={`transition-opacity duration-200 ${dim ? 'opacity-30' : 'opacity-100'}`}
+              >
+                <p className="mb-1.5 font-medium text-[var(--ink)]">
+                  {p.name} <span className="text-[var(--muted)]">· {p.year}</span>
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.images!.map((src, i) => (
+                    <a
+                      key={src}
+                      href={p.link && p.link !== '#' ? p.link : undefined}
+                      target={p.link && p.link !== '#' ? '_blank' : undefined}
+                      rel="noreferrer"
+                      className="block h-[132px] overflow-hidden bg-[var(--surface)]"
+                    >
+                      <img
+                        src={src}
+                        alt={`${p.name} screenshot ${i + 1}`}
+                        loading="lazy"
+                        className="h-[132px] w-auto max-w-none object-cover"
+                      />
+                    </a>
+                  ))}
+                </div>
               </div>
-              {/* code */}
-              <pre className="overflow-x-auto p-5 text-[13px] leading-relaxed">
-                <code className="font-mono">
-                  <span className="text-[var(--muted)]">{'// Software engineer\n'}</span>
-                  <span className="text-[#c678dd]">const </span>
-                  <span className="text-[var(--brand-bright)]">andrew</span>
-                  <span className="text-white"> = {'{'}</span>
-                  {'\n'}
-                  {'  '}<span className="text-[#e0b25c]">name</span>
-                  <span className="text-white">: </span>
-                  <span className="text-[#98c379]">'Andrew P.J. Langeveldt'</span>
-                  <span className="text-white">,</span>
-                  {'\n'}
-                  {'  '}<span className="text-[#e0b25c]">role</span>
-                  <span className="text-white">: </span>
-                  <span className="text-[#98c379]">'Full-Stack Developer'</span>
-                  <span className="text-white">,</span>
-                  {'\n'}
-                  {'  '}<span className="text-[#e0b25c]">stack</span>
-                  <span className="text-white">: [</span>
-                  <span className="text-[#98c379]">'React'</span>
-                  <span className="text-white">, </span>
-                  <span className="text-[#98c379]">'Laravel'</span>
-                  <span className="text-white">, </span>
-                  <span className="text-[#98c379]">'Flutter'</span>
-                  <span className="text-white">,</span>
-                  {'\n'}
-                  {'         '}<span className="text-[#98c379]">'Motoko'</span>
-                  <span className="text-white">],</span>
-                  {'\n'}
-                  {'  '}<span className="text-[#e0b25c]">based</span>
-                  <span className="text-white">: </span>
-                  <span className="text-[#98c379]">'Gaborone, Botswana'</span>
-                  <span className="text-white">,</span>
-                  {'\n'}
-                  {'  '}<span className="text-[#e0b25c]">available</span>
-                  <span className="text-white">: </span>
-                  <span className="text-[#56b6c2]">true</span>
-                  <span className="text-white">,</span>
-                  {'\n'}
-                  <span className="text-white">{'}'}</span>
-                  {'\n\n'}
-                  <span className="text-[#c678dd]">async function </span>
-                  <span className="text-[var(--brand-bright)]">build</span>
-                  <span className="text-white">({'('}</span>
-                  <span className="text-[#e0b25c]">idea</span>
-                  <span className="text-white">{') {'}</span>
-                  {'\n'}
-                  {'  '}<span className="text-[#c678dd]">return</span>
-                  <span className="text-white"> await </span>
-                  <span className="text-[var(--brand-bright)]">ship</span>
-                  <span className="text-white">(</span>
-                  <span className="text-[#e0b25c]">idea</span>
-                  <span className="text-white">)</span>
-                  {'\n'}
-                  <span className="text-white">{'}'}</span>
-                </code>
-              </pre>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </div>
-
-      <a
-        href="#about"
-        className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 text-[var(--muted)] transition-colors hover:text-white lg:flex"
-        aria-label="Scroll down"
-      >
-        <span className="text-[10px] uppercase tracking-[0.2em]">Scroll</span>
-        <span className="flex h-9 w-5 items-start justify-center rounded-full border border-white/20 p-1">
-          <span className="h-2 w-1 animate-bounce rounded-full bg-[var(--text)]/60" />
-        </span>
-      </a>
     </section>
   );
 }

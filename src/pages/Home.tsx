@@ -18,7 +18,7 @@ export default function Home() {
   useReveal([]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+    <div className="paper min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <Navbar />
       <main>
         <Hero />
