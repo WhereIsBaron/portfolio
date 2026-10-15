@@ -2,37 +2,30 @@ import { skillGroups } from '@/data/cv';
 
 export default function Skills() {
   return (
-    <section id="skills" className="relative py-28">
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="reveal mb-14 flex items-center gap-4">
-          <span className="text-sm font-medium text-[var(--brand-bright)]">
-            02
-          </span>
-          <span className="h-px w-12 bg-white/15" />
-          <span className="text-sm uppercase tracking-[0.2em] text-[var(--muted)]">
-            Capabilities
-          </span>
-        </div>
+    <section id="skills" className="relative px-4 py-24 sm:px-5">
+      <div className="mx-auto max-w-[1600px] border-t border-[var(--border)] pt-6">
+        <p className="reveal mb-12 text-[13px] uppercase tracking-[0.18em] text-[var(--muted)]">
+          Capabilities
+        </p>
 
-        <h2 className="reveal mb-14 max-w-2xl font-display text-4xl font-light leading-tight text-white sm:text-5xl">
-          A toolkit spanning the whole build,{' '}
-          <span className="text-[var(--brand-bright)]">idea to production.</span>
+        <h2 className="reveal mb-14 max-w-2xl font-display text-4xl font-medium leading-tight text-[var(--ink)] sm:text-5xl">
+          A toolkit spanning the whole build, idea to production.
         </h2>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {skillGroups.map((group) => (
             <div
               key={group.category}
-              className="reveal rounded-xl border border-white/10 bg-[var(--surface)] p-4 transition-colors hover:border-white/20"
+              className="reveal border border-[var(--border)] bg-[var(--surface)] p-5 transition-colors hover:border-[var(--accent)]"
             >
-              <h3 className="font-display text-base text-white">
+              <h3 className="font-display text-base text-[var(--ink)]">
                 {group.category}
               </h3>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {group.items.map((skill) => (
                   <span
                     key={skill}
-                    className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-[var(--muted)] transition-colors hover:border-white/25 hover:text-white"
+                    className="border border-[var(--border)] bg-[var(--bg)] px-2.5 py-1 text-xs text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--ink)]"
                   >
                     {skill}
                   </span>
@@ -43,8 +36,8 @@ export default function Skills() {
         </div>
 
         <p className="reveal mt-10 max-w-2xl text-sm text-[var(--muted)]">
-          These are the languages, frameworks, and tools I’ve worked with so far — the
-          list keeps growing as I take on new projects and expand my skillset.
+          These are the languages, frameworks, and tools I’ve worked with so
+          far — the list keeps growing with each new project.
         </p>
       </div>
     </section>

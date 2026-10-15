@@ -6,13 +6,13 @@ import { useVisitCount } from '@/lib/useVisitCount';
 export default function Footer() {
   const visits = useVisitCount();
   return (
-    <footer className="border-t border-white/5 py-12">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-6 sm:flex-row">
+    <footer className="border-t border-[var(--border)] px-4 py-12 sm:px-5">
+      <div className="mx-auto flex max-w-[1600px] flex-col items-center justify-between gap-6 sm:flex-row">
         <a
           href="#top"
-          className="font-display text-lg font-semibold tracking-tight text-white"
+          className="font-display text-lg font-semibold tracking-tight text-[var(--ink)]"
         >
-          Andrew<span className="text-[var(--brand-bright)]">.</span>Langeveldt
+          Andrew<span className="text-[var(--accent)]">.</span>Langeveldt
         </a>
 
         <div className="flex items-center gap-6">
@@ -22,14 +22,14 @@ export default function Footer() {
               href={s.href}
               target="_blank"
               rel="noreferrer"
-              className="text-sm text-[var(--muted)] transition-colors hover:text-white"
+              className="text-sm text-[var(--muted)] transition-colors hover:text-[var(--ink)]"
             >
               {s.label}
             </a>
           ))}
           <Link
             to="/privacy"
-            className="text-sm text-[var(--muted)] transition-colors hover:text-white"
+            className="text-sm text-[var(--muted)] transition-colors hover:text-[var(--ink)]"
           >
             Privacy
           </Link>
@@ -37,23 +37,23 @@ export default function Footer() {
 
         <a
           href="#top"
-          className="group inline-flex items-center gap-2 text-sm text-[var(--muted)] transition-colors hover:text-white"
+          className="group inline-flex items-center gap-2 text-sm text-[var(--muted)] transition-colors hover:text-[var(--ink)]"
         >
           Back to top
-          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 transition-colors group-hover:border-white/40">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] transition-colors group-hover:border-[var(--accent)]">
             <ArrowUp size={14} />
           </span>
         </a>
       </div>
-      <p className="mt-8 text-center text-xs text-[var(--muted)]/60">
-        © {new Date().getFullYear()} {profile.name}. Designed & built with care.
+      <p className="mt-8 text-center text-xs text-[var(--muted)]">
+        © {new Date().getFullYear()} {profile.name}. Built and maintained by Andrew.
       </p>
       {visits !== null && (
         <p
-          className="mt-2 text-center text-xs text-[var(--muted)]/50"
+          className="mt-2 text-center text-xs text-[var(--muted)]"
           aria-live="polite"
         >
-          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--brand-bright)] align-middle" />
+          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent)] align-middle" />
           {visits.toLocaleString()} site visits
         </p>
       )}

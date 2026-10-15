@@ -54,21 +54,21 @@ function ContactForm() {
   };
 
   const field =
-    'w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2.5 text-white placeholder:text-[var(--muted)]/60 focus:border-[var(--brand-bright)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-bright)]';
+    'w-full rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2.5 text-[var(--ink)] placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]';
 
   if (state === 'sent') {
     return (
-      <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-[var(--brand)]/30 bg-[var(--surface)] p-8 text-center">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--brand-bright)]/15">
-          <CheckCircle2 size={28} className="text-[var(--brand-bright)]" />
+      <div className="flex h-full flex-col items-center justify-center border border-[var(--accent)] bg-[var(--surface)] p-8 text-center">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)]/15">
+          <CheckCircle2 size={28} className="text-[var(--accent)]" />
         </span>
-        <h3 className="mt-4 font-display text-xl text-white">Message sent</h3>
+        <h3 className="mt-4 font-display text-xl text-[var(--ink)]">Message sent</h3>
         <p className="mt-2 max-w-xs text-sm text-[var(--muted)]">
           Thanks for reaching out — I’ll get back to you within two business days.
         </p>
         <button
           onClick={() => setState('idle')}
-          className="mt-5 text-sm text-[var(--brand-bright)] hover:underline"
+          className="mt-5 text-sm text-[var(--accent)] hover:underline"
         >
           Send another
         </button>
@@ -77,8 +77,8 @@ function ContactForm() {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-2xl border border-white/10 bg-[var(--surface)] p-6">
-      <h3 className="font-display text-xl text-white">Send a message</h3>
+    <form onSubmit={submit} className="border border-[var(--border)] bg-[var(--surface)] p-6">
+      <h3 className="font-display text-xl text-[var(--ink)]">Send a message</h3>
       <p className="mt-1 text-sm text-[var(--muted)]">Prefer a form? Drop me a line and I’ll reply by email.</p>
       <div className="mt-5 space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
@@ -94,7 +94,7 @@ function ContactForm() {
       </div>
 
       {state === 'error' && error && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+        <div className="mt-3 flex items-start gap-2 border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-600">
           <AlertCircle size={16} className="mt-0.5 shrink-0" /> {error}
         </div>
       )}
@@ -102,7 +102,7 @@ function ContactForm() {
       <button
         type="submit"
         disabled={state === 'sending'}
-        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-bright)] py-3 font-medium text-[#0b0d10] transition-colors hover:bg-white disabled:opacity-60"
+        className="mt-5 inline-flex w-full items-center justify-center gap-2 bg-[var(--accent)] py-3 font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90 disabled:opacity-60"
       >
         {state === 'sending' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
         {state === 'sending' ? 'Sending…' : 'Send message'}
@@ -128,28 +128,28 @@ function PaymentCard() {
   };
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-[var(--surface)] p-6">
+    <div className="border border-[var(--border)] bg-[var(--surface)] p-6">
       <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[var(--bg-soft)]">
-          <CreditCard size={20} className="text-[var(--brand-bright)]" />
+        <span className="flex h-11 w-11 items-center justify-center border border-[var(--border)] bg-[var(--bg-soft)]">
+          <CreditCard size={20} className="text-[var(--accent)]" />
         </span>
         <div>
-          <h3 className="font-display text-lg text-white">Make a payment</h3>
+          <h3 className="font-display text-lg text-[var(--ink)]">Make a payment</h3>
           <p className="text-sm text-[var(--muted)]">Settle a deposit or invoice securely via DPO Pay.</p>
         </div>
       </div>
 
       <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-stretch">
-        <div className="flex flex-1 items-stretch overflow-hidden rounded-xl border border-white/10 bg-[var(--bg-soft)] transition-colors focus-within:border-[var(--brand-bright)] focus-within:ring-1 focus-within:ring-[var(--brand-bright)]">
-          <div className="relative flex items-center border-r border-white/10">
+        <div className="flex flex-1 items-stretch overflow-hidden rounded-md border border-[var(--border)] bg-[var(--bg-soft)] transition-colors focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]">
+          <div className="relative flex items-center border-r border-[var(--border)]">
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="h-full cursor-pointer appearance-none bg-transparent py-2.5 pl-3.5 pr-8 text-sm font-medium text-white focus:outline-none"
+              className="h-full cursor-pointer appearance-none bg-transparent py-2.5 pl-3.5 pr-8 text-sm font-medium text-[var(--ink)] focus:outline-none"
               aria-label="Currency"
             >
               {PAY_CURRENCIES.map((c) => (
-                <option key={c} value={c} className="bg-[var(--bg-soft)] text-white">
+                <option key={c} value={c} className="bg-[var(--bg-soft)] text-[var(--ink)]">
                   {c}
                 </option>
               ))}
@@ -164,12 +164,12 @@ function PaymentCard() {
             onChange={(e) => setAmount(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && go()}
             placeholder="Amount"
-            className="w-full min-w-0 bg-transparent px-3.5 text-white placeholder:text-[var(--muted)]/50 focus:outline-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
+            className="w-full min-w-0 bg-transparent px-3.5 text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
           />
         </div>
         <button
           onClick={go}
-          className="group inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[var(--brand-bright)] px-5 py-2.5 text-sm font-medium text-[#0b0d10] transition-colors hover:bg-white"
+          className="group inline-flex shrink-0 items-center justify-center gap-1.5 bg-[var(--accent)] px-5 py-2.5 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
         >
           Pay
           <ArrowUpRight size={15} className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
@@ -182,20 +182,20 @@ function PaymentCard() {
 export default function Contact() {
   const details = [
     {
-      icon: <Mail size={22} className="text-[var(--brand-bright)]" />,
+      icon: <Mail size={22} className="text-[var(--accent)]" />,
       label: 'Email',
       value: profile.email,
       href: `mailto:${profile.email}`,
       valueClass: 'break-all text-sm lg:text-base',
     },
     {
-      icon: <Phone size={22} className="text-[var(--brand-bright)]" />,
+      icon: <Phone size={22} className="text-[var(--accent)]" />,
       label: 'Phone',
       value: profile.phone,
       href: `tel:${profile.phone.replace(/\s+/g, '')}`,
     },
     {
-      icon: <MapPin size={22} className="text-[var(--brand-bright)]" />,
+      icon: <MapPin size={22} className="text-[var(--accent)]" />,
       label: 'Location',
       value: profile.location,
       href: null as string | null,
@@ -203,17 +203,14 @@ export default function Contact() {
   ];
 
   return (
-    <section id="contact" className="relative py-28">
-      <div className="mx-auto max-w-5xl px-6">
-        <div className="reveal mb-14 flex items-center gap-4">
-          <span className="text-sm font-medium text-[var(--brand-bright)]">06</span>
-          <span className="h-px w-12 bg-white/15" />
-          <span className="text-sm uppercase tracking-[0.2em] text-[var(--muted)]">Contact</span>
-        </div>
+    <section id="contact" className="relative px-4 py-24 sm:px-5">
+      <div className="mx-auto max-w-5xl border-t border-[var(--border)] pt-6">
+        <p className="reveal mb-12 text-[13px] uppercase tracking-[0.18em] text-[var(--muted)]">
+          Contact
+        </p>
 
-        <h2 className="reveal max-w-2xl font-display text-4xl font-light leading-tight text-white sm:text-5xl">
-          Let’s build something{' '}
-          <span className="text-[var(--brand-bright)]">that works.</span>
+        <h2 className="reveal max-w-2xl font-display text-4xl font-medium leading-tight text-[var(--ink)] sm:text-5xl">
+          Let’s build something that works.
         </h2>
         <p className="reveal mt-6 max-w-xl text-lg leading-relaxed text-[var(--muted)]">
           Have a role or project in mind? WhatsApp is the quickest way to reach me, and I reply
@@ -224,18 +221,18 @@ export default function Contact() {
           {/* Left: contact details + actions */}
           <div>
         {/* Contact details, front and centre */}
-        <div className="reveal grid gap-4 sm:grid-cols-2">
+        <div className="reveal grid gap-3 sm:grid-cols-2">
           {details.map((d) => {
             const inner = (
               <>
-                <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-[var(--bg-soft)] transition-colors group-hover:border-[var(--brand-bright)]/40">
+                <span className="flex h-12 w-12 items-center justify-center border border-[var(--border)] bg-[var(--bg-soft)] transition-colors group-hover:border-[var(--accent)]">
                   {d.icon}
                 </span>
                 <span className="mt-4 block text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
                   {d.label}
                 </span>
                 <span
-                  className={`mt-1 block break-words font-medium text-white ${
+                  className={`mt-1 block break-words font-medium text-[var(--ink)] ${
                     'valueClass' in d ? d.valueClass : 'text-lg'
                   }`}
                 >
@@ -247,14 +244,14 @@ export default function Contact() {
               <a
                 key={d.label}
                 href={d.href}
-                className="group rounded-2xl border border-white/10 bg-[var(--surface)] p-6 transition-colors hover:border-[var(--brand)]/40"
+                className="group border border-[var(--border)] bg-[var(--surface)] p-6 transition-colors hover:border-[var(--accent)]"
               >
                 {inner}
               </a>
             ) : (
               <div
                 key={d.label}
-                className="group rounded-2xl border border-white/10 bg-[var(--surface)] p-6"
+                className="group border border-[var(--border)] bg-[var(--surface)] p-6"
               >
                 {inner}
               </div>
@@ -267,7 +264,7 @@ export default function Contact() {
           <div className="flex flex-wrap items-center gap-3">
             <a
               href={`mailto:${profile.email}`}
-              className="group inline-flex w-fit items-center gap-2 rounded-full bg-[var(--brand-bright)] px-6 py-3 text-sm font-medium text-[#0b0d10] transition-all hover:bg-white"
+              className="group inline-flex w-fit items-center gap-2 bg-[var(--accent)] px-6 py-3 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
             >
               <Mail size={16} />
               Email me
@@ -282,7 +279,7 @@ export default function Contact() {
                 href={s.href}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-[var(--muted)] transition-colors hover:border-white/40 hover:text-white"
+                className="inline-flex items-center gap-2 border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--ink)]"
               >
                 {socialIcon[s.icon]}
                 {s.label}

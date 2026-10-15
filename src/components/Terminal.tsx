@@ -331,22 +331,19 @@ export default function Terminal() {
   };
 
   return (
-    <section id="terminal" className="relative py-28">
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="reveal mb-14 flex items-center gap-4">
-          <span className="font-mono text-sm font-medium text-[var(--brand-bright)]">&gt;_</span>
-          <span className="h-px w-12 bg-white/15" />
-          <span className="text-sm uppercase tracking-[0.2em] text-[var(--muted)]">Terminal</span>
-        </div>
+    <section id="terminal" className="relative px-4 py-24 sm:px-5">
+      <div className="mx-auto max-w-6xl border-t border-[var(--border)] pt-6">
+        <p className="reveal mb-12 text-[13px] uppercase tracking-[0.18em] text-[var(--muted)]">
+          Terminal
+        </p>
 
-        <h2 className="reveal mb-10 max-w-2xl font-display text-4xl font-light leading-tight text-white sm:text-5xl">
-          Prefer the command line?{' '}
-          <span className="text-[var(--brand-bright)]">Ask me anything.</span>
+        <h2 className="reveal mb-10 max-w-2xl font-display text-4xl font-medium leading-tight text-[var(--ink)] sm:text-5xl">
+          Prefer the command line? Ask me anything.
         </h2>
 
         <div className="reveal mx-auto max-w-3xl">
           <div
-            className="preserve-dark overflow-hidden rounded-2xl border border-white/10 bg-[#0e1117] shadow-2xl"
+            className="preserve-dark overflow-hidden rounded-xl border border-[var(--border)] bg-[#0e1117]"
             style={darkTokens}
           >
             {/* window bar */}
