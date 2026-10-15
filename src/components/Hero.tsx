@@ -1,21 +1,11 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { projects } from '@/data/cv';
 
 /**
- * Contact-sheet hero (direction: "The contact sheet", seed 929611170).
- * A plain text band at one small size, then a wall of the real interfaces
- * Andrew has shipped, grouped into runs by project. Pointing at a run
- * focuses it and dims the rest — the work is the navigation.
+ * Hero — a confident masthead (name set in the site's display face, the
+ * same Fraunces used by the logo) over a band of facts: what Andrew
+ * builds, availability, services, credentials and the ways to reach him.
+ * The work itself lives in the Projects section below.
  */
-
-// One-line descriptions shown when a run is focused.
-const blurb: Record<string, string> = {
-  limkonnect: 'University community platform — React + Firebase, trust-based access, moderated forums.',
-  'bhc-mobile-app': 'Flutter + Laravel mobile app, built at the Botswana Housing Corporation hackathon.',
-  scripts: 'Torn userscripts (BUSTR, FLIPR, MUGSHOT) — rate-limited API tooling, single-key security.',
-  'the-dying-forge': 'Blacksmith crafting & management game, built in Godot 4 with C#.',
-};
 
 const services = [
   'Full-stack web',
@@ -33,16 +23,12 @@ const credentials = [
   '5+ languages shipped to production',
 ];
 
-const sheet = projects.filter((p) => p.images && p.images.length > 0);
-
 export default function Hero() {
-  const [active, setActive] = useState<string | null>(null);
-
   return (
     <section id="top" className="relative px-4 pt-28 pb-16 sm:px-5">
       {/* ── Masthead ──────────────────────────────────────────────── */}
       <div className="mx-auto max-w-[1600px]">
-        <h1 className="font-grotesk text-[clamp(2.75rem,7vw,5.5rem)] font-extrabold leading-[0.95] tracking-[-0.03em] text-[var(--ink)]">
+        <h1 className="font-display text-[clamp(2.75rem,7vw,5.5rem)] font-medium leading-[0.95] tracking-[-0.02em] text-[var(--ink)]">
           Andrew Langeveldt
         </h1>
         <p className="mt-4 max-w-[46ch] text-[clamp(1.125rem,2vw,1.5rem)] font-medium leading-snug text-[var(--muted)]">
@@ -113,53 +99,6 @@ export default function Hero() {
           >
             Get in touch
           </a>
-        </div>
-      </div>
-
-      {/* ── The sheet ─────────────────────────────────────────────── */}
-      <div className="mx-auto mt-12 max-w-[1600px] text-[13px]">
-        <div className="mb-3 flex items-baseline justify-between">
-          <p className="text-[var(--muted)]">Selected work — {sheet.length} projects, {sheet.reduce((n, p) => n + (p.images?.length ?? 0), 0)} frames</p>
-          <p className="h-4 text-[var(--ink)] transition-opacity">
-            {active ? blurb[active] : <span className="text-[var(--muted)]">Point at a project to read what it is.</span>}
-          </p>
-        </div>
-
-        <div className="space-y-6">
-          {sheet.map((p) => {
-            const slug = p.slug!;
-            const dim = active && active !== slug;
-            return (
-              <div
-                key={slug}
-                onMouseEnter={() => setActive(slug)}
-                onMouseLeave={() => setActive(null)}
-                className={`transition-opacity duration-200 ${dim ? 'opacity-30' : 'opacity-100'}`}
-              >
-                <p className="mb-1.5 font-medium text-[var(--ink)]">
-                  {p.name} <span className="text-[var(--muted)]">· {p.year}</span>
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {p.images!.map((src, i) => (
-                    <a
-                      key={src}
-                      href={p.link && p.link !== '#' ? p.link : undefined}
-                      target={p.link && p.link !== '#' ? '_blank' : undefined}
-                      rel="noreferrer"
-                      className="block h-[132px] overflow-hidden bg-[var(--surface)]"
-                    >
-                      <img
-                        src={src}
-                        alt={`${p.name} screenshot ${i + 1}`}
-                        loading="lazy"
-                        className="h-[132px] w-auto max-w-none object-cover"
-                      />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
     </section>
