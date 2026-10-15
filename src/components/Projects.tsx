@@ -39,7 +39,7 @@ const categoryIcon: Record<string, React.ReactNode> = {
 };
 
 const fieldLabel = 'font-mono text-[11px] uppercase tracking-[0.15em] text-[var(--muted)]';
-const STEPS_PREVIEW = 3;
+const STEPS_PREVIEW = 2;
 
 // Issue / Steps taken / Resolution blocks of a project "ticket".
 function TicketFields({ ticket, isOwner }: { ticket: Ticket; isOwner: boolean }) {
@@ -50,9 +50,9 @@ function TicketFields({ ticket, isOwner }: { ticket: Ticket; isOwner: boolean })
   return (
     <>
       {ticket.issue ? (
-        <div className="mt-4">
+        <div className="mt-3">
           <p className={fieldLabel}>Issue</p>
-          <p className="mt-1.5 text-sm text-[var(--muted)]">{ticket.issue}</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">{ticket.issue}</p>
         </div>
       ) : (
         isOwner && (
@@ -67,9 +67,9 @@ function TicketFields({ ticket, isOwner }: { ticket: Ticket; isOwner: boolean })
       )}
 
       {ticket.steps.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-3">
           <p className={fieldLabel}>Steps taken</p>
-          <ol className="mt-1.5 space-y-1.5">
+          <ol className="mt-1 space-y-1">
             {steps.map((s, i) => (
               <li key={s} className="flex gap-2 text-xs text-[var(--muted)]">
                 <span className="w-4 shrink-0 font-mono text-[var(--accent)]">{i + 1}.</span>
@@ -91,9 +91,9 @@ function TicketFields({ ticket, isOwner }: { ticket: Ticket; isOwner: boolean })
         </div>
       )}
 
-      <div className="mt-4">
+      <div className="mt-3">
         <p className={fieldLabel}>Resolution</p>
-        <p className="mt-1.5 text-sm text-[var(--muted)]">{ticket.resolution}</p>
+        <p className="mt-1 text-sm text-[var(--muted)]">{ticket.resolution}</p>
       </div>
     </>
   );
@@ -201,7 +201,7 @@ export default function Projects() {
                     <button
                       type="button"
                       onClick={() => setSelected(p)}
-                      className="relative aspect-video overflow-hidden border-b border-[var(--border)] bg-black/20 text-left"
+                      className="relative aspect-[2/1] overflow-hidden border-b border-[var(--border)] bg-black/20 text-left"
                       aria-label={`Open ${p.name} gallery`}
                     >
                       <img
@@ -226,7 +226,7 @@ export default function Projects() {
                     <button
                       type="button"
                       onClick={() => navigate(p.route!)}
-                      className="relative flex aspect-video items-center justify-center overflow-hidden border-b border-[var(--border)] bg-[var(--bg)] text-left"
+                      className="relative flex aspect-[2/1] items-center justify-center overflow-hidden border-b border-[var(--border)] bg-[var(--bg)] text-left"
                       aria-label={`Open ${p.name} demo`}
                     >
                       {p.wordmark ? (
@@ -251,7 +251,7 @@ export default function Projects() {
                     </button>
                   )}
 
-                  <div className="flex flex-1 flex-col p-5">
+                  <div className="flex flex-1 flex-col p-4">
                     <div className="flex items-center justify-between gap-3 font-mono text-xs">
                       <span className="text-[var(--muted)]">#{ticket.id}</span>
                       <span
@@ -266,7 +266,7 @@ export default function Projects() {
                       </span>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between">
+                    <div className="mt-3 flex items-center justify-between">
                       <span className="inline-flex items-center gap-2 border border-[var(--border)] bg-[var(--bg)] px-3 py-1 text-xs text-[var(--accent)]">
                         {categoryIcon[p.category]}
                         {p.category}
@@ -274,11 +274,11 @@ export default function Projects() {
                       <span className="text-xs text-[var(--muted)]">{p.year}</span>
                     </div>
 
-                    <h3 className="mt-3 font-display text-lg text-[var(--ink)]">{p.name}</h3>
+                    <h3 className="mt-2.5 font-display text-base text-[var(--ink)]">{p.name}</h3>
 
                     <TicketFields ticket={ticket} isOwner={Boolean(user)} />
 
-                    <p className={`${fieldLabel} mt-auto pt-4`}>Stack</p>
+                    <p className={`${fieldLabel} mt-auto pt-3`}>Stack</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {ticket.stack.map((t) => (
                         <span
