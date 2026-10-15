@@ -135,7 +135,7 @@ export default function Projects() {
 
   return (
     <section id="work" className="relative px-4 py-24 sm:px-5">
-      <div className="mx-auto max-w-[1600px] border-t border-[var(--border)] pt-6">
+      <div className="mx-auto max-w-6xl border-t border-[var(--border)] pt-6">
         <p className="reveal mb-12 text-[13px] uppercase tracking-[0.18em] text-[var(--muted)]">
           Projects &amp; Practical Experience
         </p>
@@ -175,7 +175,7 @@ export default function Projects() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((p, index) => {
             const imgs = p.images ?? [];
             const hasGallery = imgs.length > 0;
