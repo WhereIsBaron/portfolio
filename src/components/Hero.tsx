@@ -39,13 +39,23 @@ export default function Hero() {
   const [active, setActive] = useState<string | null>(null);
 
   return (
-    <section id="top" className="relative px-4 pt-24 pb-16 sm:px-5">
-      {/* ── Text band ─────────────────────────────────────────────── */}
-      <div className="mx-auto grid max-w-[1600px] grid-cols-2 gap-x-6 gap-y-8 border-t border-[var(--border)] pt-6 text-[15px] leading-snug sm:grid-cols-4 lg:grid-cols-12">
+    <section id="top" className="relative px-4 pt-28 pb-16 sm:px-5">
+      {/* ── Masthead ──────────────────────────────────────────────── */}
+      <div className="mx-auto max-w-[1600px]">
+        <h1 className="font-grotesk text-[clamp(2.75rem,7vw,5.5rem)] font-extrabold leading-[0.95] tracking-[-0.03em] text-[var(--ink)]">
+          Andrew Langeveldt
+        </h1>
+        <p className="mt-4 max-w-[46ch] text-[clamp(1.125rem,2vw,1.5rem)] font-medium leading-snug text-[var(--muted)]">
+          Junior Software Engineer &amp; Full-Stack Web / Mobile Developer.
+        </p>
+      </div>
+
+      {/* ── Facts band ────────────────────────────────────────────── */}
+      <div className="mx-auto mt-10 grid max-w-[1600px] grid-cols-2 gap-x-6 gap-y-8 border-t border-[var(--border)] pt-6 text-[15px] leading-snug sm:grid-cols-4 lg:grid-cols-12">
         <div className="col-span-2 lg:col-span-3">
-          <p className="font-bold text-[var(--ink)]">Andrew Langeveldt</p>
-          <p className="mt-1 max-w-[22ch] text-[var(--muted)]">
-            Junior software engineer &amp; full-stack web / mobile developer.
+          <p className="font-bold text-[var(--ink)]">What I build</p>
+          <p className="mt-1 max-w-[24ch] text-[var(--muted)]">
+            Production web &amp; mobile apps, end to end — shipped, not prototyped.
           </p>
         </div>
 
