@@ -73,7 +73,7 @@ export default function OwnerBar() {
       {status && (
         <div
           className={`fixed top-24 right-4 z-[80] flex items-center gap-2 rounded-lg px-4 py-2 text-sm text-white shadow-lg ${
-            isError ? 'bg-red-600' : 'bg-[var(--brand)]'
+            isError ? 'bg-red-600' : 'bg-[var(--accent)]'
           }`}
         >
           {isError ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
@@ -83,8 +83,8 @@ export default function OwnerBar() {
 
       <div className="fixed bottom-4 right-4 z-[80]">
         {user ? (
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-[var(--surface)] py-1.5 pl-3 pr-2 shadow-lg">
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--brand-bright)]">
+          <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-3 pr-2 shadow-lg">
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--accent)]">
               <Pencil size={14} /> Edit mode
             </span>
             <span className="hidden max-w-[160px] truncate text-xs text-[var(--muted)] sm:inline">
@@ -94,7 +94,7 @@ export default function OwnerBar() {
             <VisitorInsights />
             <button
               onClick={() => signOut()}
-              className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-sm text-[var(--muted)] transition-colors hover:bg-white/10 hover:text-white"
+              className="inline-flex items-center gap-1 rounded-full bg-[var(--bg)] px-2.5 py-1 text-sm text-[var(--muted)] transition-colors hover:text-[var(--ink)]"
             >
               <LogOut size={14} /> Log out
             </button>
@@ -102,7 +102,7 @@ export default function OwnerBar() {
         ) : (
           <button
             onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted)] shadow-lg transition-all hover:text-white"
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted)] shadow-lg transition-all hover:text-[var(--ink)]"
             title="Owner login"
             aria-label="Owner login"
           >
@@ -118,16 +118,16 @@ export default function OwnerBar() {
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl border border-white/10 bg-[var(--surface)] p-6 shadow-2xl"
+            className="w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-1 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 font-display text-lg text-white">
+              <h2 className="flex items-center gap-2 font-display text-lg text-[var(--ink)]">
                 <Lock size={18} /> Owner login
               </h2>
               <button
                 onClick={() => setOpen(false)}
-                className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-white/5 hover:text-white"
+                className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
                 aria-label="Close"
               >
                 <X size={18} />
@@ -142,7 +142,7 @@ export default function OwnerBar() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-white focus:border-[var(--brand-bright)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-bright)]"
+                  className="w-full rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
                 />
               </div>
               <div>
@@ -153,12 +153,12 @@ export default function OwnerBar() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-white focus:border-[var(--brand-bright)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-bright)]"
+                  className="w-full rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
                 />
               </div>
 
               {locked ? (
-                <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700">
                   <ShieldAlert size={16} className="mt-0.5 shrink-0" />
                   <span>
                     Too many failed attempts. Try again in{' '}
@@ -167,7 +167,7 @@ export default function OwnerBar() {
                 </div>
               ) : (
                 error && (
-                  <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                  <div className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-600">
                     <AlertCircle size={16} className="mt-0.5 shrink-0" />
                     {error}
                   </div>
@@ -177,7 +177,7 @@ export default function OwnerBar() {
               <button
                 type="submit"
                 disabled={busy || locked}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-bright)] py-2.5 font-medium text-[#0b0d10] transition-colors hover:bg-white disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[var(--accent)] py-2.5 font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90 disabled:opacity-60"
               >
                 {busy ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
                 {busy ? 'Signing in...' : locked ? 'Locked' : 'Sign in'}

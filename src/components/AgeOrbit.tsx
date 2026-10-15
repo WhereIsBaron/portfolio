@@ -169,7 +169,7 @@ export default function AgeOrbit() {
   }, [reduced]);
 
   return (
-    <div className="reveal mt-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[var(--surface)] to-transparent p-6">
+    <div className="reveal mt-4 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6">
       <p className="text-sm text-[var(--muted)]">Age, live</p>
 
       <div className="mt-4 flex justify-center">
@@ -327,7 +327,7 @@ export default function AgeOrbit() {
         <span className="text-sm text-[var(--muted)] sm:text-base"> mo </span>
         <span ref={dyRef}>{init.day}</span>
         <span className="text-sm text-[var(--muted)] sm:text-base"> d </span>
-        <span ref={clockRef} className="text-[var(--brand-bright)]">
+        <span ref={clockRef} className="text-[var(--accent)]">
           {pad(init.hh)}:{pad(init.mm)}:{pad(init.ss)}
         </span>
       </p>

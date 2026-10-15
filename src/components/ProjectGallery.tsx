@@ -70,11 +70,11 @@ export default function ProjectGallery({ project, onClose }: Props) {
         className="flex min-h-full items-start justify-center p-4 sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="my-4 w-full max-w-6xl rounded-3xl border border-white/10 bg-[var(--surface)] shadow-2xl">
+        <div className="my-4 w-full max-w-6xl rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl">
           {/* Header */}
-          <div className="sticky top-0 z-10 flex items-center justify-between gap-4 rounded-t-3xl border-b border-white/10 bg-[var(--surface)] p-5">
+          <div className="sticky top-0 z-10 flex items-center justify-between gap-4 rounded-t-3xl border-b border-[var(--border)] bg-[var(--surface)] p-5">
             <div className="min-w-0">
-              <h2 className="truncate font-display text-xl text-white">{project.name}</h2>
+              <h2 className="truncate font-display text-xl text-[var(--ink)]">{project.name}</h2>
               <p className="text-sm text-[var(--muted)]">
                 {items.length} {items.length === 1 ? 'image' : 'images'}
                 {canEdit ? ' • drag to re-arrange' : ''}
@@ -82,7 +82,7 @@ export default function ProjectGallery({ project, onClose }: Props) {
             </div>
             <button
               onClick={onClose}
-              className="shrink-0 rounded-lg p-2 text-[var(--muted)] transition-colors hover:bg-white/5 hover:text-white"
+              className="shrink-0 rounded-lg p-2 text-[var(--muted)] transition-colors hover:bg-[var(--bg)] hover:text-[var(--ink)]"
               aria-label="Close gallery"
             >
               <X size={22} />
@@ -90,7 +90,7 @@ export default function ProjectGallery({ project, onClose }: Props) {
           </div>
 
           {canEdit && (
-            <div className="mx-5 mt-4 flex items-center gap-2 rounded-lg border border-[var(--brand)]/30 bg-[var(--brand)]/10 px-3 py-2 text-sm text-[var(--brand-bright)]">
+            <div className="mx-5 mt-4 flex items-center gap-2 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-2 text-sm text-[var(--accent)]">
               <GripVertical size={16} />
               Edit mode: drag any image to reorder. Your order is saved for everyone.
             </div>
@@ -114,7 +114,7 @@ export default function ProjectGallery({ project, onClose }: Props) {
                   if (didDrag.current) return;
                   setLightbox(index);
                 }}
-                className={`group relative aspect-[4/3] overflow-hidden rounded-lg border border-white/10 bg-black/30 focus:outline-none focus:ring-2 focus:ring-[var(--brand-bright)] ${
+                className={`group relative aspect-[4/3] overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${
                   canEdit ? 'cursor-move' : 'cursor-zoom-in'
                 }`}
                 title={canEdit ? 'Drag to reorder, click to view' : 'Click to view'}
