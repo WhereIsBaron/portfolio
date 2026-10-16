@@ -11,7 +11,6 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import Footer from '@/components/Footer';
 import {
   FamilyPerson, FamilyRelationship, FamilyPhoto, FamilySubmission,
   buildLayout, computeGenerations, getRelationshipLabel, generationLabel,
@@ -216,35 +215,82 @@ function Connectors({
   const nodeById = new Map<string, { id: string; x: number; y: number }>(nodes.map(n => [n.id, n]));
   const lines: JSX.Element[] = [];
 
-  const drawn = new Set<string>();
+  // child → set of its parents, and child → its parent-link status (for styling)
+  const parentsOf = new Map<string, Set<string>>();
+  const childStatus = new Map<string, string | null>();
   for (const r of rels) {
-    if (r.relationship_type !== 'parent' && r.relationship_type !== 'child') continue;
-    const parentId = r.relationship_type === 'parent' ? r.person_a_id : r.person_b_id;
-    const childId  = r.relationship_type === 'parent' ? r.person_b_id : r.person_a_id;
-    const key = `${parentId}-${childId}`;
-    if (drawn.has(key)) continue;
-    drawn.add(key);
+    if (r.relationship_type === 'parent') {
+      if (!parentsOf.has(r.person_b_id)) parentsOf.set(r.person_b_id, new Set());
+      parentsOf.get(r.person_b_id)!.add(r.person_a_id);
+      if (!childStatus.has(r.person_b_id)) childStatus.set(r.person_b_id, r.status);
+    } else if (r.relationship_type === 'child') {
+      if (!parentsOf.has(r.person_a_id)) parentsOf.set(r.person_a_id, new Set());
+      parentsOf.get(r.person_a_id)!.add(r.person_b_id);
+      if (!childStatus.has(r.person_a_id)) childStatus.set(r.person_a_id, r.status);
+    }
+  }
 
-    const p = nodeById.get(parentId);
-    const c = nodeById.get(childId);
-    if (!p || !c) continue;
+  // spouse couples present, so co-parents share a single junction to their kids
+  const coupleKeys = new Set<string>();
+  for (const r of rels) {
+    if (r.relationship_type === 'spouse') coupleKeys.add([r.person_a_id, r.person_b_id].sort().join('-'));
+  }
 
-    const x1 = p.x + NODE_W / 2;
-    const y1 = p.y + NODE_H;
-    const x2 = c.x + NODE_W / 2;
-    const y2 = c.y;
-    const my = (y1 + y2) / 2;
-    const st = childLinkStyle(r.status);
+  // group children by the set of their parents present in the layout
+  const groups = new Map<string, { parents: string[]; children: string[] }>();
+  for (const [childId, pset] of parentsOf) {
+    if (!nodeById.has(childId)) continue;
+    const present = [...pset].filter(pid => nodeById.has(pid)).sort();
+    if (present.length === 0) continue;
+    const gkey = present.join('-');
+    if (!groups.has(gkey)) groups.set(gkey, { parents: present, children: [] });
+    groups.get(gkey)!.children.push(childId);
+  }
+
+  // draw each nuclear family as: parent couple → drop → bar → down to each child
+  for (const { parents, children } of groups.values()) {
+    const pNodes = parents.map(id => nodeById.get(id)!).filter(Boolean);
+    const cNodes = children.map(id => nodeById.get(id)!).filter(Boolean);
+    if (pNodes.length === 0 || cNodes.length === 0) continue;
+
+    const multi = pNodes.length >= 2;
+    const married = multi && coupleKeys.has(parents.slice(0, 2).sort().join('-'));
+    const originX = multi
+      ? pNodes.reduce((s, n) => s + n.x + NODE_W / 2, 0) / pNodes.length
+      : pNodes[0].x + NODE_W / 2;
+    const originY = married
+      ? pNodes[0].y + NODE_H / 2                       // on the marriage line
+      : Math.max(...pNodes.map(n => n.y)) + NODE_H;    // below the parent card
+
+    const railY = Math.min(...cNodes.map(n => n.y)) - 22;
+    const centers = cNodes.map(n => n.x + NODE_W / 2);
+
+    // vertical drop from the couple down to the sibling rail
     lines.push(
-      <path
-        key={key}
-        d={`M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`}
-        fill="none"
-        stroke={st.stroke}
-        strokeWidth={st.width}
-        strokeDasharray={st.dash}
-      />
+      <path key={`drop-${parents.join('_')}`}
+        d={`M${originX},${originY} L${originX},${railY}`}
+        fill="none" stroke={LINK_INK} strokeWidth={1.5} />
     );
+    // horizontal rail spanning the children and the drop point
+    const barLeft = Math.min(originX, ...centers);
+    const barRight = Math.max(originX, ...centers);
+    if (barRight - barLeft > 1) {
+      lines.push(
+        <line key={`rail-${parents.join('_')}`}
+          x1={barLeft} y1={railY} x2={barRight} y2={railY}
+          stroke={LINK_INK} strokeWidth={1.5} />
+      );
+    }
+    // down from the rail to each child, styled by that child's link kind
+    for (const c of cNodes) {
+      const cx = c.x + NODE_W / 2;
+      const st = childLinkStyle(childStatus.get(c.id) ?? null);
+      lines.push(
+        <path key={`cdrop-${c.id}`}
+          d={`M${cx},${railY} L${cx},${c.y}`}
+          fill="none" stroke={st.stroke} strokeWidth={st.width} strokeDasharray={st.dash} />
+      );
+    }
   }
 
   // union lines (horizontal)
@@ -273,6 +319,40 @@ function Connectors({
     );
   }
 
+  // sibling ties — only when the pair shares no parent that's drawn above them,
+  // so siblings who are already joined through a common parent don't get a
+  // redundant line, while siblings linked directly (no parent in the tree) still
+  // show the relationship. Routed as a bracket above the row to avoid crossing boxes.
+  const drawnSib = new Set<string>();
+  for (const r of rels) {
+    if (r.relationship_type !== 'sibling') continue;
+    const key = [r.person_a_id, r.person_b_id].sort().join('-');
+    if (drawnSib.has(key)) continue;
+    drawnSib.add(key);
+    const a = nodeById.get(r.person_a_id);
+    const b = nodeById.get(r.person_b_id);
+    if (!a || !b) continue;
+    // skip if they share a parent that is present in the layout (already joined)
+    const pa = parentsOf.get(r.person_a_id) ?? new Set<string>();
+    const pb = parentsOf.get(r.person_b_id) ?? new Set<string>();
+    let shared = false;
+    for (const p of pa) if (pb.has(p) && nodeById.has(p)) { shared = true; break; }
+    if (shared) continue;
+    const ax = a.x + NODE_W / 2;
+    const bx = b.x + NODE_W / 2;
+    const rail = Math.min(a.y, b.y) - 16;
+    lines.push(
+      <path
+        key={`sib-${key}`}
+        d={`M${ax},${a.y} L${ax},${rail} L${bx},${rail} L${bx},${b.y}`}
+        fill="none"
+        stroke={LINK_INK}
+        strokeWidth={1.25}
+        strokeDasharray="2,4"
+      />
+    );
+  }
+
   return <>{lines}</>;
 }
 
@@ -284,6 +364,10 @@ function FamilyHighlights({
   nodeById: Map<string, { x: number; y: number }>;
 }) {
   const PAD = 16;
+  // The visible card is taller than NODE_H (icon + name + location row ≈ 114px),
+  // so bound the panel to the real card height, not the layout slot, or cards
+  // poke out the bottom of their family panel.
+  const CARD_H = 116;
   return (
     <>
       {families.map(fam => {
@@ -292,7 +376,7 @@ function FamilyHighlights({
         const minX = Math.min(...pts.map(p => p.x)) - PAD;
         const minY = Math.min(...pts.map(p => p.y)) - PAD;
         const maxX = Math.max(...pts.map(p => p.x)) + NODE_W + PAD;
-        const maxY = Math.max(...pts.map(p => p.y)) + NODE_H + PAD;
+        const maxY = Math.max(...pts.map(p => p.y)) + CARD_H + PAD;
         return (
           <div
             key={fam.id}
@@ -664,15 +748,15 @@ function RelPanel({
         </button>
       </div>
 
-      <div className="space-y-2 max-h-60 overflow-y-auto">
+      <div className="space-y-2">
         {rels.map(r => (
-          <div key={r.id} className="flex items-center justify-between rounded-xl border border-[var(--border)]bg-[var(--bg-soft)] px-3 py-2 text-xs text-[var(--muted)]">
+          <div key={r.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-xs text-[var(--muted)]">
             <span>
               <span className="text-[var(--ink)] font-medium">{nameOf(r.person_a_id)}</span>
               {' '}is {r.relationship_type === 'spouse' ? statusLabel('spouse', r.status) : r.relationship_type} of{' '}
               <span className="text-[var(--ink)] font-medium">{nameOf(r.person_b_id)}</span>
               {(r.relationship_type === 'parent' || r.relationship_type === 'child') && r.status && r.status !== 'biological' && (
-                <span className="ml-1 rounded bg-[var(--bg-soft)]px-1.5 py-0.5 text-[10px] text-white/60">{statusLabel(r.relationship_type, r.status)}</span>
+                <span className="ml-1 rounded bg-[var(--bg-soft)] px-1.5 py-0.5 text-[10px] text-white/60">{statusLabel(r.relationship_type, r.status)}</span>
               )}
             </span>
             <button className={btn('danger')} onClick={() => onDelete(r.id)}><Trash2 size={12} /></button>
@@ -990,6 +1074,7 @@ export default function FamilyTreePage() {
   const [scale, setScale] = useState(1);
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
+  const editFormRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // ── Load data ───────────────────────────────────────────────────────────────
@@ -1023,6 +1108,34 @@ export default function FamilyTreePage() {
   const families = computeFamilies(people, rels);
   const nodePosById = new Map(nodes.map(n => [n.person.id, { x: n.x, y: n.y }]));
   const genMap = computeGenerations(people, rels);
+
+  // ── Initial view: centre horizontally on the grandparent generation ──────────
+  // The top generation that still has descendants = the ancestral grandparents
+  // (childless top-row people like an unlinked in-law don't skew the centre).
+  const centeredRef = useRef(false);
+  useEffect(() => {
+    if (centeredRef.current || nodes.length === 0) return;
+    const el = canvasRef.current;
+    const cw = el?.clientWidth ?? 0;
+    if (!cw) return;
+    const minGen = Math.min(...nodes.map(n => n.generation));
+    const parentIds = new Set<string>();
+    for (const r of rels) {
+      if (r.relationship_type === 'parent') parentIds.add(r.person_a_id);
+      else if (r.relationship_type === 'child') parentIds.add(r.person_b_id);
+    }
+    let anchors = nodes.filter(n => n.generation === minGen && parentIds.has(n.person.id));
+    if (anchors.length === 0) anchors = nodes.filter(n => n.generation === minGen);
+    const cx = anchors.reduce((s, n) => s + n.x + NODE_W / 2, 0) / anchors.length;
+    setOffset({ x: cw / 2 - cx, y: 40 });
+    centeredRef.current = true;
+  }, [nodes, rels]);
+
+  // The edit form opens at the top of the People panel; when you edit someone far
+  // down the list, scroll it into view so it doesn't look like nothing happened.
+  useEffect(() => {
+    if (editingPerson) editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [editingPerson]);
 
   // ── Admin CRUD ──────────────────────────────────────────────────────────────
   const savePerson = async (data: Omit<FamilyPerson, 'id' | 'created_at'>) => {
@@ -1383,7 +1496,7 @@ export default function FamilyTreePage() {
                   </div>
 
                   {editingPerson && (
-                    <div className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                    <div ref={editFormRef} className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 scroll-mt-4">
                       <h2 className="text-sm font-semibold mb-4">{editingPerson === 'new' ? 'New Person' : `Edit: ${editingPerson.name}`}</h2>
                       <PersonForm
                         key={editingPerson === 'new' ? 'new' : (editingPerson as FamilyPerson).id}
@@ -1479,7 +1592,6 @@ export default function FamilyTreePage() {
         />
       )}
 
-      <Footer />
     </div>
   );
 }
