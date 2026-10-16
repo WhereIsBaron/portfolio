@@ -7,6 +7,7 @@ import PayPage from '@/pages/PayPage';
 import PayReturn from '@/pages/PayReturn';
 import ProductionPage from '@/pages/ProductionPage';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import CvPage from '@/pages/CvPage';
 import TimetablePage from '@/pages/TimetablePage';
 import FamilyTreePage from '@/pages/FamilyTreePage';
 import NotFound from '@/pages/NotFound';
@@ -31,6 +32,7 @@ function App() {
             <Route path="/pay/return" element={<PayReturn />} />
             <Route path="/production" element={<ProductionPage />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/cv" element={<CvPage />} />
             <Route path="/timetable" element={<TimetablePage />} />
             <Route path="/family-tree" element={<FamilyTreePage />} />
             <Route path="*" element={<NotFound />} />

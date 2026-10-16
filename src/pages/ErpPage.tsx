@@ -5,14 +5,14 @@ import {
   ArrowLeft, LayoutDashboard, Wallet, Boxes, ShoppingCart, Truck, Factory,
   UsersRound, FolderKanban, Landmark, BarChart3, Settings as SettingsIcon,
   Search, ChevronRight, Menu, Database, AlertTriangle, TrendingUp, TrendingDown,
-  Package, DollarSign, ClipboardList, Building2, FileText, PackagePlus,
+  Package, DollarSign, ClipboardList, FileText, PackagePlus,
 } from 'lucide-react';
 import {
   fetchErpData, money, avatarFor, orderTotal, accountBalances,
   WAREHOUSES, DEPARTMENTS, SO_FLOW, PO_FLOW, VAT_RATE, opCostPerUnit,
   type ErpData, type SalesOrder, type PurchaseOrder,
   type SOStatus, type POStatus, type WOStatus, type AcctType,
-  type Quotation, type MaterialRequest, type QuoteStatus,
+  type QuoteStatus,
   type GLEntry, type GLLine, type StockEntry, type DocStamp, type OrderLine,
   type SalarySlip, type PayrollRun,
 } from '@/data/erpSeed';

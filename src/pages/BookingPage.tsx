@@ -15,12 +15,13 @@ import {
   BellRing,
   CreditCard,
   LayoutDashboard,
+  type LucideIcon,
 } from 'lucide-react';
 import { verticals, type Vertical, type Resource } from '@/data/booking';
 import Footer from '@/components/Footer';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
-const ICONS: Record<Vertical['icon'], React.ComponentType<{ size?: number; className?: string }>> = {
+const ICONS: Record<Vertical['icon'], LucideIcon> = {
   hotel: BedDouble,
   consultant: Briefcase,
   photography: Camera,

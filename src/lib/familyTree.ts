@@ -13,6 +13,8 @@ export interface FamilyPerson {
   hobbies: string[];
   bio: string | null;
   is_root: boolean;
+  pos_x: number | null; // manual (admin-dragged) position; null = auto-layout
+  pos_y: number | null;
   created_at: string;
 }
 
@@ -264,8 +266,8 @@ export interface TreeNode {
 
 export const NODE_W = 160;
 export const NODE_H = 80;
-export const GEN_GAP = 140;
-const NODE_GAP = 24; // horizontal gap between nodes in the same row
+export const GEN_GAP = 170; // vertical gap between generation rows
+const NODE_GAP = 44; // horizontal gap between nodes in the same row
 
 export function buildLayout(
   people: FamilyPerson[],
@@ -376,15 +378,21 @@ export function buildLayout(
 
   // Normalise so the leftmost node sits at x = 0
   const shift = -Math.min(...xMap.values());
-  const nodes: TreeNode[] = people.map(p => ({
-    person: p,
-    generation: genMap.get(p.id) ?? 0,
-    x: (xMap.get(p.id) ?? 0) + shift,
-    y: ((genMap.get(p.id) ?? 0) - minGen) * (NODE_H + GEN_GAP),
-  }));
+  const nodes: TreeNode[] = people.map(p => {
+    const autoX = (xMap.get(p.id) ?? 0) + shift;
+    const autoY = ((genMap.get(p.id) ?? 0) - minGen) * (NODE_H + GEN_GAP);
+    // A person the admin has dragged keeps their saved spot; everyone else
+    // follows the auto-layout above.
+    return {
+      person: p,
+      generation: genMap.get(p.id) ?? 0,
+      x: p.pos_x != null ? p.pos_x : autoX,
+      y: p.pos_y != null ? p.pos_y : autoY,
+    };
+  });
 
   const width = Math.max(...nodes.map(n => n.x)) + NODE_W;
-  const height = (maxGen - minGen + 1) * (NODE_H + GEN_GAP);
+  const height = Math.max(...nodes.map(n => n.y)) + NODE_H;
   return { nodes, width, height };
 }
 

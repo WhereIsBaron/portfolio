@@ -84,8 +84,11 @@ async function postXml(xml: string): Promise<{ ok: boolean; body: string; status
   }
 }
 
+// Untrusted JSON body; every field is coerced (Number/String) before use.
+type Payload = Record<string, unknown>;
+
 // ---- createToken ----
-async function handleCreate(req: Request, payload: any, companyToken: string): Promise<Response> {
+async function handleCreate(req: Request, payload: Payload, companyToken: string): Promise<Response> {
   const serviceType = process.env.DPO_SERVICE_TYPE;
   if (!serviceType) {
     return jsonResponse(500, { error: 'Payment service is not fully configured (missing service type).' });
@@ -170,7 +173,7 @@ async function handleCreate(req: Request, payload: any, companyToken: string): P
 }
 
 // ---- verifyToken ----
-async function handleVerify(_req: Request, payload: any, companyToken: string): Promise<Response> {
+async function handleVerify(_req: Request, payload: Payload, companyToken: string): Promise<Response> {
   const token = String(payload.token || '').trim();
   // DPO transaction tokens are GUIDs; reject anything that isn't one.
   if (!/^[0-9a-fA-F-]{20,60}$/.test(token)) {
@@ -210,7 +213,7 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse(500, { error: 'Payments are not configured.' });
   }
 
-  let payload: any;
+  let payload: Payload;
   try {
     payload = await req.json();
   } catch {

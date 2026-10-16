@@ -46,7 +46,66 @@
   }
 }
 
+/* ── Contact-sheet homepage theme ("Stone and blueprint") ───────────
+   Scoped to the public homepage via the .paper wrapper so the demo
+   apps (/crm, /erp, …) keep their own dark theme. Remaps the shared
+   tokens the Navbar/Footer read, so they adapt automatically, and
+   ships both a light and a dark palette driven by the theme toggle
+   (data-theme on <html>).
+   ──────────────────────────────────────────────────────────────── */
+.paper {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: 'Schibsted Grotesk', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* Light — "Stone": warm paper ground, blueprint-blue accent. Also the
+   fallback when no data-theme is set. */
+.paper,
+html[data-theme="light"] .paper {
+  --bg: #dfdedb;
+  --bg-soft: #d8d7d3;
+  --surface: #d3d2ce;
+  --border: #c4c3bd;
+  --text: #26251e;
+  --ink: #26251e;
+  --muted: #5f5d55;
+  --brand: #2456d6;
+  --brand-bright: #2456d6;
+  --accent: #2456d6;
+  --accent-ink: #ffffff;
+}
+
+/* Dark — "Slate": warm charcoal ground, the accent lifted for contrast. */
+html[data-theme="dark"] .paper {
+  --bg: #16161a;
+  --bg-soft: #1c1c21;
+  --surface: #222228;
+  --border: #33333c;
+  --text: #ebeae5;
+  --ink: #f5f4ef;
+  --muted: #9b9a93;
+  --brand: #6f90f5;
+  --brand-bright: #87a2f7;
+  --accent: #6f90f5;
+  --accent-ink: #14141a;
+}
+
+.paper ::selection {
+  background: rgba(111, 144, 245, 0.26);
+  color: var(--ink);
+}
+html[data-theme="light"] .paper ::selection {
+  background: rgba(36, 86, 214, 0.22);
+  color: var(--ink);
+}
+
 @layer utilities {
+  .font-grotesk {
+    font-family: 'Schibsted Grotesk', system-ui, sans-serif;
+  }
+
   .font-display {
     font-family: 'Fraunces', 'Times New Roman', serif;
     font-feature-settings: 'ss01';
@@ -127,12 +186,6 @@ html[data-theme="light"] .preserve-dark .text-white { color: #e7ecef; }
 html[data-theme="light"] .preserve-dark [class*="border-white"] { border-color: rgba(255,255,255,0.08); }
 html[data-theme="light"] .preserve-dark [class*="bg-white\/"] { background-color: rgba(255,255,255,0.05); }
 
-/* CookieBanner hardcoded dark bg */
-html[data-theme="light"] .cookie-bg {
-  background-color: color-mix(in srgb, var(--bg) 97%, transparent);
-  border-color: var(--border);
-}
-
 /* Mount animation for the chat greeting bubble. */
 @keyframes fadeInUp {
   from {
@@ -155,4 +208,25 @@ html[data-theme="light"] .cookie-bg {
     opacity: 1;
     transform: translateX(0);
   }
+}
+
+/* Project tickets: darker "Resolved" green for contrast on the light surface */
+html[data-theme="light"] .ticket-resolved { color: #047857; }
+
+/* Printable CV (/cv): print only the paper sheet, not the toolbar or global widgets */
+@media print {
+  @page { margin: 12mm; }
+  body:has(.cv-sheet) { background: #fff; }
+  body:has(.cv-sheet) * { visibility: hidden; }
+  body:has(.cv-sheet) .cv-sheet,
+  body:has(.cv-sheet) .cv-sheet * { visibility: visible; }
+  .cv-sheet {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .cv-sheet a { text-decoration: none; }
+  .cv-avoid-break { break-inside: avoid; }
 }

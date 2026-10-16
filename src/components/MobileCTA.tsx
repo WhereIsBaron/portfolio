@@ -26,7 +26,7 @@ export default function MobileCTA() {
     <a
       href="#contact"
       aria-label="Contact me"
-      className={`fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-[var(--brand-bright)] px-4 py-3 text-sm font-semibold text-[#0b0d10] shadow-lg transition-all duration-300 sm:hidden ${
+      className={`fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-[var(--accent-ink)] shadow-lg transition-all duration-300 sm:hidden ${
         visible ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0 pointer-events-none'
       }`}
     >

@@ -3,6 +3,7 @@ import Hero from '@/components/Hero';
 import About from '@/components/About';
 import Skills from '@/components/Skills';
 import Projects from '@/components/Projects';
+import Terminal from '@/components/Terminal';
 import Education from '@/components/Education';
 import References from '@/components/References';
 import Contact from '@/components/Contact';
@@ -17,13 +18,14 @@ export default function Home() {
   useReveal([]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+    <div className="paper min-h-screen bg-[var(--bg)] text-[var(--text)]">
       <Navbar />
       <main>
         <Hero />
         <About />
         <Skills />
         <Projects />
+        <Terminal />
         <Education />
         <References />
         <Contact />

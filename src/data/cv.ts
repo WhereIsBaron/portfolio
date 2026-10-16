@@ -12,7 +12,7 @@ export const profile = {
   license: "Driver's License: Class B",
   availability: 'Available for full-time & freelance work',
   photo: '/andrew.jpg',
-  resumeUrl: '#',
+  resumeUrl: '/cv', // printable CV generated from this file (src/pages/CvPage.tsx)
   socials: [
     { label: 'GitHub', href: 'https://github.com/WhereIsBaron', icon: 'github' as const },
     { label: 'LinkedIn', href: 'https://www.linkedin.com/in/andrew-langeveldt-953789292/', icon: 'linkedin' as const },
@@ -133,6 +133,11 @@ export type Project = {
   images?: string[];
   route?: string; // if set, the card navigates to this in-app route instead of opening a gallery
   wordmark?: string; // if set (with route), the card thumbnail shows the "Andrew.<wordmark>" logo
+  // Support-ticket view (Projects section). Steps taken = highlights, Stack = tags.
+  issue?: string; // the problem the project solved; empty = TODO (shown only in owner edit mode)
+  resolution?: string; // optional; falls back to `description`
+  ticketId?: string; // optional override; defaults to AL-1001, AL-1002… by array position
+  status?: 'Resolved' | 'In progress'; // defaults to 'Resolved'
 };
 
 // Build a gallery path list for screenshots in /public/projects/<slug>/NN.png
@@ -149,6 +154,7 @@ export const projects: Project[] = [
     description:
       'An interactive training simulator for new chemical plant supervisors — covering daily production management, quality control, safety & compliance, team leadership, inventory, and continuous improvement. Built from real manufacturing workflows.',
     year: '2026',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['React', 'TypeScript', 'Operations', 'Manufacturing', 'Training'],
     highlights: [
       '6 in-depth modules covering OEE, PPE, GHS pictograms, Permit to Work, batch release decisions, and Kaizen — with a clickable glossary for every key term.',
@@ -167,6 +173,7 @@ export const projects: Project[] = [
     description:
       'A full community platform for the Limkokwing University community — students, staff, and alumni. A single React + Firebase app with a trust-based access ladder (visitor → pending → alumni → verified student/staff → tutor → publisher → admin), manual ID verification, LinkedIn-style profiles, a conflict-detecting timetable engine, moderated forums, peer tutoring, and a curated newspaper feed. Built end-to-end and code-complete across all six phases.',
     year: '2026 - Present',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['React', 'TypeScript', 'Firebase', 'Firestore', 'Tailwind', 'Netlify'],
     highlights: [
       'Trust-based access control enforced both in-app and in Firestore security rules, with anti-privilege-escalation guards so roles can only be granted by an admin.',
@@ -186,6 +193,7 @@ export const projects: Project[] = [
     description:
       'One booking engine any business can drop in and run: hotels, clinics, consultants, photographers, or anything that takes appointments. Configure the resource types, availability, and fields once, and the same flow adapts to the use case.',
     year: '2026 - Present',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['React', 'TypeScript', 'Config-driven', 'Firebase (next)'],
     highlights: [
       'One engine, many verticals: hotel rooms, consultants, photography, clinics, appointments.',
@@ -201,6 +209,7 @@ export const projects: Project[] = [
     description:
       'A full-fledged customer-relationship platform simulated end to end, with workflows modelled on EspoCRM and ERPNext: lead capture and one-click conversion, contacts and companies, a deal pipeline with lost-reason tracking, support cases, tasks, a calendar, an email inbox with templates, invoicing, marketing campaigns, workflow automations, and a reporting suite — all driven by a live dashboard. Sample identities are pulled from a public API so the whole thing feels real.',
     year: '2026 - Present',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['React', 'TypeScript', 'Public APIs', 'Supabase (next)'],
     highlights: [
       'Fourteen interactive modules including a lead pipeline that converts a qualified lead into a contact, company, and opportunity in one click (the core EspoCRM/ERPNext flow), plus a support-case desk.',
@@ -217,6 +226,7 @@ export const projects: Project[] = [
     description:
       'A full enterprise resource-planning suite simulated end to end, modelled on systems like ERPNext: a live double-entry general ledger that derives the P&L and balance sheet, cascading sales/purchase document chains with VAT, a perpetual stock ledger, manufacturing with routings and built-up valuation, payroll runs, HR, projects, and a depreciating fixed-asset register — all feeding a live financial dashboard. Real products and people are pulled from public APIs so the data feels genuine.',
     year: '2026 - Present',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['React', 'TypeScript', 'Public APIs', 'Supabase (next)'],
     highlights: [
       'A real double-entry general ledger: every action — deliver, invoice, receive, pay, manufacture, run payroll — posts balanced entries, and the P&L, balance sheet and chart of accounts are derived live from them (the sheet stays in balance as you go).',
@@ -233,6 +243,7 @@ export const projects: Project[] = [
     description:
       'A Supabase-backed university timetable scheduling system with real-time conflict detection — room, lecturer, and cohort clashes surfaced instantly without a page reload. Admin controls let the owner add, reschedule, or soft-delete sessions; conflicts include suggested fixes. TypeScript port of a sweep-cluster conflict-detection algorithm.',
     year: '2026 - Present',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['React', 'TypeScript', 'Supabase', 'PostgreSQL', 'RLS'],
     highlights: [
       'O(n log n) sweep-cluster conflict detector — room, lecturer, cohort dimensions in one pass.',
@@ -249,6 +260,7 @@ export const projects: Project[] = [
     description:
       'An interactive family tree builder — admin-managed, publicly viewable. Drag-pannable canvas with SVG connectors, automatic relationship labels (uncle/aunt, 1st cousin, etc.), country flags, and click-through profile cards with photos. Family members submit branches via a form; the admin reviews and adds them to the main tree.',
     year: '2026 - Present',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['React', 'TypeScript', 'Supabase', 'PostgreSQL', 'RLS', 'Tailwind'],
     highlights: [
       'BFS-based relationship calculator — derives uncle/aunt, 1st cousin, great-grandparent labels from the graph automatically.',
@@ -267,6 +279,7 @@ export const projects: Project[] = [
     description:
       'Placed Top 13 of 547 participants. Built backend smart-contract logic in Motoko on the Internet Computer for transparent public-sector solutions.',
     year: '2024',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['Motoko', 'ICP', 'Web3', 'Smart Contracts'],
     highlights: [
       'Top 13 of 547 participants in Pretoria, South Africa.',
@@ -281,6 +294,7 @@ export const projects: Project[] = [
     description:
       'Built the Flutter/Dart frontend and integrated it with a Laravel backend for seamless, API-driven user interaction at the Botswana Innovation Hub.',
     year: '2024',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['Flutter', 'Dart', 'Laravel', 'REST API'],
     highlights: [
       'Cross-platform Flutter frontend for Android & iOS.',
@@ -297,6 +311,7 @@ export const projects: Project[] = [
     description:
       "A set of Tampermonkey userscripts I build and maintain for Torn, a browser MMO, that bolt trading, combat and market-analysis tools straight into the game's own pages. The part I care most about is the plumbing: every call to Torn's REST API runs through a single key accessor, so my API key is read from local storage in one place only, never leaks into the page, and can only ever reach the official api.torn.com. No third-party server ever touches your key or your data.",
     year: '2025 - Present',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['JavaScript', 'Tampermonkey', 'REST API integration', 'Rate limiting', 'DOM injection'],
     highlights: [
       "One choke point for the API key: it is read from Tampermonkey storage (or the Torn PDA's injected token on mobile) in a single accessor that is the only path to the network, so the key never lands in the DOM, in logs, or in debug exports.",
@@ -316,6 +331,7 @@ export const projects: Project[] = [
     description:
       'A blacksmith-themed crafting and management game in active development. Players forge items, research upgrades, and assign apprentices in a guild-driven progression loop. Built in the Godot Engine with C#.',
     year: '2025',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['Godot Engine', 'C#', 'Game Dev'],
     highlights: [
       'Crafting and resource-management gameplay loop.',
@@ -332,6 +348,7 @@ export const projects: Project[] = [
     description:
       'Programmed a robotic arm with camera recognition on Arduino and Raspberry Pi OS to simulate mineral separation through color differentiation.',
     year: '2023',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['Arduino', 'Raspberry Pi', 'Computer Vision'],
     highlights: [
       'Robotic arm control with Arduino + Raspberry Pi OS.',
@@ -346,6 +363,7 @@ export const projects: Project[] = [
     description:
       'Team-based Web3 challenges focused on decentralized application concepts and smart-contract workflows on the Mzansi bootcamp.',
     year: '2024',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['Web3', 'Decentralized Apps', 'Smart Contracts'],
     highlights: [
       'Team-based decentralized application concepts.',
