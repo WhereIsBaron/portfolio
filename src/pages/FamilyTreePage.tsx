@@ -273,6 +273,50 @@ function Connectors({
     );
   }
 
+  // sibling ties — only when the pair shares no parent that's drawn above them,
+  // so siblings who are already joined through a common parent don't get a
+  // redundant line, while siblings linked directly (no parent in the tree) still
+  // show the relationship. Routed as a bracket above the row to avoid crossing boxes.
+  const parentsOf = new Map<string, Set<string>>();
+  for (const r of rels) {
+    if (r.relationship_type === 'parent') {
+      if (!parentsOf.has(r.person_b_id)) parentsOf.set(r.person_b_id, new Set());
+      parentsOf.get(r.person_b_id)!.add(r.person_a_id);
+    } else if (r.relationship_type === 'child') {
+      if (!parentsOf.has(r.person_a_id)) parentsOf.set(r.person_a_id, new Set());
+      parentsOf.get(r.person_a_id)!.add(r.person_b_id);
+    }
+  }
+  const drawnSib = new Set<string>();
+  for (const r of rels) {
+    if (r.relationship_type !== 'sibling') continue;
+    const key = [r.person_a_id, r.person_b_id].sort().join('-');
+    if (drawnSib.has(key)) continue;
+    drawnSib.add(key);
+    const a = nodeById.get(r.person_a_id);
+    const b = nodeById.get(r.person_b_id);
+    if (!a || !b) continue;
+    // skip if they share a parent that is present in the layout (already joined)
+    const pa = parentsOf.get(r.person_a_id) ?? new Set<string>();
+    const pb = parentsOf.get(r.person_b_id) ?? new Set<string>();
+    let shared = false;
+    for (const p of pa) if (pb.has(p) && nodeById.has(p)) { shared = true; break; }
+    if (shared) continue;
+    const ax = a.x + NODE_W / 2;
+    const bx = b.x + NODE_W / 2;
+    const rail = Math.min(a.y, b.y) - 16;
+    lines.push(
+      <path
+        key={`sib-${key}`}
+        d={`M${ax},${a.y} L${ax},${rail} L${bx},${rail} L${bx},${b.y}`}
+        fill="none"
+        stroke={LINK_INK}
+        strokeWidth={1.25}
+        strokeDasharray="2,4"
+      />
+    );
+  }
+
   return <>{lines}</>;
 }
 
@@ -664,15 +708,15 @@ function RelPanel({
         </button>
       </div>
 
-      <div className="space-y-2 max-h-60 overflow-y-auto">
+      <div className="space-y-2">
         {rels.map(r => (
-          <div key={r.id} className="flex items-center justify-between rounded-xl border border-[var(--border)]bg-[var(--bg-soft)] px-3 py-2 text-xs text-[var(--muted)]">
+          <div key={r.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-xs text-[var(--muted)]">
             <span>
               <span className="text-[var(--ink)] font-medium">{nameOf(r.person_a_id)}</span>
               {' '}is {r.relationship_type === 'spouse' ? statusLabel('spouse', r.status) : r.relationship_type} of{' '}
               <span className="text-[var(--ink)] font-medium">{nameOf(r.person_b_id)}</span>
               {(r.relationship_type === 'parent' || r.relationship_type === 'child') && r.status && r.status !== 'biological' && (
-                <span className="ml-1 rounded bg-[var(--bg-soft)]px-1.5 py-0.5 text-[10px] text-white/60">{statusLabel(r.relationship_type, r.status)}</span>
+                <span className="ml-1 rounded bg-[var(--bg-soft)] px-1.5 py-0.5 text-[10px] text-white/60">{statusLabel(r.relationship_type, r.status)}</span>
               )}
             </span>
             <button className={btn('danger')} onClick={() => onDelete(r.id)}><Trash2 size={12} /></button>
@@ -1479,7 +1523,7 @@ export default function FamilyTreePage() {
         />
       )}
 
-      <Footer />
+      <Footer compact />
     </div>
   );
 }

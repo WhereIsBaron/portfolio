@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { profile } from '@/data/cv';
 import { useVisitCount } from '@/lib/useVisitCount';
 
-export default function Footer() {
+export default function Footer({ compact = false }: { compact?: boolean }) {
   const visits = useVisitCount();
   return (
-    <footer className="border-t border-[var(--border)] px-4 py-12 sm:px-5">
-      <div className="mx-auto flex max-w-[1600px] flex-col items-center justify-between gap-6 sm:flex-row">
+    <footer className={`border-t border-[var(--border)] px-4 sm:px-5 ${compact ? 'py-5' : 'py-12'}`}>
+      <div className={`mx-auto flex max-w-[1600px] flex-col items-center justify-between sm:flex-row ${compact ? 'gap-3' : 'gap-6'}`}>
         <a
           href="#top"
           className="font-display text-lg font-semibold tracking-tight text-[var(--ink)]"
