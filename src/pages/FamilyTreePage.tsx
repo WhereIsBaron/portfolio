@@ -11,7 +11,6 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { usePageTitle } from '@/hooks/usePageTitle';
-import Footer from '@/components/Footer';
 import {
   FamilyPerson, FamilyRelationship, FamilyPhoto, FamilySubmission,
   buildLayout, computeGenerations, getRelationshipLabel, generationLabel,
@@ -1545,7 +1544,6 @@ export default function FamilyTreePage() {
         />
       )}
 
-      <Footer compact />
     </div>
   );
 }
