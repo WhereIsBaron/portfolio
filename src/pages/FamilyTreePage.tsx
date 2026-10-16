@@ -1068,6 +1068,28 @@ export default function FamilyTreePage() {
   const nodePosById = new Map(nodes.map(n => [n.person.id, { x: n.x, y: n.y }]));
   const genMap = computeGenerations(people, rels);
 
+  // ── Initial view: centre horizontally on the grandparent generation ──────────
+  // The top generation that still has descendants = the ancestral grandparents
+  // (childless top-row people like an unlinked in-law don't skew the centre).
+  const centeredRef = useRef(false);
+  useEffect(() => {
+    if (centeredRef.current || nodes.length === 0) return;
+    const el = canvasRef.current;
+    const cw = el?.clientWidth ?? 0;
+    if (!cw) return;
+    const minGen = Math.min(...nodes.map(n => n.generation));
+    const parentIds = new Set<string>();
+    for (const r of rels) {
+      if (r.relationship_type === 'parent') parentIds.add(r.person_a_id);
+      else if (r.relationship_type === 'child') parentIds.add(r.person_b_id);
+    }
+    let anchors = nodes.filter(n => n.generation === minGen && parentIds.has(n.person.id));
+    if (anchors.length === 0) anchors = nodes.filter(n => n.generation === minGen);
+    const cx = anchors.reduce((s, n) => s + n.x + NODE_W / 2, 0) / anchors.length;
+    setOffset({ x: cw / 2 - cx, y: 40 });
+    centeredRef.current = true;
+  }, [nodes, rels]);
+
   // ── Admin CRUD ──────────────────────────────────────────────────────────────
   const savePerson = async (data: Omit<FamilyPerson, 'id' | 'created_at'>) => {
     if (!supabase) return;
