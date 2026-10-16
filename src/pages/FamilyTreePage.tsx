@@ -215,35 +215,82 @@ function Connectors({
   const nodeById = new Map<string, { id: string; x: number; y: number }>(nodes.map(n => [n.id, n]));
   const lines: JSX.Element[] = [];
 
-  const drawn = new Set<string>();
+  // child → set of its parents, and child → its parent-link status (for styling)
+  const parentsOf = new Map<string, Set<string>>();
+  const childStatus = new Map<string, string | null>();
   for (const r of rels) {
-    if (r.relationship_type !== 'parent' && r.relationship_type !== 'child') continue;
-    const parentId = r.relationship_type === 'parent' ? r.person_a_id : r.person_b_id;
-    const childId  = r.relationship_type === 'parent' ? r.person_b_id : r.person_a_id;
-    const key = `${parentId}-${childId}`;
-    if (drawn.has(key)) continue;
-    drawn.add(key);
+    if (r.relationship_type === 'parent') {
+      if (!parentsOf.has(r.person_b_id)) parentsOf.set(r.person_b_id, new Set());
+      parentsOf.get(r.person_b_id)!.add(r.person_a_id);
+      if (!childStatus.has(r.person_b_id)) childStatus.set(r.person_b_id, r.status);
+    } else if (r.relationship_type === 'child') {
+      if (!parentsOf.has(r.person_a_id)) parentsOf.set(r.person_a_id, new Set());
+      parentsOf.get(r.person_a_id)!.add(r.person_b_id);
+      if (!childStatus.has(r.person_a_id)) childStatus.set(r.person_a_id, r.status);
+    }
+  }
 
-    const p = nodeById.get(parentId);
-    const c = nodeById.get(childId);
-    if (!p || !c) continue;
+  // spouse couples present, so co-parents share a single junction to their kids
+  const coupleKeys = new Set<string>();
+  for (const r of rels) {
+    if (r.relationship_type === 'spouse') coupleKeys.add([r.person_a_id, r.person_b_id].sort().join('-'));
+  }
 
-    const x1 = p.x + NODE_W / 2;
-    const y1 = p.y + NODE_H;
-    const x2 = c.x + NODE_W / 2;
-    const y2 = c.y;
-    const my = (y1 + y2) / 2;
-    const st = childLinkStyle(r.status);
+  // group children by the set of their parents present in the layout
+  const groups = new Map<string, { parents: string[]; children: string[] }>();
+  for (const [childId, pset] of parentsOf) {
+    if (!nodeById.has(childId)) continue;
+    const present = [...pset].filter(pid => nodeById.has(pid)).sort();
+    if (present.length === 0) continue;
+    const gkey = present.join('-');
+    if (!groups.has(gkey)) groups.set(gkey, { parents: present, children: [] });
+    groups.get(gkey)!.children.push(childId);
+  }
+
+  // draw each nuclear family as: parent couple → drop → bar → down to each child
+  for (const { parents, children } of groups.values()) {
+    const pNodes = parents.map(id => nodeById.get(id)!).filter(Boolean);
+    const cNodes = children.map(id => nodeById.get(id)!).filter(Boolean);
+    if (pNodes.length === 0 || cNodes.length === 0) continue;
+
+    const multi = pNodes.length >= 2;
+    const married = multi && coupleKeys.has(parents.slice(0, 2).sort().join('-'));
+    const originX = multi
+      ? pNodes.reduce((s, n) => s + n.x + NODE_W / 2, 0) / pNodes.length
+      : pNodes[0].x + NODE_W / 2;
+    const originY = married
+      ? pNodes[0].y + NODE_H / 2                       // on the marriage line
+      : Math.max(...pNodes.map(n => n.y)) + NODE_H;    // below the parent card
+
+    const railY = Math.min(...cNodes.map(n => n.y)) - 22;
+    const centers = cNodes.map(n => n.x + NODE_W / 2);
+
+    // vertical drop from the couple down to the sibling rail
     lines.push(
-      <path
-        key={key}
-        d={`M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`}
-        fill="none"
-        stroke={st.stroke}
-        strokeWidth={st.width}
-        strokeDasharray={st.dash}
-      />
+      <path key={`drop-${parents.join('_')}`}
+        d={`M${originX},${originY} L${originX},${railY}`}
+        fill="none" stroke={LINK_INK} strokeWidth={1.5} />
     );
+    // horizontal rail spanning the children and the drop point
+    const barLeft = Math.min(originX, ...centers);
+    const barRight = Math.max(originX, ...centers);
+    if (barRight - barLeft > 1) {
+      lines.push(
+        <line key={`rail-${parents.join('_')}`}
+          x1={barLeft} y1={railY} x2={barRight} y2={railY}
+          stroke={LINK_INK} strokeWidth={1.5} />
+      );
+    }
+    // down from the rail to each child, styled by that child's link kind
+    for (const c of cNodes) {
+      const cx = c.x + NODE_W / 2;
+      const st = childLinkStyle(childStatus.get(c.id) ?? null);
+      lines.push(
+        <path key={`cdrop-${c.id}`}
+          d={`M${cx},${railY} L${cx},${c.y}`}
+          fill="none" stroke={st.stroke} strokeWidth={st.width} strokeDasharray={st.dash} />
+      );
+    }
   }
 
   // union lines (horizontal)
@@ -276,16 +323,6 @@ function Connectors({
   // so siblings who are already joined through a common parent don't get a
   // redundant line, while siblings linked directly (no parent in the tree) still
   // show the relationship. Routed as a bracket above the row to avoid crossing boxes.
-  const parentsOf = new Map<string, Set<string>>();
-  for (const r of rels) {
-    if (r.relationship_type === 'parent') {
-      if (!parentsOf.has(r.person_b_id)) parentsOf.set(r.person_b_id, new Set());
-      parentsOf.get(r.person_b_id)!.add(r.person_a_id);
-    } else if (r.relationship_type === 'child') {
-      if (!parentsOf.has(r.person_a_id)) parentsOf.set(r.person_a_id, new Set());
-      parentsOf.get(r.person_a_id)!.add(r.person_b_id);
-    }
-  }
   const drawnSib = new Set<string>();
   for (const r of rels) {
     if (r.relationship_type !== 'sibling') continue;

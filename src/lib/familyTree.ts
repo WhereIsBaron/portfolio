@@ -471,6 +471,8 @@ export const COUNTRY_NAMES: Record<string, string> = {
   JP: 'Japan', BR: 'Brazil', AR: 'Argentina', NG: 'Nigeria', KE: 'Kenya',
   GH: 'Ghana', ET: 'Ethiopia', EG: 'Egypt', MA: 'Morocco',
   AE: 'UAE', SA: 'Saudi Arabia', SG: 'Singapore', MY: 'Malaysia',
+  DK: 'Denmark', SE: 'Sweden', NO: 'Norway', FI: 'Finland',
+  CH: 'Switzerland', AT: 'Austria', PL: 'Poland', GR: 'Greece',
 };
 
 export function flagUrl(code: string): string {
