@@ -23,16 +23,16 @@ import {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const inp =
-  'w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white placeholder:text-[var(--muted)]/50 focus:border-[var(--brand-bright)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-bright)]';
+  'w-full rounded-xl border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--muted)]/60 focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]';
 
 const sel =
-  'w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white focus:border-[var(--brand-bright)] focus:outline-none';
+  'w-full rounded-xl border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none';
 
 const btn = (variant: 'primary' | 'ghost' | 'danger' = 'ghost') => {
   const base = 'inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40';
-  if (variant === 'primary') return `${base} bg-[var(--brand-bright)] text-[#0b0d10] hover:bg-white`;
-  if (variant === 'danger') return `${base} bg-red-500/10 text-red-400 hover:bg-red-500/20`;
-  return `${base} border border-white/10 text-[var(--muted)] hover:border-white/30 hover:text-white`;
+  if (variant === 'primary') return `${base} bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90`;
+  if (variant === 'danger') return `${base} bg-red-500/10 text-red-500 hover:bg-red-500/20`;
+  return `${base} border border-[var(--border)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--ink)]`;
 };
 
 // ── Country select options ────────────────────────────────────────────────────
@@ -121,6 +121,8 @@ const blankPerson = (): Omit<FamilyPerson, 'id' | 'created_at'> => ({
   hobbies: [],
   bio: null,
   is_root: false,
+  pos_x: null,
+  pos_y: null,
 });
 
 // ── Node card (tree canvas) ───────────────────────────────────────────────────
@@ -141,15 +143,15 @@ function TreeNodeCard({
       className="group absolute cursor-pointer"
       style={{ width: 160, top: 0, left: 0 }}
     >
-      <div className={`rounded-2xl border ${isRoot ? 'border-[var(--brand-bright)]' : 'border-white/10'} bg-[var(--bg-card)] p-2.5 shadow-lg transition-all group-hover:border-[var(--brand-bright)]/60 group-hover:shadow-[var(--brand-bright)]/10`}>
+      <div className={`rounded-2xl border ${isRoot ? 'border-[var(--brand-bright)]' : 'border-[var(--border)]'} bg-[var(--surface)] p-2.5 shadow-lg transition-all group-hover:border-[var(--brand-bright)]/60 group-hover:shadow-[var(--brand-bright)]/10`}>
         {/* avatar */}
-        <div className="mb-2 h-12 w-12 overflow-hidden rounded-full border border-white/10 mx-auto bg-[var(--bg-soft)] flex items-center justify-center">
+        <div className="mb-2 h-12 w-12 overflow-hidden rounded-full border border-[var(--border)] mx-auto bg-[var(--bg-soft)] flex items-center justify-center">
           {thumb
             ? <img src={thumb.url} alt={person.name} className="h-full w-full object-cover" />
             : <Users size={20} className="text-[var(--muted)]" />
           }
         </div>
-        <p className="text-center text-xs font-semibold text-white leading-tight truncate">{person.name}</p>
+        <p className="text-center text-xs font-semibold text-[var(--ink)] leading-tight truncate">{person.name}</p>
         {isRoot && <p className="text-center text-[10px] text-[var(--brand-bright)] mt-0.5">You</p>}
         {!isRoot && label && (
           <p className="text-center text-[10px] text-[var(--muted)] mt-0.5 truncate">{label}</p>
@@ -178,24 +180,30 @@ function TreeNodeCard({
 // ── SVG connectors ────────────────────────────────────────────────────────────
 
 // Line style for a parent→child link, by child-link kind
+// Parent→child links use the muted ink; adopted/foster lean on the brand blue so
+// they read against both the light "Stone" and dark "Slate" grounds.
+const LINK_KIN = 'var(--brand-bright)';
+const LINK_INK = 'var(--muted)';
+const LINK_UNION = 'var(--accent)';
+
 function childLinkStyle(status: string | null): { stroke: string; width: number; dash?: string } {
   switch (status) {
-    case 'adopted': return { stroke: 'rgba(120,200,255,0.45)', width: 1.5, dash: '6,4' };
-    case 'foster':  return { stroke: 'rgba(120,200,255,0.4)',  width: 1.5, dash: '1,4' };
-    case 'step':    return { stroke: 'rgba(255,255,255,0.16)', width: 1,   dash: '2,4' };
-    default:        return { stroke: 'rgba(255,255,255,0.16)', width: 1.5 }; // biological
+    case 'adopted': return { stroke: LINK_KIN, width: 1.5, dash: '6,4' };
+    case 'foster':  return { stroke: LINK_KIN, width: 1.5, dash: '1,4' };
+    case 'step':    return { stroke: LINK_INK, width: 1,   dash: '2,4' };
+    default:        return { stroke: LINK_INK, width: 1.5 }; // biological
   }
 }
 
 // Line style for a union link, by union status
 function unionStyle(status: string | null): { stroke: string; width: number; dash?: string } {
   switch (status) {
-    case 'partner':   return { stroke: 'rgba(255,180,0,0.5)',  width: 1.75, dash: '6,4' };
-    case 'engaged':   return { stroke: 'rgba(255,180,0,0.5)',  width: 1.75, dash: '1,4' };
-    case 'separated': return { stroke: 'rgba(255,255,255,0.28)', width: 1.5, dash: '7,6' };
-    case 'divorced':  return { stroke: 'rgba(255,255,255,0.2)',  width: 1.5, dash: '3,5' };
-    case 'widowed':   return { stroke: 'rgba(255,180,0,0.3)',  width: 1.5, dash: '5,4' };
-    default:          return { stroke: 'rgba(255,180,0,0.5)',  width: 1.75 }; // married
+    case 'partner':   return { stroke: LINK_UNION, width: 1.75, dash: '6,4' };
+    case 'engaged':   return { stroke: LINK_UNION, width: 1.75, dash: '1,4' };
+    case 'separated': return { stroke: LINK_INK,   width: 1.5,  dash: '7,6' };
+    case 'divorced':  return { stroke: LINK_INK,   width: 1.5,  dash: '3,5' };
+    case 'widowed':   return { stroke: LINK_UNION, width: 1.5,  dash: '5,4' };
+    default:          return { stroke: LINK_UNION, width: 1.75 }; // married
   }
 }
 
@@ -320,10 +328,10 @@ function ProfileModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[var(--bg-card)] p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <button onClick={onClose} className="absolute right-4 top-4 text-[var(--muted)] hover:text-white">
+        <button onClick={onClose} className="absolute right-4 top-4 text-[var(--muted)] hover:text-[var(--ink)]">
           <X size={18} />
         </button>
 
@@ -351,7 +359,7 @@ function ProfileModal({
           </div>
         )}
 
-        <h2 className="text-xl font-bold text-white mb-0.5">{person.name}</h2>
+        <h2 className="text-xl font-bold text-[var(--ink)] mb-0.5">{person.name}</h2>
         {label && <p className="text-xs text-[var(--brand-bright)] mb-3">{label}</p>}
 
         <div className="space-y-2 text-sm">
@@ -433,6 +441,8 @@ function PersonForm({
     hobbies: initial.hobbies ?? [],
     bio: initial.bio ?? null,
     is_root: initial.is_root ?? false,
+    pos_x: initial.pos_x ?? null,
+    pos_y: initial.pos_y ?? null,
   });
   const [hobbyInput, setHobbyInput] = useState('');
 
@@ -521,7 +531,7 @@ function PersonForm({
         {form.hobbies.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {form.hobbies.map(h => (
-              <span key={h} className="flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-0.5 text-xs text-[var(--muted)]">
+              <span key={h} className="flex items-center gap-1 rounded-full bg-[var(--bg-soft)]px-2.5 py-0.5 text-xs text-[var(--muted)]">
                 {h}
                 <button onClick={() => set('hobbies', form.hobbies.filter(x => x !== h))}><X size={10} /></button>
               </span>
@@ -544,7 +554,7 @@ function PersonForm({
         <div className="flex flex-wrap gap-2">
           {myPhotos.map(ph => (
             <div key={ph.id} className="relative">
-              <img src={ph.url} alt="" className="h-16 w-16 rounded-xl object-cover border border-white/10" />
+              <img src={ph.url} alt="" className="h-16 w-16 rounded-xl object-cover border border-[var(--border)]" />
               <button
                 onClick={() => onDeletePhoto(ph)}
                 className="absolute -top-1.5 -right-1.5 rounded-full bg-red-500 p-0.5 text-white"
@@ -558,7 +568,7 @@ function PersonForm({
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="h-16 w-16 rounded-xl border border-dashed border-white/20 flex items-center justify-center text-[var(--muted)] hover:border-white/40 disabled:opacity-40"
+              className="h-16 w-16 rounded-xl border border-dashed border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:border-[var(--accent)] disabled:opacity-40"
             >
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
             </button>
@@ -616,7 +626,7 @@ function RelPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-white/10 bg-[var(--bg-soft)] p-4 space-y-3">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-soft)] p-4 space-y-3">
         <p className="text-xs text-[var(--muted)] font-medium">Add Relationship</p>
         <div className="grid grid-cols-3 gap-2">
           <select className={sel} value={a} onChange={e => setA(e.target.value)}>
@@ -656,13 +666,13 @@ function RelPanel({
 
       <div className="space-y-2 max-h-60 overflow-y-auto">
         {rels.map(r => (
-          <div key={r.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-[var(--bg-soft)] px-3 py-2 text-xs text-[var(--muted)]">
+          <div key={r.id} className="flex items-center justify-between rounded-xl border border-[var(--border)]bg-[var(--bg-soft)] px-3 py-2 text-xs text-[var(--muted)]">
             <span>
-              <span className="text-white font-medium">{nameOf(r.person_a_id)}</span>
+              <span className="text-[var(--ink)] font-medium">{nameOf(r.person_a_id)}</span>
               {' '}is {r.relationship_type === 'spouse' ? statusLabel('spouse', r.status) : r.relationship_type} of{' '}
-              <span className="text-white font-medium">{nameOf(r.person_b_id)}</span>
+              <span className="text-[var(--ink)] font-medium">{nameOf(r.person_b_id)}</span>
               {(r.relationship_type === 'parent' || r.relationship_type === 'child') && r.status && r.status !== 'biological' && (
-                <span className="ml-1 rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/60">{statusLabel(r.relationship_type, r.status)}</span>
+                <span className="ml-1 rounded bg-[var(--bg-soft)]px-1.5 py-0.5 text-[10px] text-white/60">{statusLabel(r.relationship_type, r.status)}</span>
               )}
             </span>
             <button className={btn('danger')} onClick={() => onDelete(r.id)}><Trash2 size={12} /></button>
@@ -718,7 +728,7 @@ function SubmitBranchForm({ onSubmitted }: { onSubmitted: () => void }) {
     return (
       <div className="text-center py-8">
         <CheckCircle size={36} className="text-green-400 mx-auto mb-3" />
-        <p className="text-white font-semibold mb-1">Branch Submitted!</p>
+        <p className="text-[var(--ink)] font-semibold mb-1">Branch Submitted!</p>
         <p className="text-sm text-[var(--muted)]">The admin will review and add your family members to the tree.</p>
       </div>
     );
@@ -739,12 +749,12 @@ function SubmitBranchForm({ onSubmitted }: { onSubmitted: () => void }) {
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-medium text-white">Family Members</p>
+          <p className="text-sm font-medium text-[var(--ink)]">Family Members</p>
           <button className={btn('ghost')} onClick={addMember}><Plus size={13} /> Add Person</button>
         </div>
         <div className="space-y-4">
           {members.map((m, i) => (
-            <div key={i} className="rounded-2xl border border-white/10 bg-[var(--bg-soft)] p-4 space-y-3">
+            <div key={i} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-soft)] p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-[var(--muted)]">Person {i + 1}</p>
                 {members.length > 1 && (
@@ -851,15 +861,15 @@ function SubmissionsPanel({
         <p className="text-xs text-[var(--muted)] text-center py-6">No submissions yet</p>
       )}
       {submissions.map(s => (
-        <div key={s.id} className="rounded-2xl border border-white/10 bg-[var(--bg-soft)] overflow-hidden">
+        <div key={s.id} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-soft)] overflow-hidden">
           <div
-            className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-white/5"
+            className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[var(--bg-soft)]"
             onClick={() => setExpanded(expanded === s.id ? null : s.id)}
           >
             <div className="flex items-center gap-2">
               {statusIcon(s.status)}
               <div>
-                <p className="text-sm font-medium text-white">{s.submitter_name}</p>
+                <p className="text-sm font-medium text-[var(--ink)]">{s.submitter_name}</p>
                 <p className="text-xs text-[var(--muted)]">{s.submitter_email} · {new Date(s.created_at).toLocaleDateString()}</p>
               </div>
             </div>
@@ -870,10 +880,10 @@ function SubmissionsPanel({
           </div>
 
           {expanded === s.id && (
-            <div className="border-t border-white/5 px-4 py-3 space-y-3">
+            <div className="border-t border-[var(--border)]px-4 py-3 space-y-3">
               {(s.data.members ?? []).map((m, i) => (
                 <div key={i} className="text-xs text-[var(--muted)] space-y-0.5">
-                  <p className="text-white font-medium">{m.name}</p>
+                  <p className="text-[var(--ink)] font-medium">{m.name}</p>
                   {m.birth_year && <p>Born: {m.birth_year}</p>}
                   {(m.city || m.country_code) && <p>Location: {[m.city, m.country_code].filter(Boolean).join(', ')}</p>}
                   {m.profession && <p>Profession: {m.profession}</p>}
@@ -883,7 +893,7 @@ function SubmissionsPanel({
                   {m.photo_urls && m.photo_urls.length > 0 && (
                     <div className="flex gap-1.5 mt-1">
                       {m.photo_urls.map((u, j) => (
-                        <img key={j} src={u} className="h-10 w-10 rounded-lg object-cover border border-white/10" alt="" />
+                        <img key={j} src={u} className="h-10 w-10 rounded-lg object-cover border border-[var(--border)]" alt="" />
                       ))}
                     </div>
                   )}
@@ -910,7 +920,7 @@ function SubmissionsPanel({
                   </div>
                 </div>
               )}
-              {s.admin_notes && <p className="text-xs text-[var(--muted)] italic border-t border-white/5 pt-2">Note: {s.admin_notes}</p>}
+              {s.admin_notes && <p className="text-xs text-[var(--muted)] italic border-t border-[var(--border)]pt-2">Note: {s.admin_notes}</p>}
             </div>
           )}
         </div>
@@ -1100,6 +1110,56 @@ export default function FamilyTreePage() {
     setScale(s => Math.min(2, Math.max(0.3, s - e.deltaY * 0.001)));
   };
 
+  // ── Admin: drag a single node ───────────────────────────────────────────────
+  // While dragging, livePos holds the node's live canvas position. A pointer that
+  // barely moves counts as a click (open profile); a real drag persists pos_x/pos_y.
+  const [livePos, setLivePos] = useState<{ id: string; x: number; y: number } | null>(null);
+
+  const startNodeDrag = (e: React.MouseEvent, node: { person: FamilyPerson; x: number; y: number }) => {
+    if (!isAdmin) return;
+    e.stopPropagation(); // don't pan the canvas
+    e.preventDefault();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const { x: origX, y: origY } = node;
+    const s = scale;
+    let moved = false;
+
+    const move = (ev: MouseEvent) => {
+      const dx = (ev.clientX - startX) / s;
+      const dy = (ev.clientY - startY) / s;
+      if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 4) moved = true;
+      setLivePos({ id: node.person.id, x: origX + dx, y: origY + dy });
+    };
+
+    const up = async (ev: MouseEvent) => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      setLivePos(null);
+      if (!moved) { setSelectedPerson(node.person); return; } // treated as a click
+      const finalX = Math.round(origX + (ev.clientX - startX) / s);
+      const finalY = Math.round(origY + (ev.clientY - startY) / s);
+      // Optimistic local update, then persist.
+      setPeople(ps => ps.map(p => p.id === node.person.id ? { ...p, pos_x: finalX, pos_y: finalY } : p));
+      if (supabase) {
+        await supabase.from('family_people').update({ pos_x: finalX, pos_y: finalY }).eq('id', node.person.id);
+      }
+    };
+
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  const resetLayout = async () => {
+    if (!supabase || !confirm('Reset to automatic layout? This clears every card you have dragged.')) return;
+    setPeople(ps => ps.map(p => ({ ...p, pos_x: null, pos_y: null })));
+    await supabase.from('family_people').update({ pos_x: null, pos_y: null }).not('id', 'is', null);
+  };
+
+  // Effective canvas position for a node (follows the live drag while dragging).
+  const posOf = (n: { person: FamilyPerson; x: number; y: number }) =>
+    livePos && livePos.id === n.person.id ? { x: livePos.x, y: livePos.y } : { x: n.x, y: n.y };
+
   // ── Pending count badge ─────────────────────────────────────────────────────
   const pendingCount = submissions.filter(s => s.status === 'pending').length;
 
@@ -1107,12 +1167,12 @@ export default function FamilyTreePage() {
   const genNumbers = [...new Set([...genMap.values()])].sort((a, b) => a - b);
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-white flex flex-col">
+    <div className="paper min-h-screen bg-[var(--bg)] text-[var(--ink)] flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[var(--bg)]/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-[var(--border)]bg-[var(--bg)]/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <Link to="/" className="text-[var(--muted)] hover:text-white transition-colors">
+            <Link to="/" className="text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
               <ArrowLeft size={18} />
             </Link>
             <div className="flex items-center gap-2">
@@ -1167,7 +1227,7 @@ export default function FamilyTreePage() {
           <div className="flex-1 relative overflow-hidden">
             {/* Login popover */}
             {showLogin && !isAdmin && (
-              <div className="absolute top-4 right-4 z-20 w-72 rounded-2xl border border-white/10 bg-[var(--bg-card)] p-4 shadow-xl">
+              <div className="absolute top-4 right-4 z-20 w-72 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xl">
                 <div className="flex justify-between items-center mb-3">
                   <p className="text-sm font-semibold">Admin Login</p>
                   <button onClick={() => setShowLogin(false)}><X size={14} /></button>
@@ -1199,40 +1259,53 @@ export default function FamilyTreePage() {
                 {/* Generation legend sidebar */}
                 <div className="absolute left-3 top-3 z-10 space-y-1 pointer-events-none">
                   {genNumbers.map(g => (
-                    <div key={g} className="flex items-center gap-1.5 rounded-lg bg-black/50 backdrop-blur-sm px-2 py-1">
+                    <div key={g} className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur-sm px-2 py-1">
                       <span className="text-[10px] text-[var(--muted)]">{g > 0 ? `+${g}` : g}</span>
-                      <span className="text-[10px] text-white/70">{generationLabel(g)}</span>
+                      <span className="text-[10px] text-[var(--ink)]/80">{generationLabel(g)}</span>
                     </div>
                   ))}
                 </div>
 
                 {/* Line-style legend */}
-                <div className="absolute left-3 bottom-3 z-10 rounded-lg bg-black/55 backdrop-blur-sm px-2.5 py-2 pointer-events-none">
+                <div className="absolute left-3 bottom-3 z-10 rounded-lg border border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur-sm px-2.5 py-2 pointer-events-none">
                   <p className="text-[9px] uppercase tracking-wide text-[var(--muted)] mb-1">Key</p>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
                     {[
-                      { c: 'rgba(255,180,0,0.8)', d: '', t: 'Married' },
-                      { c: 'rgba(255,180,0,0.8)', d: '6,4', t: 'Partners' },
-                      { c: 'rgba(255,255,255,0.4)', d: '7,6', t: 'Separated' },
-                      { c: 'rgba(255,255,255,0.35)', d: '3,5', t: 'Divorced' },
-                      { c: 'rgba(255,255,255,0.5)', d: '', t: 'Biological' },
-                      { c: 'rgba(120,200,255,0.8)', d: '6,4', t: 'Adopted' },
-                      { c: 'rgba(120,200,255,0.7)', d: '1,4', t: 'Foster' },
-                      { c: 'rgba(255,255,255,0.4)', d: '2,4', t: 'Step' },
+                      { c: LINK_UNION, d: '', t: 'Married' },
+                      { c: LINK_UNION, d: '6,4', t: 'Partners' },
+                      { c: LINK_INK, d: '7,6', t: 'Separated' },
+                      { c: LINK_INK, d: '3,5', t: 'Divorced' },
+                      { c: LINK_INK, d: '', t: 'Biological' },
+                      { c: LINK_KIN, d: '6,4', t: 'Adopted' },
+                      { c: LINK_KIN, d: '1,4', t: 'Foster' },
+                      { c: LINK_INK, d: '2,4', t: 'Step' },
                     ].map(k => (
                       <div key={k.t} className="flex items-center gap-1.5">
                         <svg width={18} height={6}><line x1={0} y1={3} x2={18} y2={3} stroke={k.c} strokeWidth={1.5} strokeDasharray={k.d || undefined} /></svg>
-                        <span className="text-[9px] text-white/70">{k.t}</span>
+                        <span className="text-[9px] text-[var(--ink)]/80">{k.t}</span>
                       </div>
                     ))}
                   </div>
                 </div>
+
+                {/* Admin drag hint */}
+                {isAdmin && (
+                  <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur-sm px-3 py-1.5 pointer-events-none">
+                    <Edit2 size={12} className="text-[var(--accent)]" />
+                    <span className="text-[11px] text-[var(--muted)]">Drag cards to rearrange — positions save automatically</span>
+                  </div>
+                )}
 
                 {/* Zoom controls */}
                 <div className="absolute right-3 bottom-16 z-10 flex flex-col gap-1">
                   <button className={btn('ghost')} onClick={() => setScale(s => Math.min(2, s + 0.1))}>+</button>
                   <button className={btn('ghost')} onClick={() => setScale(1)}>1×</button>
                   <button className={btn('ghost')} onClick={() => setScale(s => Math.max(0.3, s - 0.1))}>−</button>
+                  {isAdmin && (
+                    <button className={btn('ghost')} onClick={resetLayout} title="Reset to automatic layout">
+                      <RefreshCw size={13} />
+                    </button>
+                  )}
                 </div>
 
                 {/* Canvas */}
@@ -1261,24 +1334,32 @@ export default function FamilyTreePage() {
                     <svg
                       style={{ position: 'absolute', top: 0, left: 0, width: width + 80, height: height + 80, overflow: 'visible' }}
                     >
-                      <Connectors nodes={nodes.map(n => ({ id: n.person.id, x: n.x, y: n.y }))} rels={rels} />
+                      <Connectors nodes={nodes.map(n => ({ id: n.person.id, ...posOf(n) }))} rels={rels} />
                     </svg>
 
                     {/* Person nodes */}
-                    {nodes.map(node => (
-                      <div
-                        key={node.person.id}
-                        style={{ position: 'absolute', left: node.x, top: node.y, width: NODE_W, height: NODE_H }}
-                      >
-                        <TreeNodeCard
-                          person={node.person}
-                          photos={photos.filter(ph => ph.person_id === node.person.id)}
-                          label={getRelationshipLabel(node.person.id, people, rels)}
-                          isRoot={node.person.is_root}
-                          onClick={() => setSelectedPerson(node.person)}
-                        />
-                      </div>
-                    ))}
+                    {nodes.map(node => {
+                      const pos = posOf(node);
+                      return (
+                        <div
+                          key={node.person.id}
+                          style={{
+                            position: 'absolute', left: pos.x, top: pos.y, width: NODE_W, height: NODE_H,
+                            zIndex: livePos?.id === node.person.id ? 20 : undefined,
+                            cursor: isAdmin ? (livePos?.id === node.person.id ? 'grabbing' : 'grab') : 'pointer',
+                          }}
+                          onMouseDown={isAdmin ? (e) => startNodeDrag(e, node) : undefined}
+                        >
+                          <TreeNodeCard
+                            person={node.person}
+                            photos={photos.filter(ph => ph.person_id === node.person.id)}
+                            label={getRelationshipLabel(node.person.id, people, rels)}
+                            isRoot={node.person.is_root}
+                            onClick={isAdmin ? () => {} : () => setSelectedPerson(node.person)}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </>
@@ -1302,7 +1383,7 @@ export default function FamilyTreePage() {
                   </div>
 
                   {editingPerson && (
-                    <div className="mb-6 rounded-2xl border border-white/10 bg-[var(--bg-card)] p-5">
+                    <div className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
                       <h2 className="text-sm font-semibold mb-4">{editingPerson === 'new' ? 'New Person' : `Edit: ${editingPerson.name}`}</h2>
                       <PersonForm
                         key={editingPerson === 'new' ? 'new' : (editingPerson as FamilyPerson).id}
@@ -1324,12 +1405,12 @@ export default function FamilyTreePage() {
 
                   <div className="space-y-3">
                     {people.map(p => (
-                      <div key={p.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-[var(--bg-card)] px-4 py-3">
+                      <div key={p.id} className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
                         <div className="flex items-center gap-3">
                           {(() => {
                             const ph = photos.find(x => x.person_id === p.id);
                             return ph
-                              ? <img src={ph.url} className="h-9 w-9 rounded-full object-cover border border-white/10" alt="" />
+                              ? <img src={ph.url} className="h-9 w-9 rounded-full object-cover border border-[var(--border)]" alt="" />
                               : <div className="h-9 w-9 rounded-full bg-[var(--bg-soft)] flex items-center justify-center"><Users size={16} className="text-[var(--muted)]" /></div>;
                           })()}
                           <div>
