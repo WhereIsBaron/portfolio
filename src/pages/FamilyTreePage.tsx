@@ -327,6 +327,10 @@ function FamilyHighlights({
   nodeById: Map<string, { x: number; y: number }>;
 }) {
   const PAD = 16;
+  // The visible card is taller than NODE_H (icon + name + location row ≈ 114px),
+  // so bound the panel to the real card height, not the layout slot, or cards
+  // poke out the bottom of their family panel.
+  const CARD_H = 116;
   return (
     <>
       {families.map(fam => {
@@ -335,7 +339,7 @@ function FamilyHighlights({
         const minX = Math.min(...pts.map(p => p.x)) - PAD;
         const minY = Math.min(...pts.map(p => p.y)) - PAD;
         const maxX = Math.max(...pts.map(p => p.x)) + NODE_W + PAD;
-        const maxY = Math.max(...pts.map(p => p.y)) + NODE_H + PAD;
+        const maxY = Math.max(...pts.map(p => p.y)) + CARD_H + PAD;
         return (
           <div
             key={fam.id}
