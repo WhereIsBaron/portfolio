@@ -45,17 +45,32 @@ export default function Footer({ compact = false }: { compact?: boolean }) {
           </span>
         </a>
       </div>
-      <p className="mt-8 text-center text-xs text-[var(--muted)]">
-        © {new Date().getFullYear()} {profile.name}. Built and maintained by Andrew.
-      </p>
-      {visits !== null && (
-        <p
-          className="mt-2 text-center text-xs text-[var(--muted)]"
-          aria-live="polite"
-        >
-          <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent)] align-middle" />
-          {visits.toLocaleString()} site visits
+      {compact ? (
+        <p className="mt-3 text-center text-[11px] text-[var(--muted)]" aria-live="polite">
+          © {new Date().getFullYear()} {profile.name}.
+          {visits !== null && (
+            <>
+              {' · '}
+              <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent)] align-middle" />
+              {visits.toLocaleString()} visits
+            </>
+          )}
         </p>
+      ) : (
+        <>
+          <p className="mt-8 text-center text-xs text-[var(--muted)]">
+            © {new Date().getFullYear()} {profile.name}. Built and maintained by Andrew.
+          </p>
+          {visits !== null && (
+            <p
+              className="mt-2 text-center text-xs text-[var(--muted)]"
+              aria-live="polite"
+            >
+              <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent)] align-middle" />
+              {visits.toLocaleString()} site visits
+            </p>
+          )}
+        </>
       )}
     </footer>
   );
