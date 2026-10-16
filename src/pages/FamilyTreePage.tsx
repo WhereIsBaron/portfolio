@@ -1037,6 +1037,7 @@ export default function FamilyTreePage() {
   const [scale, setScale] = useState(1);
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
+  const editFormRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // ── Load data ───────────────────────────────────────────────────────────────
@@ -1092,6 +1093,12 @@ export default function FamilyTreePage() {
     setOffset({ x: cw / 2 - cx, y: 40 });
     centeredRef.current = true;
   }, [nodes, rels]);
+
+  // The edit form opens at the top of the People panel; when you edit someone far
+  // down the list, scroll it into view so it doesn't look like nothing happened.
+  useEffect(() => {
+    if (editingPerson) editFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [editingPerson]);
 
   // ── Admin CRUD ──────────────────────────────────────────────────────────────
   const savePerson = async (data: Omit<FamilyPerson, 'id' | 'created_at'>) => {
@@ -1452,7 +1459,7 @@ export default function FamilyTreePage() {
                   </div>
 
                   {editingPerson && (
-                    <div className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+                    <div ref={editFormRef} className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 scroll-mt-4">
                       <h2 className="text-sm font-semibold mb-4">{editingPerson === 'new' ? 'New Person' : `Edit: ${editingPerson.name}`}</h2>
                       <PersonForm
                         key={editingPerson === 'new' ? 'new' : (editingPerson as FamilyPerson).id}
