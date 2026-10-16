@@ -344,16 +344,32 @@ export function buildLayout(
       // top row: eldest → left
       ids = withSpousesAdjacent([...ids].sort(byAge));
     } else {
-      // cluster under parents; break ties (same parents = siblings) by age, eldest → left
-      const keyed = ids.map(id => {
-        const ps = [...(parentsOf.get(id) ?? [])].filter(pid => orderIndex.has(pid));
-        const key = ps.length
-          ? ps.reduce((s, pid) => s + orderIndex.get(pid)!, 0) / ps.length
-          : Number.MAX_SAFE_INTEGER;
-        return { id, key };
-      });
-      keyed.sort((a, b) => (a.key - b.key) || byAge(a.id, b.id));
-      ids = withSpousesAdjacent(keyed.map(k => k.id));
+      // Group full siblings (same set of placed parents) into one block, order
+      // the blocks by their parents' average position, and keep each block
+      // contiguous and age-sorted (eldest → left). Blocking the siblings
+      // together — rather than keying each child on its own averaged parent
+      // index — stops sibling groups from interleaving when a parent married in
+      // from another branch and sits far across the row.
+      const placedParents = (id: string) =>
+        [...(parentsOf.get(id) ?? [])].filter(pid => orderIndex.has(pid)).sort();
+      const groups = new Map<string, string[]>();
+      for (const id of ids) {
+        const ps = placedParents(id);
+        const key = ps.length ? ps.join('|') : `__none__${id}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(id);
+      }
+      const ordered = [...groups.values()]
+        .map(members => {
+          const ps = placedParents(members[0]);
+          const pkey = ps.length
+            ? ps.reduce((s, pid) => s + orderIndex.get(pid)!, 0) / ps.length
+            : Number.MAX_SAFE_INTEGER;
+          const akey = Math.min(...members.map(m => birthVal.get(m)!));
+          return { members: [...members].sort(byAge), pkey, akey };
+        })
+        .sort((a, b) => (a.pkey - b.pkey) || (a.akey - b.akey));
+      ids = withSpousesAdjacent(ordered.flatMap(g => g.members));
     }
     genRows.set(g, ids);
     ids.forEach((id, i) => orderIndex.set(id, i));
