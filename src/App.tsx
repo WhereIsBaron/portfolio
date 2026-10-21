@@ -14,6 +14,7 @@ import DbaPage from '@/pages/DbaPage';
 import RetailPage from '@/pages/RetailPage';
 import HelpdeskPage from '@/pages/HelpdeskPage';
 import EdcPage from '@/pages/EdcPage';
+import NocPage from '@/pages/NocPage';
 import NotFound from '@/pages/NotFound';
 import ScrollToHash from '@/components/ScrollToHash';
 import ChatWidget from '@/components/ChatWidget';
@@ -43,6 +44,7 @@ function App() {
             <Route path="/retail" element={<RetailPage />} />
             <Route path="/helpdesk" element={<HelpdeskPage />} />
             <Route path="/edc" element={<EdcPage />} />
+            <Route path="/noc" element={<NocPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <ChatWidget />

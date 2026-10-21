@@ -350,6 +350,25 @@ export const projects: Project[] = [
     link: '#',
   },
   {
+    name: 'Network Operations Dashboard',
+    category: 'Full-Stack Application',
+    description:
+      'A live NOC monitoring wall for a network team — routers, switches, firewalls, WAN links and services polled on a timer, with Uptime-Kuma-style heartbeat history, per-monitor latency analytics (p50/p95/timeouts), and an incident log that opens and resolves itself as monitors flap and recover. The polling simulation runs in-session; the seed state is fixed.',
+    year: '2026',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
+    tags: ['React', 'TypeScript', 'Network Monitoring', 'NOC', 'Observability'],
+    highlights: [
+      'Live status wall: monitors are polled every few seconds, each check re-sampling latency and able to flap Up → Degraded → Down and recover — pause the poll or trigger a check on demand.',
+      'Self-updating incident log: incidents open automatically when a monitor stops responding and resolve when it recovers, with manual acknowledge / resolve and severity by device role.',
+      'Heartbeat history and latency analytics: a colour-coded beat bar per monitor plus a per-monitor response-time chart with p50 / p95 / max and timeout counts.',
+      'Topology rollup: devices grouped into Core, Edge & WAN and Services tiers with a live availability and up/down summary per tier.',
+      'Reference systems studied for UX only (Uptime Kuma, Zabbix) — all logic, data and UI are original.',
+    ],
+    route: '/noc',
+    wordmark: 'NOC',
+    link: '#',
+  },
+  {
     name: 'UN Coding4Integrity Hackathon',
     category: 'Hackathon',
     description:
