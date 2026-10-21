@@ -293,6 +293,25 @@ export const projects: Project[] = [
     link: '#',
   },
   {
+    name: 'Retail Operations Console',
+    category: 'Full-Stack Application',
+    description:
+      'A store-operations cockpit for a multi-branch retailer — a working point-of-sale register that rings up a real basket with 14% VAT, cash/card tender and change, plus a live sales overview, multi-store inventory with replenishment flags, and POS terminal fleet health. Prices in Botswana Pula; every figure is generated from a fixed seed so the console is reproducible client-side.',
+    year: '2026',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
+    tags: ['React', 'TypeScript', 'Retail', 'POS', 'Tailwind'],
+    highlights: [
+      'Interactive POS register: tap products into a cart, adjust quantities, and tender by cash or card — the demo computes subtotal, VAT, total, rounds cash to the nearest note, and prints a receipt with change.',
+      'Sales overview: revenue/transaction/basket KPIs, a sales-by-hour bar chart with lunch and evening peaks, top sellers, and per-store performance.',
+      'Multi-store inventory: a product × store stock grid with reorder-point highlighting and one-click replenishment suggestions for the branches that are low.',
+      'POS terminal fleet health: online/syncing/offline device cards across all stores with an offline alert and a first-line troubleshooting note — the daily work of an in-store IT officer.',
+      'Reference systems studied for UX only (Odoo POS & Inventory) — all logic, data and UI are original.',
+    ],
+    route: '/retail',
+    wordmark: 'POS',
+    link: '#',
+  },
+  {
     name: 'UN Coding4Integrity Hackathon',
     category: 'Hackathon',
     description:
