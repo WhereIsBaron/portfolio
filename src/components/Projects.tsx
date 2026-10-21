@@ -47,6 +47,16 @@ function TicketFields({ ticket, isOwner }: { ticket: Ticket; isOwner: boolean })
   const steps = expanded ? ticket.steps : ticket.steps.slice(0, STEPS_PREVIEW);
   const hidden = ticket.steps.length - STEPS_PREVIEW;
 
+  // Resolution starts clamped to a few lines; the toggle only shows when the
+  // text is actually long enough to overflow, measured once after first paint.
+  const [resOpen, setResOpen] = useState(false);
+  const [resClamped, setResClamped] = useState(false);
+  const resRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    const el = resRef.current;
+    if (el) setResClamped(el.scrollHeight > el.clientHeight + 1);
+  }, [ticket.resolution]);
+
   return (
     <>
       {ticket.issue ? (
@@ -93,7 +103,23 @@ function TicketFields({ ticket, isOwner }: { ticket: Ticket; isOwner: boolean })
 
       <div className="mt-3">
         <p className={fieldLabel}>Resolution</p>
-        <p className="mt-1 text-sm text-[var(--muted)]">{ticket.resolution}</p>
+        <p
+          ref={resRef}
+          className={`mt-1 text-sm text-[var(--muted)] ${resOpen ? '' : 'line-clamp-3'}`}
+        >
+          {ticket.resolution}
+        </p>
+        {resClamped && (
+          <button
+            type="button"
+            onClick={() => setResOpen((v) => !v)}
+            aria-expanded={resOpen}
+            className="mt-2 inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline"
+          >
+            {resOpen ? 'Show less' : 'Show more'}
+            <ChevronDown size={14} className={`transition-transform ${resOpen ? 'rotate-180' : ''}`} />
+          </button>
+        )}
       </div>
     </>
   );
