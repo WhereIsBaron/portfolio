@@ -1,27 +1,25 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Activity, Users, FlaskConical, ClipboardList, ShieldCheck,
-  AlertTriangle, CheckCircle2, Clock, MapPin, HeartPulse, Database,
-  ListChecks, Lock, CircleDot, type LucideIcon,
+  ShieldCheck, AlertTriangle, CheckCircle2, Lock, CircleDot, FlaskConical,
 } from 'lucide-react';
-import { usePageTitle } from '@/hooks/usePageTitle';
-import Footer from '@/components/Footer';
+import {
+  DemoShell, Masthead, TabNav, Panel, Section, Stat, StatusTag, Meter,
+  AccentButton, GhostButton, fieldLabel, cx, type TabDef, type Tone,
+} from '@/components/demo/kit';
 
 // ─────────────────────────────────────────────────────────────────────────
-// Health Research Data Platform (EDC) — focused single-page demo.
+// Health Research Data Platform (EDC) — /edc — Andrew.EDC
 //
-// A simulated Electronic Data Capture console of the kind a clinical research
-// data team runs for a multi-site study: an enrolment & data-quality overview,
-// a de-identified participant register, an interactive electronic Case Report
+// An Electronic Data Capture console of the kind a clinical research data team
+// runs for a multi-site study: an enrolment & data-quality overview, a
+// de-identified participant register, an interactive electronic Case Report
 // Form with live edit-checks (range / required-field validation that auto-raises
 // data queries on save, with a 21 CFR Part 11-style audit trail), and a data-
 // query (discrepancy) workbench. Queries raised in the CRF flow straight into
 // the workbench, so the data-management loop is real; the seed data is fixed and
 // entirely fictional — no real participant data of any kind.
 //
-// Reference system (UX/feature study only — no code reused): OpenClinica.
-// All logic, data and UI here are original.
+// UX patterns studied from OpenClinica — all logic, data and UI are original.
 // ─────────────────────────────────────────────────────────────────────────
 
 // ── Seeded PRNG (deterministic demo data) ─────────────────────────────────────
@@ -57,7 +55,6 @@ const SITES: Site[] = [
 const SITE_COUNT: Record<string, number> = { 'BW-GAB': 14, 'BW-FRA': 11, 'BW-MOL': 8, 'BW-SER': 6, 'BW-MAU': 5 };
 
 const VISITS = ['Screening', 'Baseline', 'Week 4', 'Week 12', 'Week 24', 'End of study'];
-const FORMS = ['Demographics', 'Vital signs', 'Safety labs', 'Adverse events', 'Drug accountability'];
 
 type SubjectStatus = 'Screening' | 'Active' | 'Completed' | 'Withdrawn';
 
@@ -130,35 +127,18 @@ const SEED_QUERIES: QueryT[] = [
   { id: 'Q-4051', subjectId: 'BW-FRA-007', visit: 'Week 12', form: 'Vital signs', field: 'Systolic BP', value: '198 mmHg', rule: 'Above expected range (90–180) — repeat measurement recorded?', status: 'Closed', raisedDaysAgo: 15, auto: true },
 ];
 
-// ── Shared UI ─────────────────────────────────────────────────────────────────
-const card = 'rounded-2xl border border-white/10 bg-[var(--surface)]';
+// ── Tone maps ───────────────────────────────────────────────────────────────────
+function pctTone(p: number): Tone { return p >= 90 ? 'ok' : p >= 75 ? 'warn' : 'danger'; }
 
-function pctColour(p: number) { return p >= 90 ? '#34d399' : p >= 75 ? '#fbbf24' : '#f87171'; }
-
-const STATUS_BG: Record<SubjectStatus, string> = {
-  Screening: 'bg-blue-500/15 text-blue-400',
-  Active: 'bg-[var(--brand-bright)]/15 text-[var(--brand-bright)]',
-  Completed: 'bg-emerald-500/15 text-emerald-400',
-  Withdrawn: 'bg-white/10 text-[var(--muted)]',
+const SUBJECT_TONE: Record<SubjectStatus, Tone> = {
+  Screening: 'warn', Active: 'ok', Completed: 'accent', Withdrawn: 'neutral',
 };
-const QUERY_BG: Record<QueryStatus, string> = {
-  Open: 'bg-amber-500/15 text-amber-400',
-  Answered: 'bg-blue-500/15 text-blue-400',
-  Closed: 'bg-emerald-500/15 text-emerald-400',
+const QUERY_TONE: Record<QueryStatus, Tone> = {
+  Open: 'warn', Answered: 'accent', Closed: 'ok',
 };
 
-function Kpi({ label, value, sub, Icon, warn }: { label: string; value: string; sub: string; Icon: LucideIcon; warn?: boolean }) {
-  return (
-    <div className={`${card} p-4`}>
-      <div className="flex items-center gap-2 text-[var(--muted)]">
-        <Icon size={14} className="text-[var(--brand-bright)]" />
-        <span className="text-xs">{label}</span>
-      </div>
-      <p className={`mt-1 font-display text-2xl ${warn ? 'text-amber-400' : 'text-white'}`}>{value}</p>
-      <p className="mt-1 text-[10px] text-[var(--muted)]/70">{sub}</p>
-    </div>
-  );
-}
+const siteName = (code: string) => SITES.find((s) => s.code === code)?.town ?? code;
+const openCountFor = (id: string, queries: QueryT[]) => queries.filter((q) => q.subjectId === id && q.status === 'Open').length;
 
 function VisitDots({ idx }: { idx: number }) {
   return (
@@ -166,15 +146,13 @@ function VisitDots({ idx }: { idx: number }) {
       {VISITS.map((v, i) => (
         <span
           key={v}
-          className={`h-1.5 w-1.5 rounded-full ${i <= idx ? 'bg-[var(--brand-bright)]' : 'bg-white/15'}`}
+          className="h-1.5 w-1.5 rounded-full"
+          style={{ background: i <= idx ? 'var(--accent)' : 'var(--border)' }}
         />
       ))}
     </span>
   );
 }
-
-const siteName = (code: string) => SITES.find((s) => s.code === code)?.town ?? code;
-const openCountFor = (id: string, queries: QueryT[]) => queries.filter((q) => q.subjectId === id && q.status === 'Open').length;
 
 // ── Overview tab ──────────────────────────────────────────────────────────────
 const FORM_COMPLETION: { form: string; pct: number }[] = [
@@ -199,77 +177,63 @@ function OverviewTab({ queries }: { queries: QueryT[] }) {
   const armB = enrolled - armA;
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label="Participants enrolled" value={`${enrolled}/${STUDY.target}`} sub={`${Math.round((enrolled / STUDY.target) * 100)}% of target · ${active.length} in follow-up`} Icon={Users} />
-        <Kpi label="Data completeness" value={`${completeness}%`} sub="mean CRF completion (excl. withdrawn)" Icon={Database} />
-        <Kpi label="Open data queries" value={String(openQueries)} sub="awaiting site response" Icon={AlertTriangle} warn={openQueries > 0} />
-        <Kpi label="Active sites" value={String(SITES.length)} sub="across Botswana" Icon={MapPin} />
+    <div className="space-y-10">
+      <div className="grid grid-cols-2 gap-px bg-[var(--border)] lg:grid-cols-4">
+        <Stat label="Participants enrolled" value={`${enrolled}/${STUDY.target}`} sub={`${Math.round((enrolled / STUDY.target) * 100)}% of target · ${active.length} in follow-up`} />
+        <Stat label="Data completeness" value={`${completeness}%`} sub="mean CRF completion (excl. withdrawn)" tone={pctTone(completeness)} />
+        <Stat label="Open data queries" value={String(openQueries)} sub="awaiting site response" tone={openQueries > 0 ? 'warn' : 'ok'} />
+        <Stat label="Active sites" value={String(SITES.length)} sub="across Botswana" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Enrolment by site */}
-        <div className={`${card} p-5`}>
-          <div className="mb-4 flex items-center gap-2">
-            <MapPin size={15} className="text-[var(--brand-bright)]" />
-            <h3 className="font-display text-sm text-white">Enrolment by site</h3>
-          </div>
-          <div className="space-y-3">
-            {bySite.map((s) => (
-              <div key={s.code}>
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="text-white">{s.town}</span>
-                  <span className="text-[var(--muted)]">{s.code} · {s.n}</span>
+      <Section label="Data quality" title="Where the study stands">
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Panel label="Recruitment" title="Enrolment by site">
+            <div className="space-y-3.5">
+              {bySite.map((s) => (
+                <div key={s.code}>
+                  <div className="mb-1.5 flex items-center justify-between text-xs">
+                    <span className="text-[var(--ink)]">{s.town}</span>
+                    <span className="font-mono tabular-nums text-[var(--muted)]">{s.code} · {s.n}</span>
+                  </div>
+                  <Meter value={s.n} max={maxSite} tone="accent" />
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/5">
-                  <div className="h-full rounded-full bg-[var(--brand-bright)]/70" style={{ width: `${(s.n / maxSite) * 100}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+              ))}
+            </div>
+          </Panel>
 
-        {/* CRF completion by form */}
-        <div className={`${card} p-5`}>
-          <div className="mb-4 flex items-center gap-2">
-            <ClipboardList size={15} className="text-[var(--brand-bright)]" />
-            <h3 className="font-display text-sm text-white">CRF completion by form</h3>
-          </div>
-          <div className="space-y-3">
-            {FORM_COMPLETION.map((f) => (
-              <div key={f.form}>
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="text-white">{f.form}</span>
-                  <span className="text-[var(--muted)]">{f.pct}%</span>
+          <Panel label="Completeness" title="CRF completion by form">
+            <div className="space-y-3.5">
+              {FORM_COMPLETION.map((f) => (
+                <div key={f.form}>
+                  <div className="mb-1.5 flex items-center justify-between text-xs">
+                    <span className="text-[var(--ink)]">{f.form}</span>
+                    <span className="font-mono tabular-nums text-[var(--muted)]">{f.pct}%</span>
+                  </div>
+                  <Meter value={f.pct} max={100} tone={pctTone(f.pct)} />
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/5">
-                  <div className="h-full rounded-full" style={{ width: `${f.pct}%`, background: pctColour(f.pct) }} />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </Panel>
         </div>
-      </div>
+      </Section>
 
-      {/* Randomisation balance */}
-      <div className={`${card} p-5`}>
-        <div className="mb-4 flex items-center gap-2">
-          <ListChecks size={15} className="text-[var(--brand-bright)]" />
-          <h3 className="font-display text-sm text-white">Randomisation balance</h3>
-          <span className="text-[10px] text-[var(--muted)]">target 1:1</span>
-        </div>
-        <div className="flex h-7 overflow-hidden rounded-lg border border-white/10">
-          <div className="flex items-center justify-center bg-[var(--brand-bright)]/30 text-[11px] text-white" style={{ width: `${(armA / SUBJECTS.length) * 100}%` }}>
+      <Panel
+        label="Allocation"
+        title="Randomisation balance"
+        actions={<span className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--muted)]">target 1:1</span>}
+      >
+        <div className="flex h-9 overflow-hidden border border-[var(--border)]">
+          <div className="flex items-center justify-center bg-[var(--accent-soft)] text-[11px] text-[var(--ink)]" style={{ width: `${(armA / SUBJECTS.length) * 100}%` }}>
             {ARMS[0]} · {armA}
           </div>
-          <div className="flex items-center justify-center bg-white/10 text-[11px] text-white" style={{ width: `${(armB / SUBJECTS.length) * 100}%` }}>
+          <div className="flex items-center justify-center bg-[var(--bg-soft)] text-[11px] text-[var(--ink)]" style={{ width: `${(armB / SUBJECTS.length) * 100}%` }}>
             {ARMS[1]} · {armB}
           </div>
         </div>
-        <p className="mt-2 text-[10px] text-[var(--muted)]/70">
+        <p className="mt-2.5 text-[11px] text-[var(--muted)]">
           Allocation generated by the randomisation module at enrolment; imbalance of ±{Math.abs(armA - armB)} is within tolerance for n={SUBJECTS.length}.
         </p>
-      </div>
+      </Panel>
     </div>
   );
 }
@@ -282,64 +246,60 @@ function ParticipantsTab({ queries }: { queries: QueryT[] }) {
   const rows = SUBJECTS.filter((s) => filter === 'All' || s.status === filter);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex flex-wrap gap-2">
         {SUBJ_FILTERS.map((f) => {
           const n = f === 'All' ? SUBJECTS.length : SUBJECTS.filter((s) => s.status === f).length;
+          const on = filter === f;
           return (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`rounded-xl border px-3 py-1.5 text-xs transition-colors ${
-                filter === f ? 'border-[var(--brand-bright)]/40 bg-[var(--brand-bright)]/10 text-white' : 'border-white/10 text-[var(--muted)] hover:text-white'
-              }`}
+              className={cx(
+                'border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors',
+                on ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)]' : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)]'
+              )}
             >
-              {f} <span className="text-[var(--muted)]">· {n}</span>
+              {f} <span className="opacity-60">· {n}</span>
             </button>
           );
         })}
       </div>
 
-      <div className={`${card} overflow-hidden`}>
+      <Panel bodyClassName="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-white/10 text-[11px] uppercase tracking-wide text-[var(--muted)]">
-              <tr>
-                <th className="px-4 py-3 font-medium">Participant</th>
-                <th className="px-4 py-3 font-medium">Site</th>
-                <th className="px-4 py-3 font-medium">Arm</th>
-                <th className="px-4 py-3 font-medium">Enrolled</th>
-                <th className="px-4 py-3 font-medium">Visits</th>
-                <th className="px-4 py-3 font-medium">CRF</th>
-                <th className="px-4 py-3 font-medium">Queries</th>
-                <th className="px-4 py-3 font-medium">Status</th>
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border)]">
+                {['Participant', 'Site', 'Arm', 'Enrolled', 'Visits', 'CRF', 'Queries'].map((h) => (
+                  <th key={h} className={cx('px-4 py-3 font-medium first:pl-5', fieldLabel)}>{h}</th>
+                ))}
+                <th className={cx('px-5 py-3 text-right font-medium', fieldLabel)}>Status</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((s) => {
                 const oq = openCountFor(s.id, queries);
                 return (
-                  <tr key={s.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
-                    <td className="px-4 py-3 font-mono text-xs text-white">{s.id}</td>
+                  <tr key={s.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--bg-soft)]">
+                    <td className="px-4 py-3 pl-5 font-mono text-xs text-[var(--ink)]">{s.id}</td>
                     <td className="px-4 py-3 text-[var(--muted)]">{siteName(s.site)}</td>
                     <td className="px-4 py-3 text-[var(--muted)]">{s.arm}</td>
                     <td className="px-4 py-3 text-[var(--muted)]">{s.enrolledDaysAgo}d ago</td>
                     <td className="px-4 py-3"><VisitDots idx={s.visitIdx} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/5">
-                          <div className="h-full rounded-full" style={{ width: `${s.crfPct}%`, background: pctColour(s.crfPct) }} />
-                        </div>
-                        <span className="text-[11px] text-[var(--muted)]">{s.crfPct}%</span>
+                        <Meter value={s.crfPct} max={100} tone={pctTone(s.crfPct)} className="w-16" />
+                        <span className="font-mono text-[11px] tabular-nums text-[var(--muted)]">{s.crfPct}%</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       {oq > 0
-                        ? <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-400">{oq} open</span>
-                        : <span className="text-[11px] text-[var(--muted)]/60">—</span>}
+                        ? <StatusTag tone="warn" dot={false}>{oq} open</StatusTag>
+                        : <span className="text-[11px] text-[var(--muted)]">—</span>}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_BG[s.status]}`}>{s.status}</span>
+                    <td className="px-5 py-3 text-right">
+                      <StatusTag tone={SUBJECT_TONE[s.status]} dot={false}>{s.status}</StatusTag>
                     </td>
                   </tr>
                 );
@@ -347,8 +307,8 @@ function ParticipantsTab({ queries }: { queries: QueryT[] }) {
             </tbody>
           </table>
         </div>
-      </div>
-      <p className="text-[10px] text-[var(--muted)]/60">
+      </Panel>
+      <p className="text-[11px] text-[var(--muted)]">
         Participant identifiers are site-sequential codes only — no names, dates of birth or other identifiers are held in this demo.
       </p>
     </div>
@@ -401,11 +361,17 @@ function checkField(def: FieldDef, raw: string): { level: CheckLevel; msg: strin
   return { level: 'ok', msg: 'In range' };
 }
 
-const LEVEL_STYLE: Record<CheckLevel, string> = {
-  ok: 'text-emerald-400',
+const LEVEL_TEXT: Record<CheckLevel, string> = {
+  ok: 'text-[var(--ok)]',
   incomplete: 'text-[var(--muted)]',
-  query: 'text-amber-400',
-  error: 'text-red-400',
+  query: 'text-[var(--warn)]',
+  error: 'text-[var(--danger)]',
+};
+const LEVEL_BORDER: Record<CheckLevel, string> = {
+  ok: 'border-[var(--ok)]',
+  incomplete: 'border-[var(--border)]',
+  query: 'border-[var(--warn)]',
+  error: 'border-[var(--danger)]',
 };
 
 type AuditEntry = { field: string; value: string };
@@ -459,53 +425,50 @@ function CrfTab({ addQueries }: { addQueries: (items: Omit<QueryT, 'id'>[]) => s
     setSaved({ raised: ids, audit });
   };
 
+  const selectCls = 'w-full border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--accent)]';
   const inputCls = (lvl: CheckLevel) =>
-    `w-full rounded-lg border bg-[var(--bg)] px-3 py-2 text-sm text-white outline-none transition-colors ${
-      lvl === 'error' ? 'border-red-500/50' : lvl === 'query' ? 'border-amber-500/50' : lvl === 'incomplete' ? 'border-white/10' : 'border-emerald-500/40'
-    }`;
+    cx('w-full border bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none transition-colors', LEVEL_BORDER[lvl]);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+    <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
       {/* Form */}
-      <div className={`${card} p-5`}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <HeartPulse size={16} className="text-[var(--brand-bright)]" />
-            <h3 className="font-display text-sm text-white">Vital signs &amp; safety labs</h3>
-          </div>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${saved ? (saved.raised.length ? 'bg-amber-500/15 text-amber-400' : 'bg-emerald-500/15 text-emerald-400') : 'bg-white/10 text-[var(--muted)]'}`}>
-            {saved ? (saved.raised.length ? `Complete · ${saved.raised.length} quer${saved.raised.length === 1 ? 'y' : 'ies'} raised` : 'Complete · clean') : 'In progress'}
-          </span>
-        </div>
-
+      <Panel
+        label="Electronic case report form"
+        title="Vital signs & safety labs"
+        actions={
+          <StatusTag tone={saved ? (saved.raised.length ? 'warn' : 'ok') : 'neutral'} dot={false}>
+            {saved ? (saved.raised.length ? `${saved.raised.length} quer${saved.raised.length === 1 ? 'y' : 'ies'} raised` : 'Saved clean') : 'In progress'}
+          </StatusTag>
+        }
+      >
         {/* Context selectors */}
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <label className="text-xs text-[var(--muted)]">
+        <div className="grid grid-cols-2 gap-3">
+          <label className={fieldLabel}>
             Participant
-            <select value={subjectId} onChange={(e) => { setSubjectId(e.target.value); setSaved(null); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--bg)] px-3 py-2 text-sm text-white outline-none">
+            <select value={subjectId} onChange={(e) => { setSubjectId(e.target.value); setSaved(null); }} className={cx(selectCls, 'mt-1.5')}>
               {activeSubjects.map((s) => <option key={s.id} value={s.id}>{s.id} · {siteName(s.site)}</option>)}
             </select>
           </label>
-          <label className="text-xs text-[var(--muted)]">
+          <label className={fieldLabel}>
             Visit event
-            <select value={visit} onChange={(e) => { setVisit(e.target.value); setSaved(null); }} className="mt-1 w-full rounded-lg border border-white/10 bg-[var(--bg)] px-3 py-2 text-sm text-white outline-none">
+            <select value={visit} onChange={(e) => { setVisit(e.target.value); setSaved(null); }} className={cx(selectCls, 'mt-1.5')}>
               {VISITS.slice(1).map((v) => <option key={v} value={v}>{v}</option>)}
             </select>
           </label>
         </div>
 
         {/* Fields */}
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-5 grid gap-3.5 sm:grid-cols-2">
           {checks.map(({ def, chk }) => (
             <div key={def.key}>
-              <div className="mb-1 flex items-center justify-between">
+              <div className="mb-1.5 flex items-center justify-between">
                 <label className="text-xs text-[var(--muted)]">
-                  {def.label}{def.unit ? <span className="text-[var(--muted)]/60"> ({def.unit})</span> : null}
-                  {def.required && <span className="text-[var(--brand-bright)]"> *</span>}
+                  {def.label}{def.unit ? <span className="opacity-60"> ({def.unit})</span> : null}
+                  {def.required && <span className="text-[var(--accent)]"> *</span>}
                 </label>
-                {chk.level === 'ok' && <CheckCircle2 size={12} className="text-emerald-400" />}
-                {chk.level === 'query' && <AlertTriangle size={12} className="text-amber-400" />}
-                {chk.level === 'error' && <AlertTriangle size={12} className="text-red-400" />}
+                {chk.level === 'ok' && <CheckCircle2 size={12} className="text-[var(--ok)]" />}
+                {chk.level === 'query' && <AlertTriangle size={12} className="text-[var(--warn)]" />}
+                {chk.level === 'error' && <AlertTriangle size={12} className="text-[var(--danger)]" />}
               </div>
               {def.type === 'select' ? (
                 <select value={values[def.key] ?? ''} onChange={(e) => set(def.key, e.target.value)} className={inputCls(chk.level)}>
@@ -520,30 +483,20 @@ function CrfTab({ addQueries }: { addQueries: (items: Omit<QueryT, 'id'>[]) => s
                   placeholder="—"
                 />
               )}
-              {chk.msg && <p className={`mt-1 text-[10px] ${LEVEL_STYLE[chk.level]}`}>{chk.msg}</p>}
+              {chk.msg && <p className={cx('mt-1 text-[10px]', LEVEL_TEXT[chk.level])}>{chk.msg}</p>}
             </div>
           ))}
         </div>
 
         {/* Completeness + save */}
-        <div className="mt-5 border-t border-white/10 pt-4">
-          <div className="mb-1 flex items-center justify-between text-xs">
+        <div className="mt-6 border-t border-[var(--border)] pt-5">
+          <div className="mb-1.5 flex items-center justify-between text-xs">
             <span className="text-[var(--muted)]">Required fields complete</span>
-            <span className="text-white">{requiredDone}/{requiredTotal}</span>
+            <span className="font-mono tabular-nums text-[var(--ink)]">{requiredDone}/{requiredTotal}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/5">
-            <div className="h-full rounded-full" style={{ width: `${completePct}%`, background: pctColour(completePct) }} />
-          </div>
+          <Meter value={completePct} max={100} tone={pctTone(completePct)} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              onClick={save}
-              disabled={!canSave}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
-                canSave ? 'bg-[var(--brand-bright)] text-black hover:opacity-90' : 'cursor-not-allowed bg-white/10 text-[var(--muted)]'
-              }`}
-            >
-              Save &amp; complete form
-            </button>
+            <AccentButton onClick={save} disabled={!canSave}>Save &amp; complete form</AccentButton>
             <span className="text-[11px] text-[var(--muted)]">
               {hasError
                 ? 'Resolve implausible values before saving.'
@@ -555,54 +508,53 @@ function CrfTab({ addQueries }: { addQueries: (items: Omit<QueryT, 'id'>[]) => s
             </span>
           </div>
         </div>
-      </div>
+      </Panel>
 
       {/* Audit trail / edit-check legend */}
-      <div className="space-y-4">
-        <div className={`${card} p-5`}>
-          <div className="mb-3 flex items-center gap-2">
-            <Lock size={14} className="text-[var(--brand-bright)]" />
-            <h3 className="font-display text-sm text-white">Audit trail</h3>
-            <span className="text-[10px] text-[var(--muted)]">21 CFR Part 11 style</span>
-          </div>
+      <div className="space-y-5">
+        <Panel
+          label="21 CFR Part 11 style"
+          title="Audit trail"
+          actions={<Lock size={14} className="text-[var(--accent)]" />}
+        >
           {saved ? (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <p className="text-[11px] text-[var(--muted)]">
-                {subjectId} · {visit} — signed by <span className="text-white">Andrew L.</span> (Data Associate) · just now
+                {subjectId} · {visit} — signed by <span className="text-[var(--ink)]">Andrew L.</span> (Data Associate) · just now
               </p>
-              <ul className="space-y-1">
+              <ul className="divide-y divide-[var(--border)] border border-[var(--border)]">
                 {saved.audit.map((a) => (
-                  <li key={a.field} className="flex items-center justify-between rounded-lg bg-white/[0.03] px-2.5 py-1.5 text-[11px]">
+                  <li key={a.field} className="flex items-center justify-between px-3 py-2 text-[11px]">
                     <span className="text-[var(--muted)]">{a.field}</span>
-                    <span className="font-mono text-white">{a.value || '—'}</span>
+                    <span className="font-mono text-[var(--ink)]">{a.value || '—'}</span>
                   </li>
                 ))}
               </ul>
               {saved.raised.length > 0 && (
-                <p className="mt-2 rounded-lg bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-400">
+                <p className="border border-[var(--warn)] bg-[var(--warn-bg)] px-3 py-2 text-[11px] text-[var(--warn)]">
                   Auto-raised {saved.raised.join(', ')} — see the Data queries tab.
                 </p>
               )}
             </div>
           ) : (
-            <p className="text-[11px] text-[var(--muted)]/70">
+            <p className="text-[11px] leading-relaxed text-[var(--muted)]">
               Every value written is logged with the entering user, a timestamp and the form context. Save the form to record this entry; out-of-range values raise a data query automatically.
             </p>
           )}
-        </div>
+        </Panel>
 
-        <div className={`${card} p-5`}>
-          <div className="mb-3 flex items-center gap-2">
-            <ShieldCheck size={14} className="text-[var(--brand-bright)]" />
-            <h3 className="font-display text-sm text-white">Edit checks</h3>
-          </div>
-          <ul className="space-y-2 text-[11px] text-[var(--muted)]">
-            <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-emerald-400" /> In range — accepted</li>
-            <li className="flex items-center gap-2"><AlertTriangle size={12} className="text-amber-400" /> Outside expected range — raises a query on save</li>
-            <li className="flex items-center gap-2"><AlertTriangle size={12} className="text-red-400" /> Implausible — blocks save until corrected</li>
+        <Panel
+          label="Validation"
+          title="Edit checks"
+          actions={<ShieldCheck size={14} className="text-[var(--accent)]" />}
+        >
+          <ul className="space-y-2.5 text-[11px] text-[var(--muted)]">
+            <li className="flex items-center gap-2"><CheckCircle2 size={12} className="text-[var(--ok)]" /> In range — accepted</li>
+            <li className="flex items-center gap-2"><AlertTriangle size={12} className="text-[var(--warn)]" /> Outside expected range — raises a query on save</li>
+            <li className="flex items-center gap-2"><AlertTriangle size={12} className="text-[var(--danger)]" /> Implausible — blocks save until corrected</li>
             <li className="flex items-center gap-2"><CircleDot size={12} className="text-[var(--muted)]" /> Required fields marked with *</li>
           </ul>
-        </div>
+        </Panel>
       </div>
     </div>
   );
@@ -619,19 +571,21 @@ function QueriesTab({ queries, setQueries }: { queries: QueryT[]; setQueries: Re
     setQueries((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex flex-wrap gap-2">
         {QUERY_FILTERS.map((f) => {
           const n = f === 'All' ? queries.length : queries.filter((q) => q.status === f).length;
+          const on = filter === f;
           return (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`rounded-xl border px-3 py-1.5 text-xs transition-colors ${
-                filter === f ? 'border-[var(--brand-bright)]/40 bg-[var(--brand-bright)]/10 text-white' : 'border-white/10 text-[var(--muted)] hover:text-white'
-              }`}
+              className={cx(
+                'border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors',
+                on ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)]' : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)]'
+              )}
             >
-              {f} <span className="text-[var(--muted)]">· {n}</span>
+              {f} <span className="opacity-60">· {n}</span>
             </button>
           );
         })}
@@ -639,38 +593,34 @@ function QueriesTab({ queries, setQueries }: { queries: QueryT[]; setQueries: Re
 
       <div className="space-y-3">
         {rows.length === 0 && (
-          <div className={`${card} p-8 text-center text-sm text-[var(--muted)]`}>No {filter !== 'All' ? filter.toLowerCase() : ''} queries.</div>
+          <Panel><p className="py-6 text-center text-sm text-[var(--muted)]">No {filter !== 'All' ? filter.toLowerCase() : ''} queries.</p></Panel>
         )}
         {rows.map((q) => (
-          <div key={q.id} className={`${card} p-4`}>
+          <div key={q.id} className="border border-[var(--border)] bg-[var(--surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs text-white">{q.id}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${QUERY_BG[q.status]}`}>{q.status}</span>
-                  <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-[var(--muted)]">{q.auto ? 'Auto edit-check' : 'Manual review'}</span>
+                  <span className="font-mono text-xs text-[var(--ink)]">{q.id}</span>
+                  <StatusTag tone={QUERY_TONE[q.status]} dot={false}>{q.status}</StatusTag>
+                  <span className="border border-[var(--border)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--muted)]">
+                    {q.auto ? 'Auto edit-check' : 'Manual review'}
+                  </span>
                 </div>
-                <p className="mt-1.5 text-sm text-white">{q.field}: <span className="font-mono">{q.value}</span></p>
+                <p className="mt-2 text-sm text-[var(--ink)]">{q.field}: <span className="font-mono">{q.value}</span></p>
                 <p className="mt-0.5 text-[11px] text-[var(--muted)]">{q.rule}</p>
-                <p className="mt-1 text-[10px] text-[var(--muted)]/70">
+                <p className="mt-1.5 text-[10px] text-[var(--muted)]">
                   {q.subjectId} · {q.visit} · {q.form} · raised {q.raisedDaysAgo === 0 ? 'just now' : `${q.raisedDaysAgo}d ago`}
                 </p>
               </div>
               <div className="flex shrink-0 gap-2">
                 {q.status === 'Open' && (
-                  <button onClick={() => setStatus(q.id, 'Answered')} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-[var(--muted)] hover:text-white">
-                    Mark answered
-                  </button>
+                  <GhostButton onClick={() => setStatus(q.id, 'Answered')}>Mark answered</GhostButton>
                 )}
                 {q.status !== 'Closed' && (
-                  <button onClick={() => setStatus(q.id, 'Closed')} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/25">
-                    <CheckCircle2 size={13} /> Close
-                  </button>
+                  <AccentButton onClick={() => setStatus(q.id, 'Closed')}><CheckCircle2 size={13} /> Close</AccentButton>
                 )}
                 {q.status === 'Closed' && (
-                  <button onClick={() => setStatus(q.id, 'Open')} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-[var(--muted)] hover:text-white">
-                    Re-open
-                  </button>
+                  <GhostButton onClick={() => setStatus(q.id, 'Open')}>Re-open</GhostButton>
                 )}
               </div>
             </div>
@@ -681,17 +631,10 @@ function QueriesTab({ queries, setQueries }: { queries: QueryT[]; setQueries: Re
   );
 }
 
-// ── Page shell ────────────────────────────────────────────────────────────────
+// ── Page ────────────────────────────────────────────────────────────────────
 type Tab = 'overview' | 'participants' | 'crf' | 'queries';
-const TABS: { key: Tab; label: string; Icon: LucideIcon }[] = [
-  { key: 'overview', label: 'Overview', Icon: Activity },
-  { key: 'participants', label: 'Participants', Icon: Users },
-  { key: 'crf', label: 'Data capture', Icon: ClipboardList },
-  { key: 'queries', label: 'Data queries', Icon: FlaskConical },
-];
 
 export default function EdcPage() {
-  usePageTitle('Health Research Data Platform');
   const [tab, setTab] = useState<Tab>('overview');
   const [queries, setQueries] = useState<QueryT[]>(SEED_QUERIES);
 
@@ -705,74 +648,43 @@ export default function EdcPage() {
 
   const openQueries = queries.filter((q) => q.status === 'Open').length;
 
+  const TABS: TabDef<Tab>[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'participants', label: 'Participants' },
+    { id: 'crf', label: 'Data capture' },
+    { id: 'queries', label: 'Data queries', count: openQueries || undefined },
+  ];
+
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[var(--bg)]/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Link to="/" className="font-display text-lg font-semibold tracking-tight text-white">
-              Andrew<span className="text-[var(--brand-bright)]">.</span>EDC
-            </Link>
-            <span className="hidden h-4 w-px bg-white/10 sm:block" />
-            <span className="hidden text-xs text-[var(--muted)] sm:block">Health Research Data Platform</span>
-          </div>
-          <Link to="/#work" className="inline-flex items-center gap-1.5 text-sm text-[var(--muted)] hover:text-white">
-            <ArrowLeft size={15} /> Portfolio
-          </Link>
-        </div>
-      </header>
+    <DemoShell title="Health Research Data Platform" wordmark="EDC" revealKey={tab}>
+      <Masthead
+        eyebrow="Clinical research data management · Botswana"
+        live="Live edit-checks"
+        title="Clean data, captured at the point of care."
+        lede="An Electronic Data Capture console for a multi-site clinical study: track enrolment and data completeness, browse a de-identified participant register, and capture a visit on an electronic Case Report Form whose edit-checks validate every value as you type and raise a data query the moment something falls out of range. Raised queries flow straight to the discrepancy workbench."
+        facts={[
+          { label: 'Protocol', value: STUDY.protocol },
+          { label: 'Design', value: 'Phase III · 1:1' },
+          { label: 'Sites', value: `${SITES.length} across Botswana` },
+          { label: 'Reference', value: 'OpenClinica (UX)' },
+        ]}
+      />
 
-      {/* Hero */}
-      <section className="mx-auto max-w-7xl px-6 pb-8 pt-12">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-[var(--muted)]">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--brand-bright)]" /> Simulated EDC · live edit-checks
-        </span>
-        <h1 className="mt-5 font-display text-4xl font-light text-white sm:text-5xl">
-          Health Research <span className="text-[var(--brand-bright)]">Data Platform</span>
-        </h1>
-        <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          An Electronic Data Capture console for a multi-site clinical study — track enrolment and data
-          completeness, browse a de-identified participant register, and capture a visit on an electronic
-          Case Report Form whose edit-checks validate every value as you type and raise a data query the
-          moment something falls out of range. Queries flow straight to the discrepancy workbench.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] text-[var(--muted)]">
-          <span className="inline-flex items-center gap-1.5"><Database size={13} className="text-[var(--brand-bright)]" /> {STUDY.protocol} · {STUDY.design}</span>
-          <span className="inline-flex items-center gap-1.5"><ShieldCheck size={13} className="text-[var(--brand-bright)]" /> UX studied from OpenClinica — all logic, data and UI are original (fictional data only).</span>
-        </div>
-      </section>
+      <TabNav tabs={TABS} active={tab} onChange={setTab} />
 
-      <main className="mx-auto max-w-7xl px-6 pb-20">
-        {/* Tab bar */}
-        <div className="mb-6 flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-[var(--surface)] p-1">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium transition-colors ${
-                tab === t.key ? 'bg-white/10 text-white' : 'text-[var(--muted)] hover:text-white'
-              }`}
-            >
-              <t.Icon size={14} /> {t.label}
-              {t.key === 'queries' && openQueries > 0 && (
-                <span className="ml-0.5 rounded-full bg-amber-500/20 px-1.5 text-[10px] text-amber-400">{openQueries}</span>
-              )}
-            </button>
-          ))}
-        </div>
-
+      <div className="pt-10">
         {tab === 'overview' && <OverviewTab queries={queries} />}
         {tab === 'participants' && <ParticipantsTab queries={queries} />}
         {tab === 'crf' && <CrfTab addQueries={addQueries} />}
         {tab === 'queries' && <QueriesTab queries={queries} setQueries={setQueries} />}
+      </div>
 
-        <p className="mt-8 text-center text-xs text-[var(--muted)]/60">
-          Enrolment overview · participant register · electronic CRF with edit-checks · data-query workbench — simulated client-side
-        </p>
-      </main>
-
-      <Footer />
-    </div>
+      <p className="mt-12 flex items-center gap-2 border-t border-[var(--border)] pt-6 text-[11px] leading-relaxed text-[var(--muted)]">
+        <FlaskConical size={13} className="shrink-0 text-[var(--accent)]" />
+        An enrolment overview, a de-identified participant register, an electronic CRF with live edit-checks and a
+        21 CFR Part 11-style audit trail, and a data-query workbench — UX patterns studied from OpenClinica; all
+        logic, data and UI are original, with fictional data only.
+      </p>
+    </DemoShell>
   );
 }

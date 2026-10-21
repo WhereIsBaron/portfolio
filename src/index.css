@@ -75,6 +75,13 @@ html[data-theme="light"] .paper {
   --brand-bright: #2456d6;
   --accent: #2456d6;
   --accent-ink: #ffffff;
+  --accent-soft: rgba(36, 86, 214, 0.1);
+  --ok: #1a7f52;
+  --ok-bg: rgba(26, 127, 82, 0.12);
+  --warn: #9a6a12;
+  --warn-bg: rgba(154, 106, 18, 0.14);
+  --danger: #b23b2e;
+  --danger-bg: rgba(178, 59, 46, 0.1);
 }
 
 /* Dark — "Slate": warm charcoal ground, the accent lifted for contrast. */
@@ -90,6 +97,13 @@ html[data-theme="dark"] .paper {
   --brand-bright: #87a2f7;
   --accent: #6f90f5;
   --accent-ink: #14141a;
+  --accent-soft: rgba(111, 144, 245, 0.16);
+  --ok: #52c88a;
+  --ok-bg: rgba(82, 200, 138, 0.15);
+  --warn: #e0b25c;
+  --warn-bg: rgba(224, 178, 92, 0.16);
+  --danger: #e8766b;
+  --danger-bg: rgba(232, 118, 107, 0.16);
 }
 
 .paper ::selection {

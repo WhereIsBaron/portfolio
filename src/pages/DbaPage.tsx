@@ -1,26 +1,26 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Activity, Database, HardDrive, Gauge, Clock,
-  ShieldCheck, Play, Loader2, CheckCircle2, AlertTriangle, XCircle,
-  Cpu, Layers, Search, ChevronRight, Terminal, RotateCcw, Info,
+  Activity, Clock, HardDrive, ShieldCheck, Play, Loader2, CheckCircle2,
+  AlertTriangle, XCircle, Layers, Search, ChevronRight, Terminal, RotateCcw, Info,
   type LucideIcon,
 } from 'lucide-react';
-import { usePageTitle } from '@/hooks/usePageTitle';
-import Footer from '@/components/Footer';
+import {
+  DemoShell, Masthead, TabNav, Panel, Stat, StatusTag, Meter,
+  AccentButton, fieldLabel, cx, type TabDef, type Tone,
+} from '@/components/demo/kit';
 
 // ─────────────────────────────────────────────────────────────────────────
-// Oracle DBA Console — focused single-page demo.
+// Oracle DBA Console — /dba — Andrew.DBA
 //
-// A simulated DBA operations console modelled on the daily job of an Oracle
-// database administrator: instance health, backup & recovery, SQL performance
-// tuning (with an EXPLAIN plan-tree visualiser), and a script runner that
-// executes against a seeded schema. Everything is generated from a seeded PRNG
-// so the numbers are stable run-to-run — it is a simulation, not a live DB.
+// A DBA operations console modelled on the daily job of an Oracle database
+// administrator: instance health, backup & recovery, SQL performance tuning
+// (with an EXPLAIN plan-tree visualiser), and a script runner that executes
+// against a seeded schema. Everything is generated from a seeded PRNG so the
+// numbers are stable run-to-run — it is a simulation, not a live DB.
 //
-// Reference systems (UX/feature study only — no code reused): CloudBeaver
-// (web SQL workbench) and Percona Monitoring & Management (instance health
-// dashboards). All logic, data and UI here are original.
+// UX patterns studied from CloudBeaver (web SQL workbench) and Percona
+// Monitoring & Management (instance health) — all logic, data and UI are
+// original.
 // ─────────────────────────────────────────────────────────────────────────
 
 function mulberry32(seed: number) {
@@ -265,228 +265,181 @@ const SCRIPTS: { label: string; sql: string; run: () => ScriptResult }[] = [
   },
 ];
 
-// ── Shared UI helpers ───────────────────────────────────────────────────────────
+// ── Tone maps ─────────────────────────────────────────────────────────────────
 
-const card = 'rounded-2xl border border-white/10 bg-[var(--surface)]';
-
-function usageColour(pct: number) {
-  if (pct >= 90) return '#f87171';
-  if (pct >= 75) return '#fbbf24';
-  return '#34d399';
+function pctTone(pct: number): Tone {
+  if (pct >= 90) return 'danger';
+  if (pct >= 75) return 'warn';
+  return 'ok';
 }
 
-const WAIT_CLASS_COLOUR: Record<string, string> = {
-  'User I/O': '#60a5fa',
-  CPU: '#34d399',
-  Commit: '#a78bfa',
-  Concurrency: '#f87171',
+const WAIT_CLASS_TONE: Record<string, Tone> = {
+  'User I/O': 'accent', CPU: 'ok', Commit: 'warn', Concurrency: 'danger',
+};
+
+const BACKUP_STATUS: Record<BackupJob['status'], { Icon: LucideIcon; tone: Tone }> = {
+  COMPLETED: { Icon: CheckCircle2, tone: 'ok' },
+  RUNNING:   { Icon: Loader2,      tone: 'accent' },
+  FAILED:    { Icon: XCircle,      tone: 'danger' },
+};
+
+const TONE_VAR: Record<Tone, string> = {
+  ok: 'var(--ok)', warn: 'var(--warn)', danger: 'var(--danger)', accent: 'var(--accent)', neutral: 'var(--muted)',
 };
 
 // ── Instance health tab ─────────────────────────────────────────────────────────
 
-function Meter({ label, pct, Icon, sub, highGood }: { label: string; pct: number; Icon: LucideIcon; sub: string; highGood?: boolean }) {
+function GaugeTile({ label, pct, sub, highGood }: { label: string; pct: number; sub: string; highGood?: boolean }) {
   // Most meters are "lower is better" (usage). highGood flips the scale so a
-  // high buffer-cache hit ratio reads healthy (green) rather than critical (red).
-  const colour = highGood ? usageColour(100 - pct) : usageColour(pct);
+  // high buffer-cache hit ratio reads healthy rather than critical.
+  const tone = highGood ? pctTone(100 - pct) : pctTone(pct);
   return (
-    <div className={`${card} p-4`}>
-      <div className="flex items-center gap-2 text-[var(--muted)]">
-        <Icon size={14} className="text-[var(--brand-bright)]" />
-        <span className="text-xs">{label}</span>
-      </div>
-      <p className="mt-1 font-display text-2xl text-white">{pct}%</p>
-      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: colour }} />
-      </div>
-      <p className="mt-1.5 text-[10px] text-[var(--muted)]/70">{sub}</p>
+    <div className="border border-[var(--border)] bg-[var(--surface)] p-4">
+      <p className={fieldLabel}>{label}</p>
+      <p className="mt-2 font-display text-3xl font-medium leading-none tracking-tight text-[var(--ink)]">{pct}%</p>
+      <Meter value={pct} max={100} tone={tone} className="mt-3" />
+      <p className="mt-2 text-[11px] text-[var(--muted)]">{sub}</p>
     </div>
   );
 }
 
 function HealthTab() {
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Meter label="Host CPU"        pct={INSTANCE.cpuPct} Icon={Cpu}    sub="8 vCPU · load avg 4.9" />
-        <Meter label="Memory"          pct={INSTANCE.memPct} Icon={Gauge}  sub={`SGA ${INSTANCE.sgaGb}G · PGA ${INSTANCE.pgaGb}G`} />
-        <Meter label="Buffer cache"    pct={INSTANCE.hitRatio} Icon={Layers} sub="hit ratio · target ≥ 95%" highGood />
-        <div className={`${card} p-4`}>
-          <div className="flex items-center gap-2 text-[var(--muted)]">
-            <Activity size={14} className="text-[var(--brand-bright)]" />
-            <span className="text-xs">Sessions</span>
-          </div>
-          <p className="mt-1 font-display text-2xl text-white">{SESSIONS.length}</p>
-          <p className="mt-2 text-[10px] text-[var(--muted)]/70">
-            {SESSIONS.filter((s) => s.status === 'ACTIVE').length} active · {SESSIONS.filter((s) => s.status === 'INACTIVE').length} idle
-          </p>
-        </div>
+    <div className="space-y-8">
+      <div className="grid grid-cols-2 gap-px bg-[var(--border)] lg:grid-cols-4">
+        <GaugeTile label="Host CPU" pct={INSTANCE.cpuPct} sub="8 vCPU · load avg 4.9" />
+        <GaugeTile label="Memory" pct={INSTANCE.memPct} sub={`SGA ${INSTANCE.sgaGb}G · PGA ${INSTANCE.pgaGb}G`} />
+        <GaugeTile label="Buffer cache" pct={INSTANCE.hitRatio} sub="hit ratio · target ≥ 95%" highGood />
+        <Stat
+          label="Sessions"
+          value={String(SESSIONS.length)}
+          sub={`${SESSIONS.filter((s) => s.status === 'ACTIVE').length} active · ${SESSIONS.filter((s) => s.status === 'INACTIVE').length} idle`}
+        />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         {/* Tablespaces */}
-        <div className={card}>
-          <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3">
-            <HardDrive size={15} className="text-[var(--brand-bright)]" />
-            <h3 className="text-sm font-semibold text-white">Tablespace usage</h3>
-          </div>
-          <div className="space-y-3 p-5">
+        <Panel label="Storage" title="Tablespace usage" actions={<HardDrive size={15} className="text-[var(--accent)]" />}>
+          <div className="space-y-3.5">
             {TABLESPACES.map((t) => {
               const pct = Math.round((t.usedGb / t.totalGb) * 1000) / 10;
               return (
                 <div key={t.name}>
-                  <div className="mb-1 flex items-center justify-between text-xs">
-                    <span className="font-mono text-white">{t.name}</span>
+                  <div className="mb-1.5 flex items-center justify-between text-xs">
+                    <span className="font-mono text-[var(--ink)]">{t.name}</span>
                     <span className="text-[var(--muted)]">
                       {t.usedGb} / {t.totalGb} GB
-                      {t.autoextend && <span className="ml-1 text-[10px] text-[var(--brand-bright)]">autoextend</span>}
+                      {t.autoextend && <span className="ml-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--accent)]">autoextend</span>}
                     </span>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: usageColour(pct) }} />
-                  </div>
+                  <Meter value={pct} max={100} tone={pctTone(pct)} />
                 </div>
               );
             })}
           </div>
-        </div>
+        </Panel>
 
         {/* Wait events */}
-        <div className={card}>
-          <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3">
-            <Clock size={15} className="text-[var(--brand-bright)]" />
-            <h3 className="text-sm font-semibold text-white">Top wait events</h3>
-            <span className="ml-auto text-[10px] text-[var(--muted)]">last 60 min · DB time</span>
-          </div>
-          <div className="space-y-3 p-5">
+        <Panel
+          label="DB time · last 60 min"
+          title="Top wait events"
+          actions={<Clock size={15} className="text-[var(--accent)]" />}
+        >
+          <div className="space-y-3.5">
             {WAIT_EVENTS.map((w) => (
               <div key={w.event}>
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="font-mono text-white">{w.event}</span>
-                  <span className="text-[var(--muted)]">{w.pct}%</span>
+                <div className="mb-1.5 flex items-center justify-between text-xs">
+                  <span className="font-mono text-[var(--ink)]">{w.event}</span>
+                  <span className="font-mono tabular-nums text-[var(--muted)]">{w.pct}%</span>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full rounded-full" style={{ width: `${w.pct}%`, background: WAIT_CLASS_COLOUR[w.class] ?? '#94a3b8' }} />
-                </div>
+                <Meter value={w.pct} max={100} tone={WAIT_CLASS_TONE[w.class] ?? 'neutral'} />
               </div>
             ))}
-            <div className="flex flex-wrap gap-3 pt-1">
-              {Object.entries(WAIT_CLASS_COLOUR).map(([cls, col]) => (
+            <div className="flex flex-wrap gap-3 pt-1.5">
+              {Object.entries(WAIT_CLASS_TONE).map(([cls, tone]) => (
                 <span key={cls} className="flex items-center gap-1.5 text-[10px] text-[var(--muted)]">
-                  <span className="h-2 w-2 rounded-sm" style={{ background: col }} /> {cls}
+                  <span className="h-2 w-2" style={{ background: TONE_VAR[tone] }} /> {cls}
                 </span>
               ))}
             </div>
           </div>
-        </div>
+        </Panel>
       </div>
 
       {/* Sessions */}
-      <div className={card}>
-        <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3">
-          <Activity size={15} className="text-[var(--brand-bright)]" />
-          <h3 className="text-sm font-semibold text-white">Active session monitor</h3>
-          <span className="ml-auto text-[10px] text-[var(--muted)]">V$SESSION</span>
-        </div>
+      <Panel label="V$SESSION" title="Active session monitor" actions={<Activity size={15} className="text-[var(--accent)]" />} bodyClassName="p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-white/10 text-left text-[var(--muted)]">
-                <th className="px-5 py-2 font-medium">SID</th>
-                <th className="px-2 py-2 font-medium">User</th>
-                <th className="px-2 py-2 font-medium">Status</th>
-                <th className="px-2 py-2 font-medium">Current SQL</th>
-                <th className="px-5 py-2 text-right font-medium">Wait</th>
+              <tr className="border-b border-[var(--border)] text-left">
+                <th className={cx('px-5 py-2.5 font-medium', fieldLabel)}>SID</th>
+                <th className={cx('px-2 py-2.5 font-medium', fieldLabel)}>User</th>
+                <th className={cx('px-2 py-2.5 font-medium', fieldLabel)}>Status</th>
+                <th className={cx('px-2 py-2.5 font-medium', fieldLabel)}>Current SQL</th>
+                <th className={cx('px-5 py-2.5 text-right font-medium', fieldLabel)}>Wait</th>
               </tr>
             </thead>
             <tbody>
               {SESSIONS.map((s) => (
-                <tr key={s.sid} className="border-b border-white/5">
-                  <td className="px-5 py-2 font-mono text-white">{s.sid}</td>
-                  <td className="px-2 py-2 text-[var(--muted)]">{s.user}</td>
-                  <td className="px-2 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      s.status === 'ACTIVE' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/10 text-[var(--muted)]'
-                    }`}>{s.status}</span>
+                <tr key={s.sid} className="border-b border-[var(--border)] last:border-0">
+                  <td className="px-5 py-2.5 font-mono text-[var(--ink)]">{s.sid}</td>
+                  <td className="px-2 py-2.5 text-[var(--muted)]">{s.user}</td>
+                  <td className="px-2 py-2.5">
+                    <StatusTag tone={s.status === 'ACTIVE' ? 'ok' : 'neutral'} dot={false}>{s.status}</StatusTag>
                   </td>
-                  <td className="max-w-[320px] truncate px-2 py-2 font-mono text-[var(--muted)]" title={s.sql}>{s.sql}</td>
-                  <td className="px-5 py-2 text-right font-mono text-[var(--muted)]">{s.waitSec ? `${s.waitSec}s` : '—'}</td>
+                  <td className="max-w-[320px] truncate px-2 py-2.5 font-mono text-[var(--muted)]" title={s.sql}>{s.sql}</td>
+                  <td className="px-5 py-2.5 text-right font-mono tabular-nums text-[var(--muted)]">{s.waitSec ? `${s.waitSec}s` : '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }
 
 // ── Backup & recovery tab ────────────────────────────────────────────────────────
 
-const BACKUP_STATUS: Record<BackupJob['status'], { Icon: LucideIcon; colour: string; bg: string }> = {
-  COMPLETED: { Icon: CheckCircle2, colour: '#34d399', bg: 'bg-emerald-500/15 text-emerald-400' },
-  RUNNING:   { Icon: Loader2,      colour: '#60a5fa', bg: 'bg-blue-500/15 text-blue-400' },
-  FAILED:    { Icon: XCircle,      colour: '#f87171', bg: 'bg-red-500/15 text-red-400' },
-};
-
 function BackupTab() {
   const lastFull = BACKUP_JOBS.find((j) => j.type === 'L0 Full' && j.status === 'COMPLETED');
   const failed = BACKUP_JOBS.filter((j) => j.status === 'FAILED').length;
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className={`${card} p-4`}>
-          <p className="text-xs text-[var(--muted)]">Last full (L0)</p>
-          <p className="mt-1 font-display text-2xl text-white">{lastFull ? `${lastFull.startedAgoH}h` : '—'}</p>
-          <p className="mt-1 text-[10px] text-[var(--muted)]/70">ago · {lastFull?.sizeGb} GB</p>
-        </div>
-        <div className={`${card} p-4`}>
-          <p className="text-xs text-[var(--muted)]">Recovery window</p>
-          <p className="mt-1 font-display text-2xl text-white">7 days</p>
-          <p className="mt-1 text-[10px] text-[var(--muted)]/70">RMAN retention policy</p>
-        </div>
-        <div className={`${card} p-4`}>
-          <p className="text-xs text-[var(--muted)]">Archivelog mode</p>
-          <p className="mt-1 font-display text-2xl text-emerald-400">ON</p>
-          <p className="mt-1 text-[10px] text-[var(--muted)]/70">FRA 41% used</p>
-        </div>
-        <div className={`${card} p-4`}>
-          <p className="text-xs text-[var(--muted)]">Failed jobs (72h)</p>
-          <p className={`mt-1 font-display text-2xl ${failed ? 'text-red-400' : 'text-white'}`}>{failed}</p>
-          <p className="mt-1 text-[10px] text-[var(--muted)]/70">needs attention</p>
-        </div>
+    <div className="space-y-8">
+      <div className="grid grid-cols-2 gap-px bg-[var(--border)] lg:grid-cols-4">
+        <Stat label="Last full (L0)" value={lastFull ? `${lastFull.startedAgoH}h` : '—'} sub={`ago · ${lastFull?.sizeGb} GB`} />
+        <Stat label="Recovery window" value="7 days" sub="RMAN retention policy" />
+        <Stat label="Archivelog mode" value="ON" sub="FRA 41% used" tone="ok" />
+        <Stat label="Failed jobs (72h)" value={String(failed)} sub="needs attention" tone={failed ? 'danger' : 'ok'} />
       </div>
 
       {failed > 0 && (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 px-5 py-4">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-red-400" />
+        <div className="flex items-start gap-3 border border-[var(--danger)] bg-[var(--danger-bg)] px-5 py-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-[var(--danger)]" />
           <div>
-            <p className="text-sm font-medium text-red-300">RMAN-2045 archivelog backup failed</p>
+            <p className="text-sm font-medium text-[var(--danger)]">RMAN-2045 archivelog backup failed</p>
             <p className="mt-0.5 text-xs text-[var(--muted)]">
               ORA-19809: limit exceeded for recovery files. The job retried against the FRA before a
               housekeeping script reclaimed space; the next scheduled run completed clean. Suggested fix:
-              raise <span className="font-mono">db_recovery_file_dest_size</span> or shorten archivelog retention.
+              raise <span className="font-mono text-[var(--ink)]">db_recovery_file_dest_size</span> or shorten archivelog retention.
             </p>
           </div>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-5">
+      <div className="grid gap-5 lg:grid-cols-5">
         {/* Job history */}
-        <div className={`${card} lg:col-span-3`}>
-          <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3">
-            <ShieldCheck size={15} className="text-[var(--brand-bright)]" />
-            <h3 className="text-sm font-semibold text-white">RMAN backup history</h3>
-          </div>
-          <div className="divide-y divide-white/5">
+        <Panel label="RMAN catalog" title="Backup history" actions={<ShieldCheck size={15} className="text-[var(--accent)]" />} className="lg:col-span-3" bodyClassName="p-0">
+          <div className="divide-y divide-[var(--border)]">
             {BACKUP_JOBS.map((j) => {
               const st = BACKUP_STATUS[j.status];
               return (
-                <div key={j.id} className="flex items-center gap-3 px-5 py-3">
-                  <st.Icon size={16} style={{ color: st.colour }} className={j.status === 'RUNNING' ? 'animate-spin' : ''} />
+                <div key={j.id} className="flex items-center gap-3 px-5 py-3.5">
+                  <st.Icon size={16} style={{ color: TONE_VAR[st.tone] }} className={j.status === 'RUNNING' ? 'animate-spin' : ''} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-white">{j.id}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${st.bg}`}>{j.type}</span>
+                      <span className="font-mono text-xs text-[var(--ink)]">{j.id}</span>
+                      <StatusTag tone={st.tone} dot={false}>{j.type}</StatusTag>
                     </div>
                     <p className="mt-0.5 text-[10px] text-[var(--muted)]">
                       {j.startedAgoH}h ago · {j.durationMin} min{j.sizeGb ? ` · ${j.sizeGb} GB` : ''}
@@ -496,31 +449,25 @@ function BackupTab() {
               );
             })}
           </div>
-        </div>
+        </Panel>
 
         {/* Restore points */}
-        <div className={`${card} lg:col-span-2`}>
-          <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3">
-            <RotateCcw size={15} className="text-[var(--brand-bright)]" />
-            <h3 className="text-sm font-semibold text-white">Restore points</h3>
-          </div>
-          <div className="space-y-3 p-5">
+        <Panel label="Flashback" title="Restore points" actions={<RotateCcw size={15} className="text-[var(--accent)]" />} className="lg:col-span-2">
+          <div className="space-y-3">
             {RESTORE_POINTS.map((r) => (
-              <div key={r.name} className="rounded-xl border border-white/10 bg-[var(--bg-soft)] p-3">
+              <div key={r.name} className="border border-[var(--border)] bg-[var(--bg-soft)] p-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs text-white">{r.name}</span>
-                  {r.guaranteed && (
-                    <span className="rounded-full bg-[var(--brand-bright)]/15 px-2 py-0.5 text-[10px] text-[var(--brand-bright)]">guaranteed</span>
-                  )}
+                  <span className="font-mono text-xs text-[var(--ink)]">{r.name}</span>
+                  {r.guaranteed && <StatusTag tone="accent" dot={false}>guaranteed</StatusTag>}
                 </div>
-                <p className="mt-1 font-mono text-[10px] text-[var(--muted)]">SCN {r.scn.toLocaleString()} · {r.agoH}h ago</p>
+                <p className="mt-1.5 font-mono text-[10px] text-[var(--muted)]">SCN {r.scn.toLocaleString()} · {r.agoH}h ago</p>
               </div>
             ))}
-            <p className="pt-1 text-[10px] text-[var(--muted)]/60">
+            <p className="pt-1 text-[11px] text-[var(--muted)]">
               Flashback to any guaranteed point is a sub-minute operation vs. a full restore.
             </p>
           </div>
-        </div>
+        </Panel>
       </div>
     </div>
   );
@@ -531,21 +478,14 @@ function BackupTab() {
 function PlanTreeNode({ node, depth }: { node: PlanNode; depth: number }) {
   return (
     <div>
-      <div
-        className="flex items-center gap-2 py-1.5 pr-2"
-        style={{ paddingLeft: `${depth * 18 + 8}px` }}
-      >
-        {depth > 0 && <ChevronRight size={11} className="shrink-0 text-[var(--muted)]/50" />}
-        <span className="font-mono text-xs text-white">{node.op}</span>
-        {node.object && (
-          <span className="font-mono text-[11px] text-[var(--brand-bright)]">{node.object}</span>
-        )}
-        <span className="ml-auto flex items-center gap-2">
-          <span className="font-mono text-[10px] text-[var(--muted)]">{node.rows.toLocaleString()} rows</span>
-          <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-white/10 sm:block">
-            <span className="block h-full rounded-full" style={{ width: `${node.costPct}%`, background: usageColour(node.costPct * 1.6) }} />
-          </span>
-          <span className="w-8 text-right font-mono text-[10px] text-[var(--muted)]">{node.costPct}%</span>
+      <div className="flex items-center gap-2 py-1.5 pr-3" style={{ paddingLeft: `${depth * 18 + 12}px` }}>
+        {depth > 0 && <ChevronRight size={11} className="shrink-0 text-[var(--muted)]" />}
+        <span className="font-mono text-xs text-[var(--ink)]">{node.op}</span>
+        {node.object && <span className="font-mono text-[11px] text-[var(--accent)]">{node.object}</span>}
+        <span className="ml-auto flex items-center gap-2.5">
+          <span className="font-mono text-[10px] tabular-nums text-[var(--muted)]">{node.rows.toLocaleString()} rows</span>
+          <Meter value={Math.min(100, node.costPct * 1.6)} max={100} tone={pctTone(node.costPct * 1.6)} className="hidden w-16 sm:block" />
+          <span className="w-8 text-right font-mono text-[10px] tabular-nums text-[var(--muted)]">{node.costPct}%</span>
         </span>
       </div>
       {node.children?.map((c, i) => <PlanTreeNode key={i} node={c} depth={depth + 1} />)}
@@ -559,58 +499,50 @@ function PerfTab() {
   const maxElapsed = Math.max(...TOP_SQL.map((s) => s.elapsedSec));
 
   return (
-    <div className="grid gap-6 lg:grid-cols-5">
+    <div className="grid gap-5 lg:grid-cols-5">
       {/* Top SQL list */}
-      <div className={`${card} lg:col-span-2`}>
-        <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3">
-          <Search size={15} className="text-[var(--brand-bright)]" />
-          <h3 className="text-sm font-semibold text-white">Top SQL by elapsed time</h3>
-        </div>
-        <div className="divide-y divide-white/5">
+      <Panel label="AWR · elapsed time" title="Top SQL" actions={<Search size={15} className="text-[var(--accent)]" />} className="lg:col-span-2" bodyClassName="p-0">
+        <div className="divide-y divide-[var(--border)]">
           {TOP_SQL.map((s) => (
             <button
               key={s.sqlId}
               onClick={() => setSelected(s.sqlId)}
-              className={`w-full px-5 py-3 text-left transition-colors ${selected === s.sqlId ? 'bg-[var(--brand-bright)]/10' : 'hover:bg-white/5'}`}
+              className={cx('w-full px-5 py-3.5 text-left transition-colors', selected === s.sqlId ? 'bg-[var(--accent-soft)]' : 'hover:bg-[var(--bg-soft)]')}
             >
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[11px] text-[var(--brand-bright)]">{s.sqlId}</span>
-                <span className="font-mono text-[11px] text-white">{s.elapsedSec}s</span>
+                <span className="font-mono text-[11px] text-[var(--accent)]">{s.sqlId}</span>
+                <span className="font-mono text-[11px] tabular-nums text-[var(--ink)]">{s.elapsedSec}s</span>
               </div>
               <p className="mt-1 truncate font-mono text-[10px] text-[var(--muted)]">{s.text.split('\n')[0]}</p>
-              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-[var(--brand-bright)]/70" style={{ width: `${(s.elapsedSec / maxElapsed) * 100}%` }} />
-              </div>
-              <p className="mt-1 text-[10px] text-[var(--muted)]/70">{s.execs.toLocaleString()} execs · {s.cpuSec}s CPU</p>
+              <Meter value={s.elapsedSec} max={maxElapsed} tone="accent" className="mt-2" />
+              <p className="mt-1.5 text-[10px] text-[var(--muted)]">{s.execs.toLocaleString()} execs · {s.cpuSec}s CPU</p>
             </button>
           ))}
         </div>
-      </div>
+      </Panel>
 
       {/* Selected SQL detail + plan tree */}
-      <div className={`${card} lg:col-span-3`}>
-        <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3">
-          <Layers size={15} className="text-[var(--brand-bright)]" />
-          <h3 className="text-sm font-semibold text-white">Execution plan</h3>
-          <span className="ml-auto font-mono text-[10px] text-[var(--muted)]">{sql.sqlId}</span>
-        </div>
-        <div className="p-5">
-          <pre className="overflow-x-auto rounded-xl border border-white/10 bg-[var(--bg-soft)] p-3 font-mono text-[11px] leading-relaxed text-[var(--muted)]">{sql.text}</pre>
+      <Panel
+        label={sql.sqlId}
+        title="Execution plan"
+        actions={<Layers size={15} className="text-[var(--accent)]" />}
+        className="lg:col-span-3"
+      >
+        <pre className="overflow-x-auto border border-[var(--border)] bg-[var(--bg-soft)] p-3 font-mono text-[11px] leading-relaxed text-[var(--ink)]">{sql.text}</pre>
 
-          <div className="mt-4 rounded-xl border border-white/10">
-            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-[10px] uppercase tracking-wide text-[var(--muted)]">
-              <span>Operation</span>
-              <span>Est. rows · cost share</span>
-            </div>
-            <PlanTreeNode node={sql.plan} depth={0} />
+        <div className="mt-4 border border-[var(--border)]">
+          <div className={cx('flex items-center justify-between border-b border-[var(--border)] px-3 py-2', fieldLabel)}>
+            <span>Operation</span>
+            <span>Est. rows · cost share</span>
           </div>
-
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-[var(--brand-bright)]/20 bg-[var(--brand-bright)]/5 px-4 py-3">
-            <Info size={15} className="mt-0.5 shrink-0 text-[var(--brand-bright)]" />
-            <p className="text-xs text-[var(--muted)]"><span className="text-white">Tuning note — </span>{sql.tuning}</p>
-          </div>
+          <PlanTreeNode node={sql.plan} depth={0} />
         </div>
-      </div>
+
+        <div className="mt-4 flex items-start gap-2.5 border border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-3">
+          <Info size={15} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+          <p className="text-xs text-[var(--muted)]"><span className="text-[var(--ink)]">Tuning note — </span>{sql.tuning}</p>
+        </div>
+      </Panel>
     </div>
   );
 }
@@ -633,73 +565,65 @@ function ScriptTab() {
     }, 650);
   };
 
-  const verdictCell = (v: string) =>
-    v === 'WARN'
-      ? 'text-amber-400'
-      : v === 'OK'
-        ? 'text-emerald-400'
-        : 'text-white';
+  const verdictClass = (v: string) =>
+    v === 'WARN' ? 'text-[var(--warn)]' : v === 'OK' ? 'text-[var(--ok)]' : 'text-[var(--ink)]';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex flex-wrap gap-2">
         {SCRIPTS.map((s, i) => (
           <button
             key={s.label}
             onClick={() => { setIdx(i); setResult(null); }}
-            className={`rounded-xl border px-3 py-1.5 text-xs transition-colors ${
-              idx === i ? 'border-[var(--brand-bright)]/40 bg-[var(--brand-bright)]/10 text-white' : 'border-white/10 text-[var(--muted)] hover:border-white/30 hover:text-white'
-            }`}
+            className={cx(
+              'border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors',
+              idx === i ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--ink)]' : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)]'
+            )}
           >
             {s.label}
           </button>
         ))}
       </div>
 
-      <div className={card}>
-        <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3">
-          <Terminal size={15} className="text-[var(--brand-bright)]" />
-          <h3 className="text-sm font-semibold text-white">SQL worksheet</h3>
-          <button
-            onClick={run}
-            disabled={running}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-[var(--brand-bright)] px-3 py-1.5 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white disabled:opacity-60"
-          >
+      <Panel
+        label="CloudBeaver-style worksheet"
+        title="SQL worksheet"
+        actions={
+          <AccentButton onClick={run} disabled={running}>
             {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
             {running ? 'Running…' : 'Run script'}
-          </button>
-        </div>
-        <pre className="overflow-x-auto px-5 py-4 font-mono text-[12px] leading-relaxed text-[var(--muted)]">{script.sql}</pre>
-      </div>
+          </AccentButton>
+        }
+        bodyClassName="p-0"
+      >
+        <pre className="overflow-x-auto px-5 py-4 font-mono text-[12px] leading-relaxed text-[var(--ink)]">{script.sql}</pre>
+      </Panel>
 
       {(running || result) && (
-        <div className={card}>
-          <div className="border-b border-white/10 px-5 py-2.5 text-[10px] uppercase tracking-wide text-[var(--muted)]">
-            Output log
-          </div>
-          <div className="space-y-1 px-5 py-3 font-mono text-[11px] text-[var(--muted)]">
+        <Panel label="Session" title="Output" actions={<Terminal size={15} className="text-[var(--accent)]" />} bodyClassName="p-0">
+          <div className="space-y-1 px-5 py-3.5 font-mono text-[11px] text-[var(--muted)]">
             {running && <p className="flex items-center gap-2"><Loader2 size={12} className="animate-spin" /> Connecting to ORCLCDB …</p>}
             {result?.log.map((l, i) => (
-              <p key={i}><span className="text-emerald-400">SQL&gt;</span> {l}</p>
+              <p key={i}><span className="text-[var(--ok)]">SQL&gt;</span> {l}</p>
             ))}
           </div>
 
           {result && (
             <>
-              <div className="overflow-x-auto border-t border-white/10">
+              <div className="overflow-x-auto border-t border-[var(--border)]">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-white/10 text-left text-[var(--muted)]">
-                      {result.columns.map((c) => <th key={c} className="px-5 py-2 font-mono font-medium">{c}</th>)}
+                    <tr className="border-b border-[var(--border)] text-left">
+                      {result.columns.map((c) => <th key={c} className={cx('px-5 py-2.5 font-medium', fieldLabel)}>{c}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {result.rows.map((row, i) => (
-                      <tr key={i} className="border-b border-white/5">
+                      <tr key={i} className="border-b border-[var(--border)] last:border-0">
                         {row.map((cell, j) => {
                           const isVerdict = result.columns[j] === 'VERDICT';
                           return (
-                            <td key={j} className={`px-5 py-1.5 font-mono ${isVerdict ? verdictCell(String(cell)) : 'text-white'}`}>
+                            <td key={j} className={cx('px-5 py-2 font-mono', isVerdict ? verdictClass(String(cell)) : 'text-[var(--ink)]')}>
                               {typeof cell === 'number' ? cell.toLocaleString() : cell}
                             </td>
                           );
@@ -709,10 +633,10 @@ function ScriptTab() {
                   </tbody>
                 </table>
               </div>
-              <p className="px-5 py-2.5 font-mono text-[11px] text-emerald-400">{result.feedback}</p>
+              <p className="border-t border-[var(--border)] px-5 py-2.5 font-mono text-[11px] text-[var(--ok)]">{result.feedback}</p>
             </>
           )}
-        </div>
+        </Panel>
       )}
     </div>
   );
@@ -722,81 +646,44 @@ function ScriptTab() {
 
 type Tab = 'health' | 'backup' | 'perf' | 'script';
 
-const TABS: { key: Tab; label: string; Icon: LucideIcon }[] = [
-  { key: 'health', label: 'Instance health', Icon: Activity },
-  { key: 'backup', label: 'Backup & recovery', Icon: ShieldCheck },
-  { key: 'perf',   label: 'SQL performance', Icon: Gauge },
-  { key: 'script', label: 'Script runner', Icon: Terminal },
-];
-
 export default function DbaPage() {
-  usePageTitle('Oracle DBA Console');
   const [tab, setTab] = useState<Tab>('health');
 
+  const TABS: TabDef<Tab>[] = [
+    { id: 'health', label: 'Instance health' },
+    { id: 'backup', label: 'Backup & recovery' },
+    { id: 'perf', label: 'SQL performance' },
+    { id: 'script', label: 'Script runner' },
+  ];
+
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[var(--bg)]/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Link to="/" className="font-display text-lg font-semibold tracking-tight text-white">
-              Andrew<span className="text-[var(--brand-bright)]">.</span>DBA
-            </Link>
-            <span className="hidden h-4 w-px bg-white/10 sm:block" />
-            <span className="hidden text-xs text-[var(--muted)] sm:block">Oracle 19c Operations Console</span>
-          </div>
-          <Link to="/#work" className="inline-flex items-center gap-1.5 text-sm text-[var(--muted)] hover:text-white">
-            <ArrowLeft size={15} /> Portfolio
-          </Link>
-        </div>
-      </header>
+    <DemoShell title="Oracle DBA Console" wordmark="DBA" revealKey={tab}>
+      <Masthead
+        eyebrow="Oracle database administration · Botswana"
+        title="A steady hand on the database."
+        lede="A day-in-the-life DBA console: monitor instance health and session waits, drive RMAN backup & recovery with flashback restore points, find and tune the heaviest SQL with a visual EXPLAIN plan tree, and run scripts against a seeded schema. Every number is generated from a fixed seed, so the console is reproducible."
+        facts={[
+          { label: 'Instance', value: `${INSTANCE.name} · ${INSTANCE.version}` },
+          { label: 'Uptime', value: `${INSTANCE.uptimeDays} days` },
+          { label: 'Buffer hit', value: `${INSTANCE.hitRatio}%` },
+          { label: 'Reference', value: 'CloudBeaver · PMM' },
+        ]}
+      />
 
-      {/* Hero */}
-      <section className="mx-auto max-w-7xl px-6 pb-8 pt-12">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-[var(--muted)]">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--brand-bright)]" /> Simulated instance · {INSTANCE.name} {INSTANCE.version}
-        </span>
-        <h1 className="mt-5 font-display text-4xl font-light text-white sm:text-5xl">
-          Oracle DBA <span className="text-[var(--brand-bright)]">Console</span>
-        </h1>
-        <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          A day-in-the-life DBA cockpit — monitor instance health, drive RMAN backup &amp; recovery,
-          find and tune the heaviest SQL with a visual EXPLAIN plan tree, and run scripts against a
-          seeded schema. The data is generated from a fixed seed, so every number is reproducible.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] text-[var(--muted)]">
-          <Database size={13} className="text-[var(--brand-bright)]" />
-          <span>UX studied from CloudBeaver &amp; Percona PMM — all logic and data here are original.</span>
-        </div>
-      </section>
+      <TabNav tabs={TABS} active={tab} onChange={setTab} />
 
-      <main className="mx-auto max-w-7xl px-6 pb-20">
-        {/* Tab bar */}
-        <div className="mb-6 flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-[var(--surface)] p-1">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium transition-colors ${
-                tab === t.key ? 'bg-white/10 text-white' : 'text-[var(--muted)] hover:text-white'
-              }`}
-            >
-              <t.Icon size={14} /> {t.label}
-            </button>
-          ))}
-        </div>
-
+      <div className="pt-10">
         {tab === 'health' && <HealthTab />}
         {tab === 'backup' && <BackupTab />}
         {tab === 'perf' && <PerfTab />}
         {tab === 'script' && <ScriptTab />}
+      </div>
 
-        <p className="mt-8 text-center text-xs text-[var(--muted)]/60">
-          Oracle 19c · RMAN · AWR/ASH-style metrics · cost-based optimiser plans · PL/SQL scripting — simulated client-side
-        </p>
-      </main>
-
-      <Footer />
-    </div>
+      <p className="mt-12 flex items-center gap-2 border-t border-[var(--border)] pt-6 text-[11px] leading-relaxed text-[var(--muted)]">
+        <ShieldCheck size={13} className="shrink-0 text-[var(--accent)]" />
+        Oracle 19c instance health, RMAN backup &amp; recovery, cost-based optimiser plan trees and a PL/SQL
+        script runner — UX patterns studied from CloudBeaver &amp; Percona PMM; all logic, data and UI are original.
+      </p>
+    </DemoShell>
   );
 }
