@@ -98,7 +98,7 @@ export function DemoShell({
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] px-4 pb-20 sm:px-6">{children}</main>
+      <main className="mx-auto max-w-[1600px] px-4 pb-14 sm:px-6">{children}</main>
 
       <Footer />
     </div>
@@ -124,7 +124,7 @@ export function Masthead({
   live?: string;
 }) {
   return (
-    <section className="border-b border-[var(--border)] pb-10 pt-12 sm:pt-16">
+    <section className="border-b border-[var(--border)] pb-6 pt-8 sm:pt-10">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className={fieldLabel}>{eyebrow}</span>
         {live && (
@@ -138,17 +138,17 @@ export function Masthead({
         )}
       </div>
 
-      <h1 className="mt-5 max-w-4xl font-display text-[clamp(2.25rem,5.5vw,4rem)] font-medium leading-[0.98] tracking-[-0.02em] text-[var(--ink)]">
+      <h1 className="mt-4 max-w-4xl font-display text-[clamp(2rem,5vw,3.4rem)] font-medium leading-[0.98] tracking-[-0.02em] text-[var(--ink)]">
         {title}
       </h1>
 
-      <p className="mt-5 max-w-2xl text-pretty text-base leading-relaxed text-[var(--muted)] sm:text-lg">
+      <p className="mt-4 max-w-2xl text-pretty text-sm leading-snug text-[var(--muted)] sm:text-base">
         {lede}
       </p>
 
-      <dl className="mt-10 grid grid-cols-2 gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] sm:grid-cols-4">
+      <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden border border-[var(--border)] bg-[var(--border)] sm:grid-cols-4">
         {facts.map((f) => (
-          <div key={f.label} className="bg-[var(--bg)] px-4 py-4">
+          <div key={f.label} className="bg-[var(--bg)] px-4 py-2.5">
             <dt className={fieldLabel}>{f.label}</dt>
             <dd className="mt-1.5 font-display text-lg font-medium leading-tight text-[var(--ink)]">
               {f.value}
@@ -185,7 +185,7 @@ export function TabNav<T extends string>({
               onClick={() => onChange(t.id)}
               aria-current={on ? 'page' : undefined}
               className={cx(
-                '-mb-px flex items-center gap-2 border-b-2 py-4 font-mono text-[11px] uppercase tracking-[0.13em] transition-colors',
+                '-mb-px flex items-center gap-2 border-b-2 py-3 font-mono text-[11px] uppercase tracking-[0.13em] transition-colors',
                 on
                   ? 'border-[var(--accent)] text-[var(--ink)]'
                   : 'border-transparent text-[var(--muted)] hover:text-[var(--ink)]'
@@ -235,7 +235,7 @@ export function Panel({
       className={cx('border border-[var(--border)] bg-[var(--surface)]', className)}
     >
       {hasHead && (
-        <header className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-4">
+        <header className="flex items-start justify-between gap-4 border-b border-[var(--border)] px-5 py-3">
           <div>
             {label && <p className={fieldLabel}>{label}</p>}
             {title && (
@@ -247,7 +247,7 @@ export function Panel({
           {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </header>
       )}
-      <div className={cx('p-5', bodyClassName)}>{children}</div>
+      <div className={cx('p-4', bodyClassName)}>{children}</div>
     </section>
   );
 }
@@ -267,17 +267,17 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section className={cx('border-t border-[var(--border)] pt-8', className)}>
+    <section className={cx('border-t border-[var(--border)] pt-6', className)}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className={fieldLabel}>{label}</p>
-          <h2 className="mt-2 font-display text-[clamp(1.5rem,3vw,2rem)] font-medium leading-tight text-[var(--ink)]">
+          <h2 className="mt-2 font-display text-[clamp(1.375rem,2.6vw,1.75rem)] font-medium leading-tight text-[var(--ink)]">
             {title}
           </h2>
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
-      <div className="mt-6">{children}</div>
+      <div className="mt-5">{children}</div>
     </section>
   );
 }
@@ -296,13 +296,13 @@ export function Stat({
   tone?: Tone;
 }) {
   return (
-    <div className="border border-[var(--border)] bg-[var(--surface)] p-4">
+    <div className="border border-[var(--border)] bg-[var(--surface)] p-3.5">
       <p className={fieldLabel}>{label}</p>
-      <p className="mt-2 font-display text-3xl font-medium leading-none tracking-tight text-[var(--ink)]">
+      <p className="mt-1.5 font-display text-[1.75rem] font-medium leading-none tracking-tight text-[var(--ink)]">
         {value}
       </p>
       {sub && (
-        <p className={cx('mt-2 flex items-center gap-1.5 text-xs', TONE_TEXT[tone])}>
+        <p className={cx('mt-1.5 flex items-center gap-1.5 text-xs', TONE_TEXT[tone])}>
           {tone !== 'neutral' && (
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" />
           )}

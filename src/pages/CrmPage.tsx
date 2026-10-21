@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { usePageTitle } from '@/hooks/usePageTitle';
-import { Link } from 'react-router-dom';
+import { DemoShell, Masthead, TabNav, AccentButton, cx, type TabDef } from '@/components/demo/kit';
 import {
-  ArrowLeft, LayoutDashboard, Users, Building2, KanbanSquare, CheckSquare,
+  LayoutDashboard, Users, Building2, KanbanSquare, CheckSquare,
   Calendar, Inbox, FileText, Megaphone, Zap, BarChart3, Settings as SettingsIcon,
   Search, Plus, X, Check, Phone, Mail, StickyNote, ChevronRight, Database,
-  Clock, TrendingUp, Target, DollarSign, AlertTriangle, Send, Menu,
+  Clock, TrendingUp, Target, DollarSign, AlertTriangle, Send,
   UserPlus, LifeBuoy, ArrowRightLeft, Flame, Sparkles, Radio,
   Package, BookOpen, ScrollText, ClipboardList, Trash2,
   GraduationCap, CheckCircle2, Circle, ChevronDown, PartyPopper,
@@ -92,25 +91,28 @@ const NAV: { id: Tab; label: string; icon: typeof Users }[] = [
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
+// TabNav consumes labels only; the editorial shell drops the sidebar icons.
+const NAV_TABS: TabDef<Tab>[] = NAV.map((n) => ({ id: n.id, label: n.label }));
+
 const LEAD_STATUS_STYLE: Record<LeadStatus, string> = {
-  New: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  Contacted: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  Qualified: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  Unqualified: 'bg-white/5 text-[var(--muted)] border-white/10',
-  Converted: 'bg-[var(--brand-bright)]/15 text-[var(--brand-bright)] border-[var(--brand-bright)]/30',
+  New: 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]',
+  Contacted: 'bg-[var(--warn-bg)] text-[var(--warn)] border-[var(--warn)]',
+  Qualified: 'bg-[var(--ok-bg)] text-[var(--ok)] border-[var(--ok)]',
+  Unqualified: 'bg-[var(--bg-soft)] text-[var(--muted)] border-[var(--border)]',
+  Converted: 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]',
 };
 const CASE_STATUS_STYLE: Record<CaseStatus, string> = {
-  Open: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
-  Pending: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  Replied: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  Resolved: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  Closed: 'bg-white/5 text-[var(--muted)] border-white/10',
+  Open: 'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger)]',
+  Pending: 'bg-[var(--warn-bg)] text-[var(--warn)] border-[var(--warn)]',
+  Replied: 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]',
+  Resolved: 'bg-[var(--ok-bg)] text-[var(--ok)] border-[var(--ok)]',
+  Closed: 'bg-[var(--bg-soft)] text-[var(--muted)] border-[var(--border)]',
 };
 const SLA_STYLE: Record<SlaState, string> = {
-  Met: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  'On track': 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  'Due soon': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  Breached: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  Met: 'bg-[var(--ok-bg)] text-[var(--ok)] border-[var(--ok)]',
+  'On track': 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]',
+  'Due soon': 'bg-[var(--warn-bg)] text-[var(--warn)] border-[var(--warn)]',
+  Breached: 'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger)]',
 };
 // Short human countdown: "in 3h" when due ahead, "5h ago" when overdue.
 const relTime = (ms: number, now = Date.now()) => {
@@ -122,36 +124,36 @@ const relTime = (ms: number, now = Date.now()) => {
 };
 
 const STATUS_STYLE: Record<Status, string> = {
-  Lead: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  Prospect: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  Customer: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  Churned: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  Lead: 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]',
+  Prospect: 'bg-[var(--warn-bg)] text-[var(--warn)] border-[var(--warn)]',
+  Customer: 'bg-[var(--ok-bg)] text-[var(--ok)] border-[var(--ok)]',
+  Churned: 'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger)]',
 };
 const PRIO_STYLE: Record<Priority, string> = {
-  Low: 'bg-white/5 text-[var(--muted)] border-white/10',
-  Medium: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  High: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  Low: 'bg-[var(--bg-soft)] text-[var(--muted)] border-[var(--border)]',
+  Medium: 'bg-[var(--warn-bg)] text-[var(--warn)] border-[var(--warn)]',
+  High: 'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger)]',
 };
 const INV_STYLE: Record<InvoiceStatus, string> = {
-  Draft: 'bg-white/5 text-[var(--muted)] border-white/10',
-  Sent: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  Paid: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  Overdue: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  Draft: 'bg-[var(--bg-soft)] text-[var(--muted)] border-[var(--border)]',
+  Sent: 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]',
+  Paid: 'bg-[var(--ok-bg)] text-[var(--ok)] border-[var(--ok)]',
+  Overdue: 'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger)]',
 };
 const ACT_ICON: Record<ActivityType, typeof Phone> = {
   Call: Phone, Email: Mail, Meeting: Calendar, Note: StickyNote, Task: CheckSquare,
 };
 const QUOTE_STYLE: Record<QuoteStatus, string> = {
-  Draft: 'bg-white/5 text-[var(--muted)] border-white/10',
-  Delivered: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  Accepted: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  Rejected: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  Draft: 'bg-[var(--bg-soft)] text-[var(--muted)] border-[var(--border)]',
+  Delivered: 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]',
+  Accepted: 'bg-[var(--ok-bg)] text-[var(--ok)] border-[var(--ok)]',
+  Rejected: 'bg-[var(--danger-bg)] text-[var(--danger)] border-[var(--danger)]',
 };
 const SO_STYLE: Record<SalesOrderStatus, string> = {
-  Created: 'bg-white/5 text-[var(--muted)] border-white/10',
-  Approved: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  Delivered: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  Invoiced: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  Created: 'bg-[var(--bg-soft)] text-[var(--muted)] border-[var(--border)]',
+  Approved: 'bg-[var(--warn-bg)] text-[var(--warn)] border-[var(--warn)]',
+  Delivered: 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]',
+  Invoiced: 'bg-[var(--ok-bg)] text-[var(--ok)] border-[var(--ok)]',
 };
 
 const fmtDate = (ms: number) =>
@@ -169,19 +171,19 @@ function Avatar({ src, name, size = 40 }: { src: string; name: string; size?: nu
       src={url}
       alt={name}
       onError={() => setErr(true)}
-      className="rounded-full border border-white/10 bg-[var(--bg-soft)] object-cover"
+      className="rounded-full border border-[var(--border)] bg-[var(--bg-soft)] object-cover"
       style={{ width: size, height: size }}
     />
   );
 }
 
-const card = 'min-w-0 rounded-2xl border border-white/10 bg-[var(--surface)]';
+const card = 'min-w-0  border border-[var(--border)] bg-[var(--surface)]';
 const field =
-  'w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--brand-bright)]';
+  'w-full  border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--accent)]';
 
 // One consistent pill for every quick reply — border matches the text colour, no emoji.
 const quickReplyPill =
-  'rounded-full border border-[var(--brand-bright)]/40 bg-[var(--brand-bright)]/5 px-2.5 py-1 text-[11px] text-[var(--brand-bright)] transition-colors hover:bg-[var(--brand-bright)]/15';
+  'rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] text-[var(--accent)] transition-colors hover:bg-[var(--accent-soft)]';
 
 // ── Blueprint ────────────────────────────────────────────────────────────────
 // Zoho's signature "enforced process": a deal can't jump to the next stage until
@@ -283,20 +285,20 @@ function ziaLeadRead(lead: Lead) {
 }
 
 const ZIA_TONE: Record<Warmth, string> = {
-  warm: 'border-emerald-500/30 text-emerald-300',
-  neutral: 'border-amber-500/30 text-amber-300',
-  cool: 'border-rose-500/30 text-rose-300',
+  warm: 'border-[var(--ok)] text-[var(--ok)]',
+  neutral: 'border-[var(--warn)] text-[var(--warn)]',
+  cool: 'border-[var(--danger)] text-[var(--danger)]',
 };
 
 // The compact Zia card — a score ring, a one-line verdict, and the reasons behind
 // it. Reused on the record page (deal read) and could drive a leads popover.
 function ZiaCard({ pct, verdict, tone, reasons, unit = '%' }: { pct: number; verdict: string; tone: Warmth; reasons: string[]; unit?: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-[var(--bg-soft)] p-3">
-      <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--brand-bright)]"><Sparkles size={13} /> Zia insights</div>
+    <div className=" border border-[var(--border)] bg-[var(--bg-soft)] p-3">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--accent)]"><Sparkles size={13} /> Zia insights</div>
       <div className="mt-2 flex items-center gap-3">
         <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 ${ZIA_TONE[tone]}`}>
-          <span className="font-display text-sm text-white">{pct}{unit}</span>
+          <span className="font-display text-sm text-[var(--ink)]">{pct}{unit}</span>
         </div>
         <div className="min-w-0">
           <div className={`text-sm font-medium ${ZIA_TONE[tone].split(' ')[1]}`}>{verdict}</div>
@@ -305,7 +307,7 @@ function ZiaCard({ pct, verdict, tone, reasons, unit = '%' }: { pct: number; ver
       </div>
       <ul className="mt-2.5 space-y-1">
         {reasons.map((r) => (
-          <li key={r} className="flex gap-1.5 text-[11px] text-[var(--muted)]"><span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[var(--brand-bright)]" />{r}</li>
+          <li key={r} className="flex gap-1.5 text-[11px] text-[var(--muted)]"><span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[var(--accent)]" />{r}</li>
         ))}
       </ul>
     </div>
@@ -490,25 +492,25 @@ function inboundReaction(body: string, firstName: string, avoid = ''): { body: s
 // Toast stack (bottom-right). Each is dismissed on a timer by the caller.
 function Toasts({ items, onDismiss, onOpen }: { items: Toast[]; onDismiss: (id: number) => void; onOpen: (id: string) => void }) {
   const dot: Record<Toast['tone'], string> = {
-    info: 'bg-sky-400', success: 'bg-emerald-400', warn: 'bg-amber-400', coach: 'bg-[var(--brand-bright)]',
+    info: 'bg-[var(--accent)]', success: 'bg-[var(--ok)]', warn: 'bg-[var(--warn)]', coach: 'bg-[var(--accent)]',
   };
   return (
     <div className="pointer-events-none fixed bottom-24 right-4 z-[80] flex w-[min(92vw,340px)] flex-col gap-2">
       {items.map((t) => {
         const clickable = Boolean(t.contactId);
         return (
-        <div key={t.id} className={`pointer-events-auto flex items-start gap-2.5 rounded-xl border border-white/10 bg-[var(--surface)]/95 px-3.5 py-2.5 text-sm text-[var(--text)] shadow-xl backdrop-blur animate-[slideIn_.25s_ease] ${clickable ? 'cursor-pointer transition-colors hover:border-[var(--brand-bright)]/40 hover:bg-[var(--surface)]' : ''}`}
+        <div key={t.id} className={`pointer-events-auto flex items-start gap-2.5  border border-[var(--border)] bg-[var(--surface)]/95 px-3.5 py-2.5 text-sm text-[var(--text)] shadow-xl backdrop-blur animate-[slideIn_.25s_ease] ${clickable ? 'cursor-pointer transition-colors hover:border-[var(--accent)] hover:bg-[var(--surface)]' : ''}`}
           onClick={clickable ? () => { onOpen(t.contactId!); onDismiss(t.id); } : undefined}
           role={clickable ? 'button' : undefined}
         >
           {t.tone === 'coach'
-            ? <Sparkles size={15} className="mt-0.5 shrink-0 text-[var(--brand-bright)]" />
+            ? <Sparkles size={15} className="mt-0.5 shrink-0 text-[var(--accent)]" />
             : <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot[t.tone]}`} />}
           <span className="min-w-0 flex-1">
             {t.text}
-            {clickable && <span className="mt-0.5 block text-[11px] text-[var(--brand-bright)]">View activity →</span>}
+            {clickable && <span className="mt-0.5 block text-[11px] text-[var(--accent)]">View activity →</span>}
           </span>
-          <button onClick={(e) => { e.stopPropagation(); onDismiss(t.id); }} className="shrink-0 text-[var(--muted)] hover:text-white"><X size={13} /></button>
+          <button onClick={(e) => { e.stopPropagation(); onDismiss(t.id); }} className="shrink-0 text-[var(--muted)] hover:text-[var(--ink)]"><X size={13} /></button>
         </div>
         );
       })}
@@ -540,24 +542,24 @@ function TrainingPanel({
     return (
       <button
         onClick={onRestore}
-        className="fixed bottom-4 left-4 z-[70] inline-flex items-center gap-2 rounded-full border border-[var(--brand-bright)]/40 bg-[var(--surface)]/95 px-3.5 py-2 text-sm text-white shadow-xl backdrop-blur transition-colors hover:border-[var(--brand-bright)]"
+        className="fixed bottom-4 left-4 z-[70] inline-flex items-center gap-2 rounded-full border border-[var(--accent)] bg-[var(--surface)]/95 px-3.5 py-2 text-sm text-[var(--ink)] shadow-xl backdrop-blur transition-colors hover:border-[var(--accent)]"
       >
-        <GraduationCap size={15} className="text-[var(--brand-bright)]" />
+        <GraduationCap size={15} className="text-[var(--accent)]" />
         Training <span className="text-[var(--muted)]">· {doneCount}/{total}</span>
       </button>
     );
   }
 
   return (
-    <div className="fixed bottom-4 left-4 z-[70] flex max-h-[min(78vh,640px)] w-[min(92vw,360px)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface)]/97 shadow-2xl backdrop-blur">
-      <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-        <GraduationCap size={17} className="shrink-0 text-[var(--brand-bright)]" />
+    <div className="fixed bottom-4 left-4 z-[70] flex max-h-[min(78vh,640px)] w-[min(92vw,360px)] flex-col overflow-hidden  border border-[var(--border)] bg-[var(--surface)]/97 shadow-2xl backdrop-blur">
+      <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-3">
+        <GraduationCap size={17} className="shrink-0 text-[var(--accent)]" />
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-white">Guided Training</div>
+          <div className="text-sm font-medium text-[var(--ink)]">Guided Training</div>
           <div className="text-[11px] text-[var(--muted)]">Lead → cash, one step at a time</div>
         </div>
-        <button onClick={onMinimize} className="rounded-lg p-1 text-[var(--muted)] hover:bg-white/5 hover:text-white" aria-label="Minimise training"><ChevronDown size={16} /></button>
-        <button onClick={onClose} className="rounded-lg p-1 text-[var(--muted)] hover:bg-white/5 hover:text-white" aria-label="Close training"><X size={16} /></button>
+        <button onClick={onMinimize} className=" p-1 text-[var(--muted)] hover:bg-[var(--bg-soft)] hover:text-[var(--ink)]" aria-label="Minimise training"><ChevronDown size={16} /></button>
+        <button onClick={onClose} className=" p-1 text-[var(--muted)] hover:bg-[var(--bg-soft)] hover:text-[var(--ink)]" aria-label="Close training"><X size={16} /></button>
       </div>
 
       <div className="px-4 pt-3">
@@ -565,8 +567,8 @@ function TrainingPanel({
           <span>{allDone ? 'Complete' : `Step ${Math.min(currentIdx + 1, total)} of ${total}`}</span>
           <span>{doneCount}/{total}</span>
         </div>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/5">
-          <div className="h-full rounded-full bg-[var(--brand-bright)] transition-all duration-500" style={{ width: `${(doneCount / total) * 100}%` }} />
+        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--bg-soft)]">
+          <div className="h-full rounded-full bg-[var(--accent)] transition-all duration-500" style={{ width: `${(doneCount / total) * 100}%` }} />
         </div>
       </div>
 
@@ -577,16 +579,16 @@ function TrainingPanel({
           return (
             <li
               key={s.id}
-              className={`rounded-xl border px-3 py-2.5 transition-colors ${
-                current ? 'border-[var(--brand-bright)]/40 bg-[var(--brand-bright)]/5' : complete ? 'border-emerald-500/20 bg-emerald-500/[0.06]' : 'border-white/10 bg-[var(--bg-soft)]'
+              className={` border px-3 py-2.5 transition-colors ${
+                current ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : complete ? 'border-[var(--ok-bg)] bg-[var(--ok)]/[0.06]' : 'border-[var(--border)] bg-[var(--bg-soft)]'
               }`}
             >
               <div className="flex items-start gap-2.5">
                 {complete
-                  ? <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-400" />
-                  : <Circle size={17} className={`mt-0.5 shrink-0 ${current ? 'text-[var(--brand-bright)]' : 'text-[var(--muted)]'}`} />}
+                  ? <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-[var(--ok)]" />
+                  : <Circle size={17} className={`mt-0.5 shrink-0 ${current ? 'text-[var(--accent)]' : 'text-[var(--muted)]'}`} />}
                 <div className="min-w-0 flex-1">
-                  <div className={`text-sm font-medium ${complete ? 'text-[var(--muted)] line-through' : 'text-white'}`}>{s.title}</div>
+                  <div className={`text-sm font-medium ${complete ? 'text-[var(--muted)] line-through' : 'text-[var(--ink)]'}`}>{s.title}</div>
                   {!complete && (current || currentIdx < 0) && (
                     <div className="mt-0.5 text-[11px] leading-snug text-[var(--muted)]">{s.hint}</div>
                   )}
@@ -594,7 +596,7 @@ function TrainingPanel({
                 {current && (
                   <button
                     onClick={() => onGo(s.tab)}
-                    className="shrink-0 rounded-full border border-[var(--brand-bright)]/40 bg-[var(--brand-bright)]/10 px-2.5 py-1 text-[11px] font-medium text-[var(--brand-bright)] transition-colors hover:bg-[var(--brand-bright)]/20"
+                    className="shrink-0 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent-soft)]"
                   >
                     Go →
                   </button>
@@ -606,14 +608,14 @@ function TrainingPanel({
       </ol>
 
       {allDone && (
-        <div className="border-t border-white/10 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-emerald-300">
+        <div className="border-t border-[var(--border)] px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-[var(--ok)]">
             <PartyPopper size={16} /> Full lifecycle complete
           </div>
           <p className="mt-1 text-[11px] leading-snug text-[var(--muted)]">
             You qualified a lead, converted it, advanced the deal through the Blueprint, quoted, raised a sales order, invoiced, and closed it Won — the entire Zoho lead-to-cash motion.
           </p>
-          <button onClick={onReset} className="mt-2.5 w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-xs font-medium text-white transition-colors hover:border-white/25">
+          <button onClick={onReset} className="mt-2.5 w-full  border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-xs font-medium text-[var(--ink)] transition-colors hover:border-[var(--border)]">
             Restart challenge
           </button>
         </div>
@@ -623,7 +625,6 @@ function TrainingPanel({
 }
 
 export default function CrmPage() {
-  usePageTitle('CRM System Demo');
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState('');
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -645,7 +646,6 @@ export default function CrmPage() {
   const [automations, setAutomations] = useState<Automation[]>([]);
 
   const [tab, setTab] = useState<Tab>('dashboard');
-  const [navOpen, setNavOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
@@ -1118,91 +1118,60 @@ export default function CrmPage() {
   };
 
   const selected = selectedId ? byId[selectedId] : null;
-  const go = (t: Tab) => { setTab(t); setNavOpen(false); };
+  const go = (t: Tab) => setTab(t);
+
+  const openDeals = deals.filter((d) => OPEN_STAGES.includes(d.stage));
+  const openCases = cases.filter((c) => c.status !== 'Closed' && c.status !== 'Resolved');
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[var(--bg)]/85 backdrop-blur">
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setNavOpen((v) => !v)}
-              className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-white/5 hover:text-white lg:hidden"
-              aria-label="Toggle navigation"
-            >
-              <Menu size={20} />
-            </button>
-            <Link to="/" className="font-display text-lg font-semibold tracking-tight text-white">
-              Andrew<span className="text-[var(--brand-bright)]">.</span>CRM
-            </Link>
-            <span className="hidden items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[11px] text-emerald-300 sm:inline-flex" title={`${liveCount} live update${liveCount === 1 ? '' : 's'} this session · synced ${relTime(lastSync)}`}>
-              <Radio size={11} className="animate-pulse" /> Live
-              <span className="text-emerald-300/60">· synced {relTime(lastSync)}</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => { setTrainingOn((v) => !v); setTrainingMin(false); }}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                trainingOn
-                  ? 'border-[var(--brand-bright)]/50 bg-[var(--brand-bright)]/10 text-[var(--brand-bright)]'
-                  : 'border-white/10 text-[var(--muted)] hover:border-white/25 hover:text-white'
-              }`}
-              title="Guided walkthrough of the full sales lifecycle"
-            >
-              <GraduationCap size={15} /> <span className="hidden sm:inline">Guided Training</span>
-            </button>
-            <Link to="/#work" className="inline-flex items-center gap-2 text-sm text-[var(--muted)] transition-colors hover:text-white">
-              <ArrowLeft size={15} /> <span className="hidden sm:inline">Back to portfolio</span>
-            </Link>
-          </div>
-        </div>
-      </header>
+    <DemoShell title="CRM System Demo" wordmark="CRM" revealKey={tab}>
+      <Masthead
+        eyebrow="Revenue operations · Andrew Trading (Pty) Ltd"
+        title={
+          <>
+            Lead to cash, <span className="text-[var(--accent)]">one honest pipeline.</span>
+          </>
+        }
+        lede="A full lead-to-cash CRM — leads, accounts, pipeline, quotes, sales orders, invoices and support — wired to one seeded workspace that persists in your browser. Every stage enforces its process, and the guided track walks the whole motion end to end."
+        facts={[
+          { label: 'Contacts', value: contacts.length },
+          { label: 'Open deals', value: openDeals.length },
+          { label: 'Pipeline', value: money(openDeals.reduce((s, d) => s + d.value, 0)) },
+          { label: 'Open cases', value: openCases.length },
+        ]}
+        live={`Live · ${liveCount} update${liveCount === 1 ? '' : 's'} this session · synced ${relTime(lastSync)}`}
+      />
 
-      <div className="mx-auto flex max-w-[1400px]">
-        {/* Sidebar */}
-        <aside
-          className={`${navOpen ? 'block' : 'hidden'} fixed inset-x-0 top-[57px] z-20 max-h-[calc(100vh-57px)] overflow-y-auto border-b border-white/10 bg-[var(--bg)] px-3 py-3 lg:sticky lg:top-[57px] lg:block lg:h-[calc(100vh-57px)] lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r lg:py-6`}
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <button
+          onClick={() => { setTrainingOn((v) => !v); setTrainingMin(false); }}
+          className={cx(
+            'inline-flex items-center gap-2 border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.13em] transition-colors',
+            trainingOn
+              ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+              : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)]'
+          )}
+          title="Guided walkthrough of the full sales lifecycle"
         >
-          <nav className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:flex lg:flex-col">
-            {NAV.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => go(n.id)}
-                className={`inline-flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors ${
-                  tab === n.id
-                    ? 'bg-[var(--brand-bright)] font-medium text-[#0b0d10]'
-                    : 'text-[var(--muted)] hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <n.icon size={16} className="shrink-0" /> {n.label}
-              </button>
-            ))}
-          </nav>
-        </aside>
+          <GraduationCap size={14} /> Guided training
+        </button>
+        <div className="flex items-center gap-2">
+          {(tab === 'contacts' || tab === 'dashboard') && (
+            <AccentButton onClick={() => setAddOpen(true)}>
+              <Plus size={15} /> New contact
+            </AccentButton>
+          )}
+          {tab === 'quotes' && (
+            <AccentButton onClick={() => setQuoteOpen(true)}>
+              <Plus size={15} /> New quote
+            </AccentButton>
+          )}
+        </div>
+      </div>
 
-        {/* Main */}
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mb-5 flex items-center justify-between">
-            <h1 className="font-display text-2xl text-white">{NAV.find((n) => n.id === tab)?.label}</h1>
-            {(tab === 'contacts' || tab === 'dashboard') && (
-              <button
-                onClick={() => setAddOpen(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-bright)] px-4 py-2 text-sm font-medium text-[#0b0d10] transition-colors hover:bg-white"
-              >
-                <Plus size={15} /> New contact
-              </button>
-            )}
-            {tab === 'quotes' && (
-              <button
-                onClick={() => setQuoteOpen(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-[var(--brand-bright)] px-4 py-2 text-sm font-medium text-[#0b0d10] transition-colors hover:bg-white"
-              >
-                <Plus size={15} /> New quote
-              </button>
-            )}
-          </div>
+      <TabNav tabs={NAV_TABS} active={tab} onChange={go} />
+
+      <div className="pt-6">
 
           {loading ? (
             <div className="py-24 text-center text-[var(--muted)]">Loading sample data…</div>
@@ -1240,8 +1209,14 @@ export default function CrmPage() {
               {tab === 'settings' && <SettingsView contacts={contacts} source={source} onReset={resetWorkspace} />}
             </>
           )}
-        </main>
       </div>
+
+      <p className="mt-10 border-t border-[var(--border)] pt-5 font-mono text-[11px] leading-relaxed text-[var(--muted)]">
+        UX reference: Zoho CRM's lead-to-cash flow and enforced "Blueprint" process.
+        All data, logic and UI here are original — the seeded workspace, Blueprint gates,
+        guided training, SalesSignals reads and quote→order→invoice conversions were built
+        from scratch; nothing is copied from Zoho or any other product.
+      </p>
 
       {selected && (
         <ContactDrawer
@@ -1297,7 +1272,7 @@ export default function CrmPage() {
           }}
         />
       )}
-    </div>
+    </DemoShell>
   );
 }
 
@@ -1342,9 +1317,9 @@ function Dashboard({
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {cards.map((c) => (
-          <button key={c.label} onClick={() => go(c.tab)} className={`${card} p-4 text-left transition-colors hover:border-white/25`}>
-            <c.icon size={16} className="text-[var(--brand-bright)]" />
-            <div className="mt-3 font-display text-2xl text-white">{c.value}</div>
+          <button key={c.label} onClick={() => go(c.tab)} className={`${card} p-4 text-left transition-colors hover:border-[var(--border)]`}>
+            <c.icon size={16} className="text-[var(--accent)]" />
+            <div className="mt-3 font-display text-2xl text-[var(--ink)]">{c.value}</div>
             <div className="text-xs text-[var(--muted)]">{c.label}</div>
           </button>
         ))}
@@ -1352,16 +1327,16 @@ function Dashboard({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className={`${card} p-6 lg:col-span-2`}>
-          <h3 className="font-display text-lg text-white">Pipeline by stage</h3>
+          <h3 className="font-display text-lg text-[var(--ink)]">Pipeline by stage</h3>
           <div className="mt-4 space-y-3">
             {stageCounts.map((s) => (
               <div key={s.stage}>
                 <div className="flex justify-between text-sm">
                   <span className="text-[var(--muted)]">{s.stage} <span className="opacity-60">· {s.count}</span></span>
-                  <span className="text-white">{money(s.value)}</span>
+                  <span className="text-[var(--ink)]">{money(s.value)}</span>
                 </div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5">
-                  <div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${(s.value / maxVal) * 100}%` }} />
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--bg-soft)]">
+                  <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${(s.value / maxVal) * 100}%` }} />
                 </div>
               </div>
             ))}
@@ -1369,11 +1344,11 @@ function Dashboard({
         </div>
 
         <div className={`${card} p-6`}>
-          <h3 className="flex items-center gap-2 font-display text-lg text-white"><Calendar size={17} className="text-[var(--brand-bright)]" /> Upcoming</h3>
+          <h3 className="flex items-center gap-2 font-display text-lg text-[var(--ink)]"><Calendar size={17} className="text-[var(--accent)]" /> Upcoming</h3>
           <ul className="mt-4 space-y-3">
             {upcomingMeetings.map((m) => (
               <li key={m.id} className="text-sm">
-                <div className="text-white">{m.title}</div>
+                <div className="text-[var(--ink)]">{m.title}</div>
                 <div className="text-xs text-[var(--muted)]">{fmtDay(m.startAt)} · {fmtTime(m.startAt)} · {m.location}</div>
               </li>
             ))}
@@ -1385,15 +1360,15 @@ function Dashboard({
       <div className="grid gap-6 lg:grid-cols-2">
         <div className={`${card} p-6`}>
           <div className="flex items-center justify-between">
-            <h3 className="font-display text-lg text-white">Tasks due</h3>
-            <button onClick={() => go('tasks')} className="text-xs text-[var(--brand-bright)]">View all</button>
+            <h3 className="font-display text-lg text-[var(--ink)]">Tasks due</h3>
+            <button onClick={() => go('tasks')} className="text-xs text-[var(--accent)]">View all</button>
           </div>
           <ul className="mt-4 space-y-2">
             {dueTasks.map((t) => (
-              <li key={t.id} className="flex items-center gap-3 rounded-xl bg-[var(--bg-soft)] px-3 py-2 text-sm">
+              <li key={t.id} className="flex items-center gap-3  bg-[var(--bg-soft)] px-3 py-2 text-sm">
                 <span className={`rounded-full border px-2 py-0.5 text-[10px] ${PRIO_STYLE[t.priority]}`}>{t.priority}</span>
-                <span className="min-w-0 flex-1 truncate text-white">{t.title}</span>
-                <span className={`shrink-0 text-xs ${t.dueAt < Date.now() ? 'text-rose-300' : 'text-[var(--muted)]'}`}>{fmtDate(t.dueAt)}</span>
+                <span className="min-w-0 flex-1 truncate text-[var(--ink)]">{t.title}</span>
+                <span className={`shrink-0 text-xs ${t.dueAt < Date.now() ? 'text-[var(--danger)]' : 'text-[var(--muted)]'}`}>{fmtDate(t.dueAt)}</span>
               </li>
             ))}
             {dueTasks.length === 0 && <li className="text-sm text-[var(--muted)]">All caught up.</li>}
@@ -1401,13 +1376,13 @@ function Dashboard({
         </div>
 
         <div className={`${card} p-6`}>
-          <h3 className="font-display text-lg text-white">Recent activity</h3>
+          <h3 className="font-display text-lg text-[var(--ink)]">Recent activity</h3>
           <ul className="mt-4 space-y-3">
             {recent.map((a) => {
               const Icon = ACT_ICON[a.type];
               return (
                 <li key={a.id} className="flex items-center gap-3 text-sm">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-[var(--brand-bright)]"><Icon size={14} /></span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center  bg-[var(--bg-soft)] text-[var(--accent)]"><Icon size={14} /></span>
                   <span className="min-w-0 flex-1 truncate">{a.subject} <span className="text-[var(--muted)]">· {byId[a.contactId]?.name ?? '—'}</span></span>
                   <span className="shrink-0 text-xs text-[var(--muted)]">{fmtDate(a.at)}</span>
                 </li>
@@ -1438,17 +1413,17 @@ function Contacts({
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-[var(--surface)] px-3 py-2">
+        <div className="flex flex-1 items-center gap-2  border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
           <Search size={16} className="text-[var(--muted)]" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, company, email…" className="w-full bg-transparent text-sm text-white outline-none placeholder:text-[var(--muted)]" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, company, email…" className="w-full bg-transparent text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" />
         </div>
-        <select value={status} onChange={(e) => setStatus(e.target.value as 'All' | Status)} className="rounded-xl border border-white/10 bg-[var(--surface)] px-3 py-2 text-sm text-white outline-none">
+        <select value={status} onChange={(e) => setStatus(e.target.value as 'All' | Status)} className=" border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] outline-none">
           <option value="All">All statuses</option>
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-white/10">
+      <div className="overflow-x-auto  border border-[var(--border)]">
         <table className="w-full min-w-[680px] border-collapse text-left text-sm">
           <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
             <tr>
@@ -1463,12 +1438,12 @@ function Contacts({
           </thead>
           <tbody>
             {filtered.map((c) => (
-              <tr key={c.id} onClick={() => onOpen(c.id)} className="cursor-pointer border-t border-white/5 transition-colors hover:bg-white/5">
+              <tr key={c.id} onClick={() => onOpen(c.id)} className="cursor-pointer border-t border-[var(--border)] transition-colors hover:bg-[var(--bg-soft)]">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <Avatar src={c.avatar} name={c.name} />
                     <div className="min-w-0">
-                      <div className="truncate font-medium text-white">{c.name}</div>
+                      <div className="truncate font-medium text-[var(--ink)]">{c.name}</div>
                       <div className="truncate text-xs text-[var(--muted)]">{c.title}</div>
                     </div>
                   </div>
@@ -1501,22 +1476,22 @@ function Companies({
         return (
           <div key={co.id} className={`${card} p-5`}>
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-[var(--brand-bright)]"><Building2 size={18} /></span>
+              <span className="flex h-10 w-10 items-center justify-center  bg-[var(--bg-soft)] text-[var(--accent)]"><Building2 size={18} /></span>
               <div className="min-w-0">
-                <div className="truncate font-medium text-white">{co.name}</div>
+                <div className="truncate font-medium text-[var(--ink)]">{co.name}</div>
                 <div className="text-xs text-[var(--muted)]">{co.industry} · {co.size}</div>
               </div>
             </div>
             <div className="mt-4 flex items-center justify-between text-sm">
               <span className="text-[var(--muted)]">Open pipeline</span>
-              <span className="text-[var(--brand-bright)]">{money(value)}</span>
+              <span className="text-[var(--accent)]">{money(value)}</span>
             </div>
             <div className="mt-3 flex items-center justify-between">
               <div className="flex -space-x-2">
                 {people.slice(0, 4).map((p) => <Avatar key={p.id} src={p.avatar} name={p.name} size={26} />)}
-                {people.length > 4 && <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-white/10 bg-[var(--bg-soft)] text-[10px] text-[var(--muted)]">+{people.length - 4}</span>}
+                {people.length > 4 && <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-soft)] text-[10px] text-[var(--muted)]">+{people.length - 4}</span>}
               </div>
-              {people[0] && <button onClick={() => onOpen(people[0].id)} className="text-xs text-[var(--brand-bright)]">Open →</button>}
+              {people[0] && <button onClick={() => onOpen(people[0].id)} className="text-xs text-[var(--accent)]">Open →</button>}
             </div>
           </div>
         );
@@ -1553,54 +1528,54 @@ function LeadsView({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {kpi.map(([label, value]) => (
-          <div key={label} className={`${card} p-4`}><div className="font-display text-xl text-white">{value}</div><div className="text-xs text-[var(--muted)]">{label}</div></div>
+          <div key={label} className={`${card} p-4`}><div className="font-display text-xl text-[var(--ink)]">{value}</div><div className="text-xs text-[var(--muted)]">{label}</div></div>
         ))}
       </div>
       <div className="flex flex-wrap gap-2">
         {(['active', 'New', 'Contacted', 'Qualified', 'Unqualified', 'Converted', 'all'] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} className={`rounded-full px-3 py-1.5 text-xs capitalize transition-colors ${filter === f ? 'bg-[var(--brand-bright)] text-[#0b0d10]' : 'border border-white/10 text-[var(--muted)] hover:text-white'}`}>{f}</button>
+          <button key={f} onClick={() => setFilter(f)} className={`rounded-full px-3 py-1.5 text-xs capitalize transition-colors ${filter === f ? 'bg-[var(--accent)] text-[var(--accent-ink)]' : 'border border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)]'}`}>{f}</button>
         ))}
       </div>
       <div className={`${card} p-3 text-xs text-[var(--muted)]`}>
-        <span className="text-white">Web-to-Lead:</span> new leads flow in from the website form and cold outreach, get scored and qualified, then <span className="text-[var(--brand-bright)]">convert</span> into a contact, an account, and an opportunity in one click.
+        <span className="text-[var(--ink)]">Web-to-Lead:</span> new leads flow in from the website form and cold outreach, get scored and qualified, then <span className="text-[var(--accent)]">convert</span> into a contact, an account, and an opportunity in one click.
       </div>
       {hottest && (() => {
         const z = ziaLeadRead(hottest);
         return (
           <div className={`${card} flex flex-wrap items-center gap-x-4 gap-y-2 p-3`}>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--brand-bright)]"><Sparkles size={13} /> Zia recommends</div>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--accent)]"><Sparkles size={13} /> Zia recommends</div>
             <div className="flex items-center gap-2 text-sm">
               <Avatar src={hottest.avatar} name={hottest.name} size={24} />
-              <span className="font-medium text-white">{hottest.name}</span>
+              <span className="font-medium text-[var(--ink)]">{hottest.name}</span>
               <span className={`rounded-full border px-2 py-0.5 text-[11px] ${ZIA_TONE[z.tone]}`}>{z.verdict}</span>
             </div>
             <span className="text-xs text-[var(--muted)]">{z.reasons[0]} · score {z.pct}</span>
           </div>
         );
       })()}
-      <div className="overflow-x-auto rounded-2xl border border-white/10">
+      <div className="overflow-x-auto  border border-[var(--border)]">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
             <tr><th className="px-4 py-3 font-medium">Lead</th><th className="px-4 py-3 font-medium">Source</th><th className="px-4 py-3 font-medium">Score</th><th className="px-4 py-3 text-right font-medium">Est. value</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
           </thead>
           <tbody>
             {shown.map((l) => (
-              <tr key={l.id} className="border-t border-white/5">
+              <tr key={l.id} className="border-t border-[var(--border)]">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <Avatar src={l.avatar} name={l.name} size={34} />
-                    <div className="min-w-0"><div className="truncate font-medium text-white">{l.name}</div><div className="truncate text-xs text-[var(--muted)]">{l.title} · {l.company}</div></div>
+                    <div className="min-w-0"><div className="truncate font-medium text-[var(--ink)]">{l.name}</div><div className="truncate text-xs text-[var(--muted)]">{l.title} · {l.company}</div></div>
                   </div>
                 </td>
                 <td className="px-4 py-3 text-[var(--muted)]">{l.source}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    {l.score >= 70 && <Flame size={13} className="text-rose-300" />}
-                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${l.score}%` }} /></div>
+                    {l.score >= 70 && <Flame size={13} className="text-[var(--danger)]" />}
+                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-[var(--bg-soft)]"><div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${l.score}%` }} /></div>
                     <span className="text-xs text-[var(--muted)]">{l.score}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-white">{money(l.estValue)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-[var(--ink)]">{money(l.estValue)}</td>
                 <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${LEAD_STATUS_STYLE[l.status]}`}>{l.status}</span></td>
                 <td className="px-4 py-3">
                   {l.status === 'Converted' ? (
@@ -1609,9 +1584,9 @@ function LeadsView({
                     <span className="text-xs text-[var(--muted)]/60">closed</span>
                   ) : (
                     <div className="flex justify-end gap-1.5">
-                      {l.status !== 'Qualified' && <button onClick={() => onAdvance(l.id)} className="rounded-lg border border-white/10 px-2.5 py-1 text-xs text-[var(--muted)] transition-colors hover:text-white">Advance</button>}
-                      <button onClick={() => onConvert(l.id)} className="inline-flex items-center gap-1 rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white"><ArrowRightLeft size={12} /> Convert</button>
-                      <button onClick={() => onDisqualify(l.id)} className="rounded-lg border border-white/10 px-2.5 py-1 text-xs text-[var(--muted)] transition-colors hover:text-rose-300">Disqualify</button>
+                      {l.status !== 'Qualified' && <button onClick={() => onAdvance(l.id)} className=" border border-[var(--border)] px-2.5 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--ink)]">Advance</button>}
+                      <button onClick={() => onConvert(l.id)} className="inline-flex items-center gap-1  bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] transition-colors hover:opacity-90"><ArrowRightLeft size={12} /> Convert</button>
+                      <button onClick={() => onDisqualify(l.id)} className=" border border-[var(--border)] px-2.5 py-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--danger)]">Disqualify</button>
                     </div>
                   )}
                 </td>
@@ -1654,7 +1629,7 @@ function CasesView({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {kpi.map(([label, value]) => (
           <div key={label} className={`${card} p-4`}>
-            <div className={`font-display text-xl ${label === 'SLA breached' && value ? 'text-rose-300' : 'text-white'}`}>{value}</div>
+            <div className={`font-display text-xl ${label === 'SLA breached' && value ? 'text-[var(--danger)]' : 'text-[var(--ink)]'}`}>{value}</div>
             <div className="text-xs text-[var(--muted)]">{label}</div>
           </div>
         ))}
@@ -1672,10 +1647,10 @@ function CasesView({
 
       <div className="flex flex-wrap gap-2">
         {(['open', ...CASE_STATUSES, 'all'] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} className={`rounded-full px-3 py-1.5 text-xs capitalize transition-colors ${filter === f ? 'bg-[var(--brand-bright)] text-[#0b0d10]' : 'border border-white/10 text-[var(--muted)] hover:text-white'}`}>{f}</button>
+          <button key={f} onClick={() => setFilter(f)} className={`rounded-full px-3 py-1.5 text-xs capitalize transition-colors ${filter === f ? 'bg-[var(--accent)] text-[var(--accent-ink)]' : 'border border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)]'}`}>{f}</button>
         ))}
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-white/10">
+      <div className="overflow-x-auto  border border-[var(--border)]">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
             <tr><th className="px-4 py-3 font-medium">Case</th><th className="px-4 py-3 font-medium">Contact</th><th className="px-4 py-3 font-medium">Priority</th><th className="px-4 py-3 font-medium">First response</th><th className="px-4 py-3 font-medium">Resolution</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3" /></tr>
@@ -1687,9 +1662,9 @@ function CasesView({
               const canAdvance = c.status !== 'Closed';
               const nextLabel = c.status === 'Open' ? 'Take' : c.status === 'Pending' ? 'Reply' : c.status === 'Replied' ? 'Resolve' : c.status === 'Resolved' ? 'Close' : '';
               return (
-                <tr key={c.id} className="border-t border-white/5">
+                <tr key={c.id} className="border-t border-[var(--border)]">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-white">{c.subject}</div>
+                    <div className="font-medium text-[var(--ink)]">{c.subject}</div>
                     <div className="text-xs text-[var(--muted)]">{c.number} · {c.type} · opened {fmtDate(c.createdAt)}</div>
                   </td>
                   <td className="px-4 py-3 text-[var(--muted)]">{ct?.name ?? '—'}</td>
@@ -1697,7 +1672,7 @@ function CasesView({
                   <td className="px-4 py-3"><SlaCell state={sla.responseState} dueAt={sla.responseDueAt} now={now} /></td>
                   <td className="px-4 py-3"><SlaCell state={sla.resolutionState} dueAt={sla.resolutionDueAt} now={now} /></td>
                   <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${CASE_STATUS_STYLE[c.status]}`}>{c.status}</span></td>
-                  <td className="px-4 py-3 text-right">{canAdvance && nextLabel && <button onClick={() => onAdvance(c.id)} className="rounded-lg bg-[var(--brand-bright)] px-2.5 py-1 text-xs font-medium text-[#0b0d10] transition-colors hover:bg-white">{nextLabel}</button>}</td>
+                  <td className="px-4 py-3 text-right">{canAdvance && nextLabel && <button onClick={() => onAdvance(c.id)} className=" bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] transition-colors hover:opacity-90">{nextLabel}</button>}</td>
                 </tr>
               );
             })}
@@ -1730,8 +1705,8 @@ function LostDealModal({
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div className={`${card} w-full max-w-md p-6`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h3 className="font-display text-lg text-white">Mark deal as lost</h3>
-          <button onClick={onClose} className="text-[var(--muted)] hover:text-white"><X size={18} /></button>
+          <h3 className="font-display text-lg text-[var(--ink)]">Mark deal as lost</h3>
+          <button onClick={onClose} className="text-[var(--muted)] hover:text-[var(--ink)]"><X size={18} /></button>
         </div>
         <p className="mt-1 text-sm text-[var(--muted)]">{money(deal.value)} · {deal.title}</p>
         <label className="mt-4 block text-xs uppercase tracking-wide text-[var(--muted)]">Lost reason</label>
@@ -1743,8 +1718,8 @@ function LostDealModal({
           {COMPETITORS.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         <div className="mt-6 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-[var(--muted)] hover:text-white">Cancel</button>
-          <button onClick={() => onConfirm(reason, competitor)} className="rounded-xl bg-rose-500/90 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500">Mark lost</button>
+          <button onClick={onClose} className=" border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted)] hover:text-[var(--ink)]">Cancel</button>
+          <button onClick={() => onConfirm(reason, competitor)} className=" bg-[var(--danger)] px-4 py-2 text-sm font-medium text-[var(--ink)] hover:bg-[var(--danger)]">Mark lost</button>
         </div>
       </div>
     </div>
@@ -1768,40 +1743,40 @@ function BlueprintModal({
       <div className={`${card} w-full max-w-lg p-6`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand-bright)]/15 text-[var(--brand-bright)]"><KanbanSquare size={16} /></span>
+            <span className="flex h-8 w-8 items-center justify-center  bg-[var(--accent-soft)] text-[var(--accent)]"><KanbanSquare size={16} /></span>
             <div>
-              <h3 className="font-display text-lg leading-tight text-white">Blueprint</h3>
-              <div className="flex items-center gap-1.5 text-xs text-[var(--muted)]">{deal.stage} <ChevronRight size={12} /> <span className="text-[var(--brand-bright)]">{bp.next}</span></div>
+              <h3 className="font-display text-lg leading-tight text-[var(--ink)]">Blueprint</h3>
+              <div className="flex items-center gap-1.5 text-xs text-[var(--muted)]">{deal.stage} <ChevronRight size={12} /> <span className="text-[var(--accent)]">{bp.next}</span></div>
             </div>
           </div>
-          <button onClick={onClose} className="text-[var(--muted)] hover:text-white"><X size={18} /></button>
+          <button onClick={onClose} className="text-[var(--muted)] hover:text-[var(--ink)]"><X size={18} /></button>
         </div>
         <p className="mt-3 text-sm text-[var(--muted)]">{money(deal.value)} · {deal.title}{contact ? ` · ${contact.name}` : ''}</p>
-        <div className="mt-3 rounded-xl border border-[var(--brand-bright)]/25 bg-[var(--brand-bright)]/5 px-3 py-2 text-[13px] text-[var(--text)]">{bp.guidance}</div>
+        <div className="mt-3  border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-2 text-[13px] text-[var(--text)]">{bp.guidance}</div>
 
         <div className="mt-4 text-xs uppercase tracking-wide text-[var(--muted)]">Required before advancing</div>
         <ul className="mt-2 space-y-1.5">
           {bp.checklist.map((item, i) => (
             <li key={item}>
-              <button onClick={() => toggle(i)} className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-left text-sm transition-colors hover:border-white/20">
-                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${done[i] ? 'border-[var(--brand-bright)] bg-[var(--brand-bright)] text-[#0b0d10]' : 'border-white/20 text-transparent'}`}><Check size={13} /></span>
-                <span className={done[i] ? 'text-white' : 'text-[var(--muted)]'}>{item}</span>
+              <button onClick={() => toggle(i)} className="flex w-full items-center gap-3  border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-left text-sm transition-colors hover:border-[var(--border)]">
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center  border ${done[i] ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-ink)]' : 'border-[var(--border)] text-transparent'}`}><Check size={13} /></span>
+                <span className={done[i] ? 'text-[var(--ink)]' : 'text-[var(--muted)]'}>{item}</span>
               </button>
             </li>
           ))}
         </ul>
 
-        <label className="mt-4 block text-xs uppercase tracking-wide text-[var(--muted)]">Next step <span className="text-rose-300">*</span></label>
+        <label className="mt-4 block text-xs uppercase tracking-wide text-[var(--muted)]">Next step <span className="text-[var(--danger)]">*</span></label>
         <input value={nextStep} onChange={(e) => setNextStep(e.target.value)} placeholder={bp.nextStepLabel} className={`mt-1 ${field}`} />
 
         <div className="mt-6 flex items-center justify-between gap-2">
           <span className="text-xs text-[var(--muted)]">{done.filter(Boolean).length}/{bp.checklist.length} steps done{ready ? '' : ' · complete all + a next step to continue'}</span>
           <div className="flex gap-2">
-            <button onClick={onClose} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-[var(--muted)] hover:text-white">Cancel</button>
+            <button onClick={onClose} className=" border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted)] hover:text-[var(--ink)]">Cancel</button>
             <button
               disabled={!ready}
               onClick={() => onConfirm(nextStep.trim())}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${ready ? 'bg-[var(--brand-bright)] text-[#0b0d10] hover:bg-white' : 'cursor-not-allowed bg-white/5 text-[var(--muted)]'}`}
+              className={`inline-flex items-center gap-1.5  px-4 py-2 text-sm font-medium transition-colors ${ready ? 'bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90' : 'cursor-not-allowed bg-[var(--bg-soft)] text-[var(--muted)]'}`}
             >
               Complete & move to {bp.next} <ChevronRight size={15} />
             </button>
@@ -1835,7 +1810,7 @@ function Pipeline({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {forecast.map(([label, value]) => (
           <div key={label} className={`${card} p-4`}>
-            <div className="font-display text-xl text-white">{value}</div>
+            <div className="font-display text-xl text-[var(--ink)]">{value}</div>
             <div className="text-xs text-[var(--muted)]">{label}</div>
           </div>
         ))}
@@ -1848,25 +1823,25 @@ function Pipeline({
         const total = col.reduce((s, d) => s + d.value, 0);
         return (
           <div key={stage} className={`${card} p-3`}>
-            <div className="flex items-center justify-between px-1"><span className="text-sm font-medium text-white">{stage}</span><span className="text-xs text-[var(--muted)]">{col.length}</span></div>
-            <div className="mb-2 px-1 text-xs text-[var(--brand-bright)]">{money(total)}</div>
+            <div className="flex items-center justify-between px-1"><span className="text-sm font-medium text-[var(--ink)]">{stage}</span><span className="text-xs text-[var(--muted)]">{col.length}</span></div>
+            <div className="mb-2 px-1 text-xs text-[var(--accent)]">{money(total)}</div>
             <div className="space-y-2">
               {col.map((d) => {
                 const c = byId[d.contactId];
                 const canAdvance = stage !== 'Won' && stage !== 'Lost';
                 return (
-                  <div key={d.id} className="rounded-xl border border-white/10 bg-[var(--bg-soft)] p-3">
-                    <div className="text-sm font-medium text-white">{money(d.value)}</div>
+                  <div key={d.id} className=" border border-[var(--border)] bg-[var(--bg-soft)] p-3">
+                    <div className="text-sm font-medium text-[var(--ink)]">{money(d.value)}</div>
                     <div className="mt-0.5 line-clamp-2 text-xs text-[var(--muted)]">{d.title}</div>
                     {c && <div className="mt-2 flex items-center gap-2"><Avatar src={c.avatar} name={c.name} size={20} /><span className="truncate text-xs text-[var(--muted)]">{c.name}</span></div>}
                     <div className="mt-1 text-[10px] text-[var(--muted)]/70">{d.probability}% · {d.owner}</div>
                     {d.stage === 'Lost' && d.lostReason && (
-                      <div className="mt-1.5 rounded-md bg-rose-500/10 px-1.5 py-1 text-[10px] text-rose-300/90">{d.lostReason}{d.competitor && d.competitor !== 'None' ? ` · ${d.competitor}` : ''}</div>
+                      <div className="mt-1.5  bg-[var(--danger-bg)] px-1.5 py-1 text-[10px] text-[var(--danger)]">{d.lostReason}{d.competitor && d.competitor !== 'None' ? ` · ${d.competitor}` : ''}</div>
                     )}
                     {canAdvance && (
                       <div className="mt-2 flex gap-1.5">
-                        <button onClick={() => onAdvance(d.id)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-[var(--brand-bright)] px-2 py-1 text-[11px] font-medium text-[#0b0d10] transition-colors hover:bg-white">Advance <ChevronRight size={12} /></button>
-                        <button onClick={() => onLose(d.id)} className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-[var(--muted)] transition-colors hover:text-rose-300">Lost</button>
+                        <button onClick={() => onAdvance(d.id)} className="inline-flex flex-1 items-center justify-center gap-1  bg-[var(--accent)] px-2 py-1 text-[11px] font-medium text-[var(--accent-ink)] transition-colors hover:opacity-90">Advance <ChevronRight size={12} /></button>
+                        <button onClick={() => onLose(d.id)} className=" border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--muted)] transition-colors hover:text-[var(--danger)]">Lost</button>
                       </div>
                     )}
                   </div>
@@ -1913,34 +1888,34 @@ function Tasks({
   return (
     <div className="space-y-4">
       <div className={`${card} flex flex-wrap items-center gap-2 p-3`}>
-        <select value={cid || contacts[0]?.id || ''} onChange={(e) => setCid(e.target.value)} className="rounded-lg border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none">
+        <select value={cid || contacts[0]?.id || ''} onChange={(e) => setCid(e.target.value)} className=" border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--ink)] outline-none">
           {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <select value={prio} onChange={(e) => setPrio(e.target.value as Priority)} className="rounded-lg border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none">
+        <select value={prio} onChange={(e) => setPrio(e.target.value as Priority)} className=" border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--ink)] outline-none">
           {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} placeholder="New task (due in 3 days)…" className="min-w-[160px] flex-1 rounded-lg border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none placeholder:text-[var(--muted)]" />
-        <button onClick={submit} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-bright)] px-3 py-2 text-sm font-medium text-[#0b0d10] hover:bg-white"><Plus size={15} /> Add</button>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} placeholder="New task (due in 3 days)…" className="min-w-[160px] flex-1  border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" />
+        <button onClick={submit} className="inline-flex items-center gap-1.5  bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90"><Plus size={15} /> Add</button>
       </div>
 
       <div className="flex gap-2">
         {(['open', 'overdue', 'done', 'all'] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} className={`rounded-full px-3 py-1.5 text-xs capitalize transition-colors ${filter === f ? 'bg-[var(--brand-bright)] text-[#0b0d10]' : 'border border-white/10 text-[var(--muted)] hover:text-white'}`}>{f}</button>
+          <button key={f} onClick={() => setFilter(f)} className={`rounded-full px-3 py-1.5 text-xs capitalize transition-colors ${filter === f ? 'bg-[var(--accent)] text-[var(--accent-ink)]' : 'border border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)]'}`}>{f}</button>
         ))}
       </div>
 
-      <ul className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10">
+      <ul className="divide-y border-[var(--border)] overflow-hidden  border border-[var(--border)]">
         {shown.map((t) => {
           const overdue = !t.done && t.dueAt < Date.now();
           return (
             <li key={t.id} className="flex items-center gap-3 bg-[var(--surface)] px-4 py-3">
-              <button onClick={() => onToggle(t.id)} className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors ${t.done ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-300' : 'border-white/20 text-transparent hover:border-white/40'}`} aria-label="Toggle"><Check size={14} /></button>
+              <button onClick={() => onToggle(t.id)} className={`flex h-6 w-6 shrink-0 items-center justify-center  border transition-colors ${t.done ? 'border-[var(--ok)] bg-[var(--ok-bg)] text-[var(--ok)]' : 'border-[var(--border)] text-transparent hover:border-[var(--border)]'}`} aria-label="Toggle"><Check size={14} /></button>
               <span className={`rounded-full border px-2 py-0.5 text-[10px] ${PRIO_STYLE[t.priority]}`}>{t.priority}</span>
               <div className="min-w-0 flex-1">
-                <div className={`truncate text-sm ${t.done ? 'text-[var(--muted)] line-through' : 'text-white'}`}>{t.title}</div>
+                <div className={`truncate text-sm ${t.done ? 'text-[var(--muted)] line-through' : 'text-[var(--ink)]'}`}>{t.title}</div>
                 <div className="truncate text-xs text-[var(--muted)]">{byId[t.contactId]?.name ?? '—'} · {t.owner}</div>
               </div>
-              <span className={`inline-flex shrink-0 items-center gap-1 text-xs ${overdue ? 'text-rose-300' : 'text-[var(--muted)]'}`}><Clock size={12} /> {fmtDate(t.dueAt)}</span>
+              <span className={`inline-flex shrink-0 items-center gap-1 text-xs ${overdue ? 'text-[var(--danger)]' : 'text-[var(--muted)]'}`}><Clock size={12} /> {fmtDate(t.dueAt)}</span>
             </li>
           );
         })}
@@ -1963,7 +1938,7 @@ function CalendarView({ meetings, byId }: { meetings: Meeting[]; byId: Record<st
       {Object.entries(groups).map(([day, items]) => (
         <div key={day}>
           <div className="mb-2 flex items-center gap-2 text-sm text-[var(--muted)]">
-            <span className={`h-1.5 w-1.5 rounded-full ${items[0].startAt > Date.now() ? 'bg-[var(--brand-bright)]' : 'bg-white/20'}`} /> {day}
+            <span className={`h-1.5 w-1.5 rounded-full ${items[0].startAt > Date.now() ? 'bg-[var(--accent)]' : 'bg-[var(--bg-soft)]'}`} /> {day}
           </div>
           <div className="space-y-2">
             {items.map((m) => {
@@ -1971,15 +1946,15 @@ function CalendarView({ meetings, byId }: { meetings: Meeting[]; byId: Record<st
               return (
                 <div key={m.id} className={`${card} flex items-center gap-4 p-4`}>
                   <div className="w-16 shrink-0 text-center">
-                    <div className="font-display text-lg text-white">{fmtTime(m.startAt)}</div>
+                    <div className="font-display text-lg text-[var(--ink)]">{fmtTime(m.startAt)}</div>
                     <div className="text-[10px] text-[var(--muted)]">{m.durationMin} min</div>
                   </div>
-                  <div className="h-10 w-px bg-white/10" />
+                  <div className="h-10 w-px bg-[var(--bg-soft)]" />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-white">{m.title}</div>
+                    <div className="truncate font-medium text-[var(--ink)]">{m.title}</div>
                     <div className="truncate text-xs text-[var(--muted)]">{m.kind} · {c?.name ?? '—'} · {m.owner}</div>
                   </div>
-                  <span className="hidden shrink-0 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-[var(--muted)] sm:inline">{m.location}</span>
+                  <span className="hidden shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-soft)] px-2.5 py-1 text-xs text-[var(--muted)] sm:inline">{m.location}</span>
                 </div>
               );
             })}
@@ -2039,31 +2014,31 @@ function InboxView({
   };
 
   const warmthUi: Record<Warmth, { label: string; cls: string }> = {
-    warm: { label: 'Warm, well-pitched reply', cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' },
-    neutral: { label: 'Decent — room to warm it up', cls: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
-    cool: { label: 'A bit flat — see the tips', cls: 'border-rose-500/30 bg-rose-500/10 text-rose-300' },
+    warm: { label: 'Warm, well-pitched reply', cls: 'border-[var(--ok)] bg-[var(--ok-bg)] text-[var(--ok)]' },
+    neutral: { label: 'Decent — room to warm it up', cls: 'border-[var(--warn)] bg-[var(--warn-bg)] text-[var(--warn)]' },
+    cool: { label: 'A bit flat — see the tips', cls: 'border-[var(--danger)] bg-[var(--danger-bg)] text-[var(--danger)]' },
   };
 
   return (
     <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-      <div className="overflow-hidden rounded-2xl border border-white/10">
-        <ul className="max-h-[70vh] divide-y divide-white/5 overflow-y-auto">
+      <div className="overflow-hidden  border border-[var(--border)]">
+        <ul className="max-h-[70vh] divide-y border-[var(--border)] overflow-y-auto">
           {threads.map((t) => {
             const c = byId[t.contactId];
             const last = t.messages[t.messages.length - 1];
             return (
               <li key={t.id}>
-                <button onClick={() => { setOpenId(t.id); onRead(t.id); }} className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${openId === t.id ? 'bg-white/5' : 'hover:bg-white/5'}`}>
+                <button onClick={() => { setOpenId(t.id); onRead(t.id); }} className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${openId === t.id ? 'bg-[var(--bg-soft)]' : 'hover:bg-[var(--bg-soft)]'}`}>
                   {c && <Avatar src={c.avatar} name={c.name} size={34} />}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className={`truncate text-sm ${t.unread ? 'font-semibold text-white' : 'text-[var(--text)]'}`}>{c?.name ?? '—'}</span>
+                      <span className={`truncate text-sm ${t.unread ? 'font-semibold text-[var(--ink)]' : 'text-[var(--text)]'}`}>{c?.name ?? '—'}</span>
                       <span className="shrink-0 text-[10px] text-[var(--muted)]">{fmtDate(last.at)}</span>
                     </div>
                     <div className="truncate text-xs text-[var(--muted)]">{t.subject}</div>
                     <div className="truncate text-xs text-[var(--muted)]/70">{last.body}</div>
                   </div>
-                  {t.unread && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--brand-bright)]" />}
+                  {t.unread && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[var(--accent)]" />}
                 </button>
               </li>
             );
@@ -2074,22 +2049,22 @@ function InboxView({
       <div className={`${card} flex h-[70vh] min-h-[420px] flex-col`}>
         {active && contact ? (
           <>
-            <div className="flex items-center gap-3 border-b border-white/10 p-4">
+            <div className="flex items-center gap-3 border-b border-[var(--border)] p-4">
               <Avatar src={contact.avatar} name={contact.name} size={38} />
               <div className="min-w-0">
-                <div className="truncate font-medium text-white">{active.subject}</div>
+                <div className="truncate font-medium text-[var(--ink)]">{active.subject}</div>
                 <div className="truncate text-xs text-[var(--muted)]">{contact.name} · {contact.email}</div>
               </div>
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
               {active.messages.map((m, i) => (
-                <div key={i} className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${m.from === 'me' ? 'ml-auto bg-[var(--brand-bright)] text-[#0b0d10]' : 'bg-[var(--bg-soft)] text-[var(--text)]'}`}>
+                <div key={i} className={`max-w-[80%]  px-4 py-2.5 text-sm ${m.from === 'me' ? 'ml-auto bg-[var(--accent)] text-[var(--accent-ink)]' : 'bg-[var(--bg-soft)] text-[var(--text)]'}`}>
                   <p className="whitespace-pre-wrap">{m.body}</p>
-                  <div className={`mt-1 text-[10px] ${m.from === 'me' ? 'text-[#0b0d10]/60' : 'text-[var(--muted)]'}`}>{fmtDate(m.at)} · {fmtTime(m.at)}</div>
+                  <div className={`mt-1 text-[10px] ${m.from === 'me' ? 'text-[var(--accent-ink)]/60' : 'text-[var(--muted)]'}`}>{fmtDate(m.at)} · {fmtTime(m.at)}</div>
                 </div>
               ))}
               {isTyping && (
-                <div className="flex max-w-[80%] items-center gap-1 rounded-2xl bg-[var(--bg-soft)] px-4 py-3">
+                <div className="flex max-w-[80%] items-center gap-1  bg-[var(--bg-soft)] px-4 py-3">
                   <span className="text-xs text-[var(--muted)]">{first} is typing</span>
                   <span className="ml-1 flex gap-1">
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--muted)] [animation-delay:-0.3s]" />
@@ -2100,9 +2075,9 @@ function InboxView({
               )}
               <div ref={endRef} />
             </div>
-            <div className="border-t border-white/10 p-3">
+            <div className="border-t border-[var(--border)] p-3">
               {coach && (
-                <div className={`mb-2 rounded-xl border px-3 py-2 text-[11px] ${warmthUi[coach.warmth].cls}`}>
+                <div className={`mb-2  border px-3 py-2 text-[11px] ${warmthUi[coach.warmth].cls}`}>
                   <div className="flex items-center gap-1.5 font-medium"><Sparkles size={12} /> {warmthUi[coach.warmth].label}</div>
                   {coach.tips.length > 0 && <ul className="mt-1 list-disc pl-4 opacity-90">{coach.tips.map((t, i) => <li key={i}>{t}</li>)}</ul>}
                 </div>
@@ -2123,8 +2098,8 @@ function InboxView({
                 </div>
               )}
               <div className="flex items-end gap-2">
-                <textarea ref={draftRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} rows={2} placeholder="Write a reply… (Enter to send, or pick a quick reply)" className="max-h-[180px] min-h-[52px] flex-1 resize-none overflow-y-auto rounded-xl border border-white/10 bg-[var(--bg-soft)] px-3 py-2 text-sm text-white outline-none placeholder:text-[var(--muted)]" />
-                <button onClick={() => send()} className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--brand-bright)] px-3 py-2.5 text-sm font-medium text-[#0b0d10] hover:bg-white"><Send size={15} /></button>
+                <textarea ref={draftRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} rows={2} placeholder="Write a reply… (Enter to send, or pick a quick reply)" className="max-h-[180px] min-h-[52px] flex-1 resize-none overflow-y-auto  border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" />
+                <button onClick={() => send()} className="inline-flex items-center gap-1.5  bg-[var(--accent)] px-3 py-2.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90"><Send size={15} /></button>
               </div>
             </div>
           </>
@@ -2142,9 +2117,9 @@ function Invoices({
 }: { invoices: Invoice[]; byId: Record<string, Contact>; onPaid: (id: string) => void }) {
   const total = (s: InvoiceStatus) => invoices.filter((i) => i.status === s).reduce((a, i) => a + invoiceTotal(i), 0);
   const stats = [
-    { label: 'Paid', value: money(total('Paid')), style: 'text-emerald-300' },
-    { label: 'Sent', value: money(total('Sent')), style: 'text-sky-300' },
-    { label: 'Overdue', value: money(total('Overdue')), style: 'text-rose-300' },
+    { label: 'Paid', value: money(total('Paid')), style: 'text-[var(--ok)]' },
+    { label: 'Sent', value: money(total('Sent')), style: 'text-[var(--accent)]' },
+    { label: 'Overdue', value: money(total('Overdue')), style: 'text-[var(--danger)]' },
     { label: 'Draft', value: money(total('Draft')), style: 'text-[var(--muted)]' },
   ];
   return (
@@ -2157,7 +2132,7 @@ function Invoices({
           </div>
         ))}
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-white/10">
+      <div className="overflow-x-auto  border border-[var(--border)]">
         <table className="w-full min-w-[680px] border-collapse text-left text-sm">
           <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
             <tr>
@@ -2172,16 +2147,16 @@ function Invoices({
           </thead>
           <tbody>
             {invoices.map((inv) => (
-              <tr key={inv.id} className="border-t border-white/5">
-                <td className="px-4 py-3 font-medium text-white">{inv.number}</td>
+              <tr key={inv.id} className="border-t border-[var(--border)]">
+                <td className="px-4 py-3 font-medium text-[var(--ink)]">{inv.number}</td>
                 <td className="px-4 py-3 text-[var(--muted)]">{byId[inv.contactId]?.name ?? '—'}</td>
                 <td className="px-4 py-3 text-[var(--muted)]">{fmtDate(inv.issuedAt)}</td>
                 <td className="px-4 py-3 text-[var(--muted)]">{fmtDate(inv.dueAt)}</td>
-                <td className="px-4 py-3 text-white">{money(invoiceTotal(inv))}</td>
+                <td className="px-4 py-3 text-[var(--ink)]">{money(invoiceTotal(inv))}</td>
                 <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${INV_STYLE[inv.status]}`}>{inv.status}</span></td>
                 <td className="px-4 py-3 text-right">
                   {inv.status !== 'Paid' && inv.status !== 'Draft' && (
-                    <button onClick={() => onPaid(inv.id)} className="rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-300 transition-colors hover:bg-emerald-500/25">Mark paid</button>
+                    <button onClick={() => onPaid(inv.id)} className=" bg-[var(--ok-bg)] px-2.5 py-1 text-xs text-[var(--ok)] transition-colors hover:bg-[var(--ok)]">Mark paid</button>
                   )}
                 </td>
               </tr>
@@ -2203,8 +2178,8 @@ function Campaigns({ campaigns }: { campaigns: Campaign[] }) {
         return (
           <div key={c.id} className={`${card} p-5`}>
             <div className="flex items-center justify-between">
-              <h3 className="font-medium text-white">{c.name}</h3>
-              <span className={`rounded-full border px-2.5 py-0.5 text-xs ${c.status === 'Sent' ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300' : 'border-amber-500/30 bg-amber-500/15 text-amber-300'}`}>{c.status}</span>
+              <h3 className="font-medium text-[var(--ink)]">{c.name}</h3>
+              <span className={`rounded-full border px-2.5 py-0.5 text-xs ${c.status === 'Sent' ? 'border-[var(--ok)] bg-[var(--ok-bg)] text-[var(--ok)]' : 'border-[var(--warn)] bg-[var(--warn-bg)] text-[var(--warn)]'}`}>{c.status}</span>
             </div>
             <div className="mt-1 text-xs text-[var(--muted)]">{c.channel} · {c.recipients} recipients · {c.status === 'Sent' ? fmtDate(c.sentAt) : 'scheduled'}</div>
             <div className="mt-4 space-y-3">
@@ -2220,8 +2195,8 @@ function Campaigns({ campaigns }: { campaigns: Campaign[] }) {
 function Meter({ label, pct, detail }: { label: string; pct: number; detail: string }) {
   return (
     <div>
-      <div className="flex justify-between text-sm"><span className="text-[var(--muted)]">{label}</span><span className="text-white">{pct}% <span className="text-[var(--muted)]">· {detail}</span></span></div>
-      <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${pct}%` }} /></div>
+      <div className="flex justify-between text-sm"><span className="text-[var(--muted)]">{label}</span><span className="text-[var(--ink)]">{pct}% <span className="text-[var(--muted)]">· {detail}</span></span></div>
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--bg-soft)]"><div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${pct}%` }} /></div>
     </div>
   );
 }
@@ -2235,38 +2210,38 @@ function Automations({ automations, runs, onToggle }: { automations: Automation[
       <div className="space-y-3 lg:col-span-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-[var(--muted)]">Rules that run automatically when something happens. Toggle any rule on or off — disabled rules genuinely stop firing.</p>
-          <span className="shrink-0 rounded-full border border-[var(--brand-bright)]/30 bg-[var(--brand-bright)]/10 px-3 py-1 text-xs text-[var(--brand-bright)]">{active} of {automations.length} active</span>
+          <span className="shrink-0 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1 text-xs text-[var(--accent)]">{active} of {automations.length} active</span>
         </div>
         {automations.map((a) => (
           <div key={a.id} className={`${card} flex items-center gap-4 p-4`}>
-            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${a.enabled ? 'bg-[var(--brand-bright)]/15 text-[var(--brand-bright)]' : 'bg-white/5 text-[var(--muted)]'}`}><Zap size={18} /></span>
+            <span className={`flex h-10 w-10 shrink-0 items-center justify-center  ${a.enabled ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'bg-[var(--bg-soft)] text-[var(--muted)]'}`}><Zap size={18} /></span>
             <div className="min-w-0 flex-1">
-              <div className="font-medium text-white">{a.name}</div>
+              <div className="font-medium text-[var(--ink)]">{a.name}</div>
               <div className="text-xs text-[var(--muted)]"><span className="text-[var(--text)]">When</span> {a.trigger} → <span className="text-[var(--text)]">do</span> {a.action}</div>
               <div className="mt-0.5 text-[11px] text-[var(--muted)]/70">{a.runs} runs{a.enabled ? '' : ' · paused'}</div>
             </div>
             <button
               onClick={() => onToggle(a.id)}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${a.enabled ? 'bg-[var(--brand-bright)]' : 'bg-white/10'}`}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${a.enabled ? 'bg-[var(--accent)]' : 'bg-[var(--bg-soft)]'}`}
               aria-label={a.enabled ? 'Disable' : 'Enable'}
             >
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${a.enabled ? 'left-[22px]' : 'left-0.5'}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-[var(--ink)] transition-all ${a.enabled ? 'left-[22px]' : 'left-0.5'}`} />
             </button>
           </div>
         ))}
       </div>
 
       <div className={`${card} flex flex-col p-5 lg:sticky lg:top-[73px] lg:max-h-[calc(100vh-96px)]`}>
-        <h3 className="flex items-center gap-2 font-display text-lg text-white"><Zap size={17} className="text-[var(--brand-bright)]" /> Run log</h3>
+        <h3 className="flex items-center gap-2 font-display text-lg text-[var(--ink)]"><Zap size={17} className="text-[var(--accent)]" /> Run log</h3>
         <p className="mt-1 text-xs text-[var(--muted)]">{totalRuns} total runs · live as rules fire</p>
         <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto">
           {runs.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">No runs yet this session. Convert a lead, advance a deal to Proposal or Won, or wait for a time-based rule to fire — each run shows up here.</p>
           ) : (
             runs.map((r) => (
-              <div key={r.id} className="rounded-xl border border-white/5 bg-[var(--bg-soft)] px-3 py-2">
+              <div key={r.id} className=" border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium text-white">{r.name}</span>
+                  <span className="truncate text-sm font-medium text-[var(--ink)]">{r.name}</span>
                   <span className="shrink-0 text-[10px] text-[var(--muted)]">{relTime(r.at)}</span>
                 </div>
                 <div className="mt-0.5 text-[11px] text-[var(--muted)]">{r.detail}</div>
@@ -2362,43 +2337,43 @@ function Reports({
           { label: 'Deals won', value: won.toString() },
           { label: 'Email open rate', value: `${emailOpen}%` },
         ].map((k) => (
-          <div key={k.label} className={`${card} p-4`}><div className="font-display text-2xl text-white">{k.value}</div><div className="text-xs text-[var(--muted)]">{k.label}</div></div>
+          <div key={k.label} className={`${card} p-4`}><div className="font-display text-2xl text-[var(--ink)]">{k.value}</div><div className="text-xs text-[var(--muted)]">{k.label}</div></div>
         ))}
       </div>
 
       {/* Forecast vs. target — full width */}
       <div className={`${card} p-6`}>
         <div className="flex flex-wrap items-end justify-between gap-2">
-          <h3 className="font-display text-lg text-white">Forecast vs. quarter target</h3>
-          <div className="text-sm text-[var(--muted)]">Target <span className="text-white">{money(quarterTarget)}</span></div>
+          <h3 className="font-display text-lg text-[var(--ink)]">Forecast vs. quarter target</h3>
+          <div className="text-sm text-[var(--muted)]">Target <span className="text-[var(--ink)]">{money(quarterTarget)}</span></div>
         </div>
-        <div className="mt-5 h-9 w-full overflow-hidden rounded-xl bg-white/5">
+        <div className="mt-5 h-9 w-full overflow-hidden  bg-[var(--bg-soft)]">
           <div className="flex h-full">
-            <div className="flex h-full items-center justify-end bg-emerald-500/80 px-2 text-[11px] font-medium text-[#0b0d10] transition-all" style={{ width: `${Math.min((committed / quarterTarget) * 100, 100)}%` }} title={`Committed (Won): ${money(committed)}`}>
+            <div className="flex h-full items-center justify-end bg-[var(--ok)] px-2 text-[11px] font-medium text-[var(--accent-ink)] transition-all" style={{ width: `${Math.min((committed / quarterTarget) * 100, 100)}%` }} title={`Committed (Won): ${money(committed)}`}>
               {committed / quarterTarget > 0.12 ? money(committed) : ''}
             </div>
-            <div className="flex h-full items-center justify-end bg-[var(--brand-bright)]/50 px-2 text-[11px] font-medium text-white transition-all" style={{ width: `${Math.min((weighted / quarterTarget) * 100, Math.max(0, 100 - (committed / quarterTarget) * 100))}%` }} title={`Weighted open pipeline: ${money(weighted)}`}>
+            <div className="flex h-full items-center justify-end bg-[var(--accent)] px-2 text-[11px] font-medium text-[var(--ink)] transition-all" style={{ width: `${Math.min((weighted / quarterTarget) * 100, Math.max(0, 100 - (committed / quarterTarget) * 100))}%` }} title={`Weighted open pipeline: ${money(weighted)}`}>
               {weighted / quarterTarget > 0.12 ? money(weighted) : ''}
             </div>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-[var(--muted)]">
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" /> Committed (Won) · {money(committed)}</span>
-          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--brand-bright)]/50" /> Weighted pipeline · {money(weighted)}</span>
-          <span className="ml-auto text-[var(--text)]">Forecast {money(forecast)} · <span className={forecastPct >= 100 ? 'text-emerald-300' : 'text-amber-300'}>{forecastPct}% of target</span></span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--ok)]" /> Committed (Won) · {money(committed)}</span>
+          <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--accent)]" /> Weighted pipeline · {money(weighted)}</span>
+          <span className="ml-auto text-[var(--text)]">Forecast {money(forecast)} · <span className={forecastPct >= 100 ? 'text-[var(--ok)]' : 'text-[var(--warn)]'}>{forecastPct}% of target</span></span>
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className={`${card} p-6`}>
-          <h3 className="font-display text-lg text-white">Revenue (last 6 months)</h3>
+          <h3 className="font-display text-lg text-[var(--ink)]">Revenue (last 6 months)</h3>
           <div className="mt-6 flex h-44 items-stretch gap-3">
             {months.map((m) => (
               <div key={m.key} className="flex flex-1 flex-col items-center">
                 {/* Value label + bar fill the growable area and sit on the baseline */}
                 <div className="flex w-full flex-1 flex-col items-center justify-end gap-1">
                   {m.total ? <div className="text-[10px] text-[var(--muted)]">{money(m.total)}</div> : null}
-                  <div className="w-full rounded-t-md bg-[var(--brand-bright)] transition-all" style={{ height: `${(m.total / maxRev) * 100}%`, minHeight: m.total ? 4 : 0 }} />
+                  <div className="w-full  bg-[var(--accent)] transition-all" style={{ height: `${(m.total / maxRev) * 100}%`, minHeight: m.total ? 4 : 0 }} />
                 </div>
                 <div className="mt-2 text-xs text-[var(--muted)]">{m.label}</div>
               </div>
@@ -2408,8 +2383,8 @@ function Reports({
 
         <div className={`${card} p-6`}>
           <div className="flex items-baseline justify-between">
-            <h3 className="font-display text-lg text-white">Conversion funnel</h3>
-            <span className="text-xs text-[var(--muted)]">Lead→Won <span className="text-[var(--brand-bright)]">{leadToWin}%</span></span>
+            <h3 className="font-display text-lg text-[var(--ink)]">Conversion funnel</h3>
+            <span className="text-xs text-[var(--muted)]">Lead→Won <span className="text-[var(--accent)]">{leadToWin}%</span></span>
           </div>
           <div className="mt-4 space-y-2">
             {funnel.map((f, i) => {
@@ -2418,8 +2393,8 @@ function Reports({
               return (
                 <div key={f.stage} className="flex items-center gap-3">
                   <span className="w-24 shrink-0 text-xs text-[var(--muted)]">{f.stage}</span>
-                  <div className="h-7 flex-1 overflow-hidden rounded-lg bg-white/5">
-                    <div className="flex h-full items-center justify-end rounded-lg bg-[var(--brand-bright)] px-2 text-[11px] font-medium text-[#0b0d10]" style={{ width: `${Math.max((f.count / maxFunnel) * 100, 8)}%` }}>{f.count}</div>
+                  <div className="h-7 flex-1 overflow-hidden  bg-[var(--bg-soft)]">
+                    <div className="flex h-full items-center justify-end  bg-[var(--accent)] px-2 text-[11px] font-medium text-[var(--accent-ink)]" style={{ width: `${Math.max((f.count / maxFunnel) * 100, 8)}%` }}>{f.count}</div>
                   </div>
                   <span className="w-12 shrink-0 text-right text-[11px] text-[var(--muted)]">{step !== null ? `${step}%` : ''}</span>
                 </div>
@@ -2429,38 +2404,38 @@ function Reports({
         </div>
 
         <div className={`${card} p-6 lg:col-span-2`}>
-          <h3 className="font-display text-lg text-white">Sales leaderboard</h3>
+          <h3 className="font-display text-lg text-[var(--ink)]">Sales leaderboard</h3>
           <div className="mt-4 space-y-3">
             {board.map((b) => (
               <div key={b.owner} className="flex items-center gap-3">
                 <div className="flex w-28 shrink-0 items-center gap-2 sm:w-40">
                   <Avatar src={avatarFor(b.owner)} name={b.owner} size={28} />
-                  <span className="truncate text-sm text-white">{b.owner}</span>
+                  <span className="truncate text-sm text-[var(--ink)]">{b.owner}</span>
                 </div>
-                <div className="flex h-6 flex-1 overflow-hidden rounded-lg bg-white/5">
-                  <div className="h-full bg-emerald-500/80 transition-all" style={{ width: `${(b.wonValue / maxBoard) * 100}%` }} title={`Won: ${money(b.wonValue)}`} />
-                  <div className="h-full bg-[var(--brand-bright)]/50 transition-all" style={{ width: `${(b.openValue / maxBoard) * 100}%` }} title={`Open: ${money(b.openValue)}`} />
+                <div className="flex h-6 flex-1 overflow-hidden  bg-[var(--bg-soft)]">
+                  <div className="h-full bg-[var(--ok)] transition-all" style={{ width: `${(b.wonValue / maxBoard) * 100}%` }} title={`Won: ${money(b.wonValue)}`} />
+                  <div className="h-full bg-[var(--accent)] transition-all" style={{ width: `${(b.openValue / maxBoard) * 100}%` }} title={`Open: ${money(b.openValue)}`} />
                 </div>
-                <span className="hidden w-24 shrink-0 text-right text-xs text-white sm:block">{money(b.wonValue)}</span>
+                <span className="hidden w-24 shrink-0 text-right text-xs text-[var(--ink)] sm:block">{money(b.wonValue)}</span>
                 <span className="w-14 shrink-0 text-right text-xs text-[var(--muted)]">{b.winRate}% win</span>
               </div>
             ))}
           </div>
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-[var(--muted)]">
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/80" /> Won revenue</span>
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--brand-bright)]/50" /> Open pipeline</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--ok)]" /> Won revenue</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[var(--accent)]" /> Open pipeline</span>
           </div>
         </div>
 
         <div className={`${card} p-6`}>
-          <h3 className="font-display text-lg text-white">Why deals are lost</h3>
+          <h3 className="font-display text-lg text-[var(--ink)]">Why deals are lost</h3>
           {lossReasons.length ? (
             <div className="mt-4 space-y-2">
               {lossReasons.map((r) => (
                 <div key={r.label} className="flex items-center gap-3">
                   <span className="w-32 shrink-0 truncate text-xs text-[var(--muted)]" title={r.label}>{r.label}</span>
-                  <div className="h-6 flex-1 overflow-hidden rounded-lg bg-white/5">
-                    <div className="flex h-full items-center justify-end rounded-lg bg-rose-500/70 px-2 text-[11px] font-medium text-white" style={{ width: `${Math.max((r.count / maxLoss) * 100, 10)}%` }}>{r.count}</div>
+                  <div className="h-6 flex-1 overflow-hidden  bg-[var(--bg-soft)]">
+                    <div className="flex h-full items-center justify-end  bg-[var(--danger)] px-2 text-[11px] font-medium text-[var(--ink)]" style={{ width: `${Math.max((r.count / maxLoss) * 100, 10)}%` }}>{r.count}</div>
                   </div>
                 </div>
               ))}
@@ -2471,19 +2446,19 @@ function Reports({
         </div>
 
         <div className={`${card} p-6`}>
-          <h3 className="font-display text-lg text-white">Lead sources</h3>
+          <h3 className="font-display text-lg text-[var(--ink)]">Lead sources</h3>
           <div className="mt-4 space-y-2">
             {sources.map((s) => (
               <div key={s.label}>
-                <div className="flex justify-between text-sm"><span className="text-[var(--muted)]">{s.label}</span><span className="text-white">{s.count}</span></div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-[var(--brand-bright)]" style={{ width: `${(s.count / maxSrc) * 100}%` }} /></div>
+                <div className="flex justify-between text-sm"><span className="text-[var(--muted)]">{s.label}</span><span className="text-[var(--ink)]">{s.count}</span></div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--bg-soft)]"><div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${(s.count / maxSrc) * 100}%` }} /></div>
               </div>
             ))}
           </div>
         </div>
 
         <div className={`${card} p-6`}>
-          <h3 className="font-display text-lg text-white">Campaign performance</h3>
+          <h3 className="font-display text-lg text-[var(--ink)]">Campaign performance</h3>
           <div className="mt-4 space-y-3">
             {campaigns.map((c) => (
               <Meter key={c.id} label={c.name} pct={c.recipients ? Math.round((c.opens / c.recipients) * 100) : 0} detail={`${c.opens}/${c.recipients}`} />
@@ -2505,30 +2480,30 @@ function SettingsView({ contacts, source, onReset }: { contacts: Contact[]; sour
   return (
     <div className="space-y-6">
       <div className={`${card} p-6`}>
-        <h3 className="font-display text-lg text-white">Team &amp; roles</h3>
-        <div className="mt-4 divide-y divide-white/5">
+        <h3 className="font-display text-lg text-[var(--ink)]">Team &amp; roles</h3>
+        <div className="mt-4 divide-y border-[var(--border)]">
           {team.map((m) => (
             <div key={m.name} className="flex items-center gap-3 py-3">
               <Avatar src={avatarFor(m.name)} name={m.name} size={36} />
-              <div className="min-w-0 flex-1"><div className="font-medium text-white">{m.name}</div><div className="text-xs text-[var(--muted)]">{m.contacts} contacts owned</div></div>
-              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-[var(--muted)]">{m.role}</span>
+              <div className="min-w-0 flex-1"><div className="font-medium text-[var(--ink)]">{m.name}</div><div className="text-xs text-[var(--muted)]">{m.contacts} contacts owned</div></div>
+              <span className="rounded-full border border-[var(--border)] bg-[var(--bg-soft)] px-2.5 py-0.5 text-xs text-[var(--muted)]">{m.role}</span>
             </div>
           ))}
         </div>
       </div>
 
       <div className={`${card} p-6`}>
-        <h3 className="font-display text-lg text-white">Custom fields</h3>
+        <h3 className="font-display text-lg text-[var(--ink)]">Custom fields</h3>
         <p className="mt-1 text-sm text-[var(--muted)]">Fields tracked on every contact in this workspace.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {['Status', 'Source', 'Owner', 'Company', 'Title', 'Location', 'Tags', 'Created date'].map((f) => (
-            <span key={f} className="rounded-full bg-white/5 px-3 py-1 text-xs text-[var(--text)]">{f}</span>
+            <span key={f} className="rounded-full bg-[var(--bg-soft)] px-3 py-1 text-xs text-[var(--text)]">{f}</span>
           ))}
         </div>
       </div>
 
       <div className={`${card} p-6`}>
-        <h3 className="font-display text-lg text-white">Workspace data</h3>
+        <h3 className="font-display text-lg text-[var(--ink)]">Workspace data</h3>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Everything you do here — new contacts, advanced deals, quotes, invoices, guided-training
           progress — is saved in this browser and restored automatically next time. Resetting wipes
@@ -2538,7 +2513,7 @@ function SettingsView({ contacts, source, onReset }: { contacts: Contact[]; sour
           {!armed ? (
             <button
               onClick={() => setArmed(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition-colors hover:border-red-500/50 hover:bg-red-500/15"
+              className="inline-flex items-center gap-2  border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition-colors hover:border-red-500/50 hover:bg-red-500/15"
             >
               <Trash2 size={15} /> Reset workspace
             </button>
@@ -2546,13 +2521,13 @@ function SettingsView({ contacts, source, onReset }: { contacts: Contact[]; sour
             <>
               <button
                 onClick={() => { onReset(); setArmed(false); }}
-                className="inline-flex items-center gap-2 rounded-xl border border-red-500/50 bg-red-500/20 px-4 py-2 text-sm font-medium text-red-200 transition-colors hover:bg-red-500/30"
+                className="inline-flex items-center gap-2  border border-red-500/50 bg-red-500/20 px-4 py-2 text-sm font-medium text-red-200 transition-colors hover:bg-red-500/30"
               >
                 <AlertTriangle size={15} /> Yes, reset everything
               </button>
               <button
                 onClick={() => setArmed(false)}
-                className="rounded-xl border border-white/10 px-4 py-2 text-sm text-[var(--muted)] transition-colors hover:text-white"
+                className=" border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted)] transition-colors hover:text-[var(--ink)]"
               >
                 Cancel
               </button>
@@ -2571,15 +2546,15 @@ function SettingsView({ contacts, source, onReset }: { contacts: Contact[]; sour
 function ApiCredit({ source }: { source: string }) {
   return (
     <div className={`${card} bg-gradient-to-br from-[var(--surface)] to-transparent p-6`}>
-      <h3 className="flex items-center gap-2 font-display text-lg text-white"><Database size={18} className="text-[var(--brand-bright)]" /> Data &amp; APIs</h3>
+      <h3 className="flex items-center gap-2 font-display text-lg text-[var(--ink)]"><Database size={18} className="text-[var(--accent)]" /> Data &amp; APIs</h3>
       <p className="mt-2 text-sm text-[var(--muted)]">
         Sample identities were loaded from{' '}
-        <span className="text-white">{source === 'randomuser.me' ? 'the randomuser.me API (live)' : 'a built-in fallback set (API unavailable)'}</span>.
+        <span className="text-[var(--ink)]">{source === 'randomuser.me' ? 'the randomuser.me API (live)' : 'a built-in fallback set (API unavailable)'}</span>.
         Companies, deals, tasks, meetings, emails, invoices, campaigns and automations are generated on top with a seeded random generator, so the dataset stays small and reproducible.
       </p>
       <ul className="mt-3 space-y-1.5 text-sm text-[var(--muted)]">
-        <li>• <span className="text-white">randomuser.me</span> — names, emails, phones, locations, and avatars for contacts.</li>
-        <li>• <span className="text-white">DiceBear</span> — generated avatars for contacts you add, and as an image fallback.</li>
+        <li>• <span className="text-[var(--ink)]">randomuser.me</span> — names, emails, phones, locations, and avatars for contacts.</li>
+        <li>• <span className="text-[var(--ink)]">DiceBear</span> — generated avatars for contacts you add, and as an image fallback.</li>
       </ul>
       <p className="mt-3 text-xs text-[var(--muted)]/70">
         Front-end demo — everything you change is persisted to this browser's localStorage and restored on your next visit; nothing leaves the device. Use Reset workspace above to return to the seeded dataset.
@@ -2605,38 +2580,38 @@ function ContactDrawer({
   const signals = activities.filter((a) => isSignal(a.subject)).slice(0, 4);
   return (
     <div className="fixed inset-0 z-[95] flex justify-end bg-black/60" onClick={onClose}>
-      <div className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-white/10 bg-[var(--surface)] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between border-b border-white/10 p-5">
+      <div className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-[var(--border)] bg-[var(--surface)] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between border-b border-[var(--border)] p-5">
           <div className="flex items-center gap-3">
             <Avatar src={contact.avatar} name={contact.name} size={52} />
             <div>
-              <div className="font-display text-lg text-white">{contact.name}</div>
+              <div className="font-display text-lg text-[var(--ink)]">{contact.name}</div>
               <div className="text-sm text-[var(--muted)]">{contact.title}</div>
               <span className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-xs ${STATUS_STYLE[contact.status]}`}>{contact.status}</span>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-white/5 hover:text-white" aria-label="Close"><X size={18} /></button>
+          <button onClick={onClose} className=" p-1.5 text-[var(--muted)] hover:bg-[var(--bg-soft)] hover:text-[var(--ink)]" aria-label="Close"><X size={18} /></button>
         </div>
 
-        <div className="space-y-2 border-b border-white/10 p-5 text-sm">
+        <div className="space-y-2 border-b border-[var(--border)] p-5 text-sm">
           <Row icon={Building2} text={contact.company} />
           <Row icon={Mail} text={contact.email} />
           <Row icon={Phone} text={contact.phone} />
           <Row icon={Target} text={`Source: ${contact.source}`} />
           <Row icon={Calendar} text={`Added ${fmtDate(contact.createdAt)} · ${contact.location}`} />
-          <div className="flex flex-wrap gap-1.5 pt-1">{contact.tags.map((t) => <span key={t} className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-[var(--muted)]">{t}</span>)}</div>
+          <div className="flex flex-wrap gap-1.5 pt-1">{contact.tags.map((t) => <span key={t} className="rounded-full bg-[var(--bg-soft)] px-2 py-0.5 text-xs text-[var(--muted)]">{t}</span>)}</div>
         </div>
 
         {(zia || signals.length > 0) && (
-          <div className="space-y-3 border-b border-white/10 p-5">
+          <div className="space-y-3 border-b border-[var(--border)] p-5">
             {zia && <ZiaCard {...zia} />}
             {signals.length > 0 && (
               <div>
-                <h4 className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-[var(--muted)]"><Radio size={12} className="text-emerald-400" /> SalesSignals</h4>
+                <h4 className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-[var(--muted)]"><Radio size={12} className="text-[var(--ok)]" /> SalesSignals</h4>
                 <ul className="mt-2 space-y-1.5">
                   {signals.map((a) => (
                     <li key={a.id} className="flex items-center gap-2 text-[13px]">
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ok)]" />
                       <span className="min-w-0 flex-1 truncate text-[var(--text)]">{a.subject}</span>
                       <span className="shrink-0 text-[11px] text-[var(--muted)]">{relTime(a.at)}</span>
                     </li>
@@ -2648,18 +2623,18 @@ function ContactDrawer({
         )}
 
         {deals.length > 0 && (
-          <div className="border-b border-white/10 p-5">
+          <div className="border-b border-[var(--border)] p-5">
             <h4 className="text-xs uppercase tracking-wide text-[var(--muted)]">Deals</h4>
             <div className="mt-2 space-y-2">
               {deals.map((d) => (
-                <div key={d.id} className="flex items-center justify-between rounded-xl bg-[var(--bg-soft)] px-3 py-2 text-sm"><span className="min-w-0 truncate text-white">{d.title}</span><span className="ml-2 shrink-0 text-[var(--muted)]">{d.stage} · <span className="text-[var(--brand-bright)]">{money(d.value)}</span></span></div>
+                <div key={d.id} className="flex items-center justify-between  bg-[var(--bg-soft)] px-3 py-2 text-sm"><span className="min-w-0 truncate text-[var(--ink)]">{d.title}</span><span className="ml-2 shrink-0 text-[var(--muted)]">{d.stage} · <span className="text-[var(--accent)]">{money(d.value)}</span></span></div>
               ))}
             </div>
           </div>
         )}
 
         {tasks.length > 0 && (
-          <div className="border-b border-white/10 p-5">
+          <div className="border-b border-[var(--border)] p-5">
             <h4 className="text-xs uppercase tracking-wide text-[var(--muted)]">Open tasks</h4>
             <div className="mt-2 space-y-1.5">
               {tasks.filter((t) => !t.done).map((t) => (
@@ -2672,17 +2647,17 @@ function ContactDrawer({
         <div className="p-5">
           <h4 className="text-xs uppercase tracking-wide text-[var(--muted)]">Timeline</h4>
           <div className="mt-2 flex flex-wrap gap-2">
-            <select value={type} onChange={(e) => setType(e.target.value as ActivityType)} className="rounded-lg border border-white/10 bg-[var(--bg-soft)] px-2 py-1.5 text-sm text-white outline-none">{ACTIVITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>
-            <input value={subject} onChange={(e) => setSubject(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} placeholder="Log something…" className="min-w-[120px] flex-1 rounded-lg border border-white/10 bg-[var(--bg-soft)] px-3 py-1.5 text-sm text-white outline-none placeholder:text-[var(--muted)]" />
-            <button onClick={submit} className="rounded-lg bg-[var(--brand-bright)] px-3 py-1.5 text-sm font-medium text-[#0b0d10] hover:bg-white">Add</button>
+            <select value={type} onChange={(e) => setType(e.target.value as ActivityType)} className=" border border-[var(--border)] bg-[var(--bg-soft)] px-2 py-1.5 text-sm text-[var(--ink)] outline-none">{ACTIVITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} placeholder="Log something…" className="min-w-[120px] flex-1  border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-1.5 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]" />
+            <button onClick={submit} className=" bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90">Add</button>
           </div>
           <ul className="mt-4 space-y-3">
             {activities.map((a) => {
               const Icon = ACT_ICON[a.type];
               return (
                 <li key={a.id} className="flex gap-3 text-sm">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/5 text-[var(--brand-bright)]"><Icon size={13} /></span>
-                  <div className="min-w-0 flex-1"><div className={a.done ? 'text-[var(--muted)] line-through' : 'text-white'}>{a.subject}</div><div className="text-xs text-[var(--muted)]">{a.type} · {fmtDate(a.at)}</div></div>
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center  bg-[var(--bg-soft)] text-[var(--accent)]"><Icon size={13} /></span>
+                  <div className="min-w-0 flex-1"><div className={a.done ? 'text-[var(--muted)] line-through' : 'text-[var(--ink)]'}>{a.subject}</div><div className="text-xs text-[var(--muted)]">{a.type} · {fmtDate(a.at)}</div></div>
                 </li>
               );
             })}
@@ -2722,8 +2697,8 @@ function AddContactModal({
   };
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[var(--surface)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-lg text-white">New contact</h2><button onClick={onClose} className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-white/5 hover:text-white" aria-label="Close"><X size={18} /></button></div>
+      <div className="w-full max-w-sm  border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between"><h2 className="font-display text-lg text-[var(--ink)]">New contact</h2><button onClick={onClose} className=" p-1.5 text-[var(--muted)] hover:bg-[var(--bg-soft)] hover:text-[var(--ink)]" aria-label="Close"><X size={18} /></button></div>
         <div className="space-y-3">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className={field} />
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (optional)" className={field} />
@@ -2733,7 +2708,7 @@ function AddContactModal({
             <select value={status} onChange={(e) => setStatus(e.target.value as Status)} className={field}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select>
             <select value={source} onChange={(e) => setSource(e.target.value)} className={field}>{LEAD_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}</select>
           </div>
-          <button onClick={submit} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-bright)] py-2.5 font-medium text-[#0b0d10] transition-colors hover:bg-white"><Plus size={16} /> Add contact</button>
+          <button onClick={submit} className="inline-flex w-full items-center justify-center gap-2  bg-[var(--accent)] py-2.5 font-medium text-[var(--accent-ink)] transition-colors hover:opacity-90"><Plus size={16} /> Add contact</button>
         </div>
       </div>
     </div>
@@ -2742,21 +2717,21 @@ function AddContactModal({
 
 // ── Products ─────────────────────────────────────────────────────────────────
 const CAT_STYLE: Record<Product['category'], string> = {
-  Subscription: 'bg-[var(--brand-bright)]/15 text-[var(--brand-bright)] border-[var(--brand-bright)]/30',
-  Services: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  Support: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  'Add-on': 'bg-white/5 text-[var(--muted)] border-white/10',
+  Subscription: 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]',
+  Services: 'bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]',
+  Support: 'bg-[var(--warn-bg)] text-[var(--warn)] border-[var(--warn)]',
+  'Add-on': 'bg-[var(--bg-soft)] text-[var(--muted)] border-[var(--border)]',
 };
 function ProductsView({ products, onToggle }: { products: Product[]; onToggle: (id: string) => void }) {
   const active = products.filter((p) => p.active).length;
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className={`${card} p-4`}><div className="font-display text-xl text-white">{products.length}</div><div className="text-xs text-[var(--muted)]">Products</div></div>
-        <div className={`${card} p-4`}><div className="font-display text-xl text-emerald-300">{active}</div><div className="text-xs text-[var(--muted)]">Active</div></div>
-        <div className={`${card} p-4`}><div className="font-display text-xl text-white">{new Set(products.map((p) => p.category)).size}</div><div className="text-xs text-[var(--muted)]">Categories</div></div>
+        <div className={`${card} p-4`}><div className="font-display text-xl text-[var(--ink)]">{products.length}</div><div className="text-xs text-[var(--muted)]">Products</div></div>
+        <div className={`${card} p-4`}><div className="font-display text-xl text-[var(--ok)]">{active}</div><div className="text-xs text-[var(--muted)]">Active</div></div>
+        <div className={`${card} p-4`}><div className="font-display text-xl text-[var(--ink)]">{new Set(products.map((p) => p.category)).size}</div><div className="text-xs text-[var(--muted)]">Categories</div></div>
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-white/10">
+      <div className="overflow-x-auto  border border-[var(--border)]">
         <table className="w-full min-w-[640px] border-collapse text-left text-sm">
           <thead className="bg-[var(--surface)] text-xs uppercase tracking-wide text-[var(--muted)]">
             <tr>
@@ -2769,14 +2744,14 @@ function ProductsView({ products, onToggle }: { products: Product[]; onToggle: (
           </thead>
           <tbody>
             {products.map((p) => (
-              <tr key={p.id} className="border-t border-white/5">
+              <tr key={p.id} className="border-t border-[var(--border)]">
                 <td className="px-4 py-3 font-mono text-xs text-[var(--muted)]">{p.code}</td>
-                <td className={`px-4 py-3 font-medium ${p.active ? 'text-white' : 'text-[var(--muted)] line-through'}`}>{p.name}</td>
+                <td className={`px-4 py-3 font-medium ${p.active ? 'text-[var(--ink)]' : 'text-[var(--muted)] line-through'}`}>{p.name}</td>
                 <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-0.5 text-xs ${CAT_STYLE[p.category]}`}>{p.category}</span></td>
-                <td className="px-4 py-3 text-white">{money(p.unitPrice)}</td>
+                <td className="px-4 py-3 text-[var(--ink)]">{money(p.unitPrice)}</td>
                 <td className="px-4 py-3">
-                  <button onClick={() => onToggle(p.id)} className={`h-5 w-9 rounded-full p-0.5 transition-colors ${p.active ? 'bg-emerald-500/70' : 'bg-white/15'}`} aria-label="Toggle active">
-                    <span className={`block h-4 w-4 rounded-full bg-white transition-transform ${p.active ? 'translate-x-4' : ''}`} />
+                  <button onClick={() => onToggle(p.id)} className={`h-5 w-9 rounded-full p-0.5 transition-colors ${p.active ? 'bg-[var(--ok)]' : 'bg-[var(--bg-soft)]'}`} aria-label="Toggle active">
+                    <span className={`block h-4 w-4 rounded-full bg-[var(--ink)] transition-transform ${p.active ? 'translate-x-4' : ''}`} />
                   </button>
                 </td>
               </tr>
@@ -2797,23 +2772,23 @@ function PriceBooksView({ priceBooks, products, onToggle }: { priceBooks: PriceB
         <div key={b.id} className={`${card} flex flex-col p-5`}>
           <div className="flex items-start justify-between">
             <div>
-              <div className="font-display text-lg text-white">{b.name}</div>
-              <span className={`mt-1 inline-block rounded-full border px-2.5 py-0.5 text-xs ${b.adjustmentPct < 0 ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-white/5 text-[var(--muted)] border-white/10'}`}>
+              <div className="font-display text-lg text-[var(--ink)]">{b.name}</div>
+              <span className={`mt-1 inline-block rounded-full border px-2.5 py-0.5 text-xs ${b.adjustmentPct < 0 ? 'bg-[var(--ok-bg)] text-[var(--ok)] border-[var(--ok)]' : 'bg-[var(--bg-soft)] text-[var(--muted)] border-[var(--border)]'}`}>
                 {b.adjustmentPct === 0 ? 'List price' : `${b.adjustmentPct}% off list`}
               </span>
             </div>
-            <button onClick={() => onToggle(b.id)} className={`h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors ${b.active ? 'bg-emerald-500/70' : 'bg-white/15'}`} aria-label="Toggle active">
-              <span className={`block h-4 w-4 rounded-full bg-white transition-transform ${b.active ? 'translate-x-4' : ''}`} />
+            <button onClick={() => onToggle(b.id)} className={`h-5 w-9 shrink-0 rounded-full p-0.5 transition-colors ${b.active ? 'bg-[var(--ok)]' : 'bg-[var(--bg-soft)]'}`} aria-label="Toggle active">
+              <span className={`block h-4 w-4 rounded-full bg-[var(--ink)] transition-transform ${b.active ? 'translate-x-4' : ''}`} />
             </button>
           </div>
           <p className="mt-2 text-sm text-[var(--muted)]">{b.description}</p>
-          <div className="mt-4 space-y-1.5 border-t border-white/5 pt-3">
+          <div className="mt-4 space-y-1.5 border-t border-[var(--border)] pt-3">
             {preview.map((p) => (
               <div key={p.id} className="flex items-center justify-between text-[13px]">
                 <span className="min-w-0 truncate text-[var(--text)]">{p.name}</span>
                 <span className="ml-2 shrink-0">
                   {b.adjustmentPct !== 0 && <span className="mr-1.5 text-xs text-[var(--muted)] line-through">{money(p.unitPrice)}</span>}
-                  <span className="text-[var(--brand-bright)]">{money(bookPrice(p.unitPrice, b))}</span>
+                  <span className="text-[var(--accent)]">{money(bookPrice(p.unitPrice, b))}</span>
                 </span>
               </div>
             ))}
@@ -2828,14 +2803,14 @@ function PriceBooksView({ priceBooks, products, onToggle }: { priceBooks: PriceB
 function LineTable({ lines, products }: { lines: QuoteLine[]; products: Product[] }) {
   const name = (id: string) => products.find((p) => p.id === id)?.name ?? 'Item';
   return (
-    <div className="space-y-1 border-t border-white/5 pt-3">
+    <div className="space-y-1 border-t border-[var(--border)] pt-3">
       {lines.map((l, i) => (
         <div key={i} className="flex items-center justify-between text-[13px]">
           <span className="min-w-0 truncate text-[var(--text)]">
             {name(l.productId)} <span className="text-[var(--muted)]">× {l.qty}</span>
-            {l.discountPct > 0 && <span className="ml-1 text-emerald-300">−{l.discountPct}%</span>}
+            {l.discountPct > 0 && <span className="ml-1 text-[var(--ok)]">−{l.discountPct}%</span>}
           </span>
-          <span className="ml-2 shrink-0 text-white">{money(lineNet(l))}</span>
+          <span className="ml-2 shrink-0 text-[var(--ink)]">{money(lineNet(l))}</span>
         </div>
       ))}
     </div>
@@ -2843,10 +2818,10 @@ function LineTable({ lines, products }: { lines: QuoteLine[]; products: Product[
 }
 function Totals({ lines, taxPct }: { lines: QuoteLine[]; taxPct: number }) {
   return (
-    <div className="mt-2 space-y-0.5 border-t border-white/5 pt-2 text-[13px]">
+    <div className="mt-2 space-y-0.5 border-t border-[var(--border)] pt-2 text-[13px]">
       <div className="flex justify-between text-[var(--muted)]"><span>Subtotal</span><span>{money(quoteSubtotal(lines))}</span></div>
       <div className="flex justify-between text-[var(--muted)]"><span>VAT ({taxPct}%)</span><span>{money(quoteTax(lines, taxPct))}</span></div>
-      <div className="flex justify-between font-medium text-white"><span>Total</span><span>{money(quoteGrand(lines, taxPct))}</span></div>
+      <div className="flex justify-between font-medium text-[var(--ink)]"><span>Total</span><span>{money(quoteGrand(lines, taxPct))}</span></div>
     </div>
   );
 }
@@ -2869,14 +2844,14 @@ function QuotesView({
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3">
         {stats.map(([label, value]) => (
-          <div key={label} className={`${card} p-4`}><div className="font-display text-xl text-white">{value}</div><div className="text-xs text-[var(--muted)]">{label}</div></div>
+          <div key={label} className={`${card} p-4`}><div className="font-display text-xl text-[var(--ink)]">{value}</div><div className="text-xs text-[var(--muted)]">{label}</div></div>
         ))}
       </div>
       {quotes.length === 0 && (
         <div className={`${card} p-10 text-center`}>
           <ScrollText size={28} className="mx-auto text-[var(--muted)]" />
           <p className="mt-3 text-sm text-[var(--muted)]">No quotes yet.</p>
-          <button onClick={onNew} className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--brand-bright)] px-4 py-2 text-sm font-medium text-[#0b0d10] hover:bg-white"><Plus size={15} /> New quote</button>
+          <button onClick={onNew} className="mt-4 inline-flex items-center gap-2 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-ink)] hover:opacity-90"><Plus size={15} /> New quote</button>
         </div>
       )}
       <div className="grid gap-3 lg:grid-cols-2">
@@ -2885,7 +2860,7 @@ function QuotesView({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-xs text-[var(--muted)]"><span className="font-mono">{q.number}</span> · {bookName(q.priceBookId)}</div>
-                <div className="mt-0.5 truncate font-medium text-white">{q.title}</div>
+                <div className="mt-0.5 truncate font-medium text-[var(--ink)]">{q.title}</div>
                 <div className="mt-0.5 text-sm text-[var(--muted)]">{byId[q.contactId]?.name ?? '—'} · valid to {fmtDate(q.validUntil)}</div>
               </div>
               <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs ${QUOTE_STYLE[q.status]}`}>{q.status}</span>
@@ -2894,18 +2869,18 @@ function QuotesView({
             <Totals lines={q.lines} taxPct={q.taxPct} />
             <div className="mt-4 flex flex-wrap gap-2">
               {q.status === 'Draft' && (
-                <button onClick={() => onSend(q.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500/15 px-3 py-1.5 text-xs text-sky-300 hover:bg-sky-500/25"><Send size={13} /> Send to client</button>
+                <button onClick={() => onSend(q.id)} className="inline-flex items-center gap-1.5  bg-[var(--accent-soft)] px-3 py-1.5 text-xs text-[var(--accent)] hover:bg-[var(--accent)]"><Send size={13} /> Send to client</button>
               )}
               {q.status === 'Delivered' && (
                 <>
-                  <button onClick={() => onOutcome(q.id, 'Accepted')} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-500/25"><Check size={13} /> Mark accepted</button>
-                  <button onClick={() => onOutcome(q.id, 'Rejected')} className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-[var(--muted)] hover:bg-white/10"><X size={13} /> Rejected</button>
+                  <button onClick={() => onOutcome(q.id, 'Accepted')} className="inline-flex items-center gap-1.5  bg-[var(--ok-bg)] px-3 py-1.5 text-xs text-[var(--ok)] hover:bg-[var(--ok)]"><Check size={13} /> Mark accepted</button>
+                  <button onClick={() => onOutcome(q.id, 'Rejected')} className="inline-flex items-center gap-1.5  bg-[var(--bg-soft)] px-3 py-1.5 text-xs text-[var(--muted)] hover:bg-[var(--bg-soft)]"><X size={13} /> Rejected</button>
                 </>
               )}
               {q.status === 'Accepted' && (
                 q.salesOrderId
-                  ? <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-[var(--muted)]"><Check size={13} /> Sales order raised</span>
-                  : <button onClick={() => onConvert(q.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-bright)] px-3 py-1.5 text-xs font-medium text-[#0b0d10] hover:bg-white"><ArrowRightLeft size={13} /> Convert to sales order</button>
+                  ? <span className="inline-flex items-center gap-1.5  bg-[var(--bg-soft)] px-3 py-1.5 text-xs text-[var(--muted)]"><Check size={13} /> Sales order raised</span>
+                  : <button onClick={() => onConvert(q.id)} className="inline-flex items-center gap-1.5  bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90"><ArrowRightLeft size={13} /> Convert to sales order</button>
               )}
             </div>
           </div>
@@ -2926,9 +2901,9 @@ function SalesOrdersView({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3">
-        <div className={`${card} p-4`}><div className="font-display text-xl text-white">{salesOrders.length}</div><div className="text-xs text-[var(--muted)]">Orders</div></div>
-        <div className={`${card} p-4`}><div className="font-display text-xl text-sky-300">{salesOrders.filter((s) => s.status !== 'Invoiced').length}</div><div className="text-xs text-[var(--muted)]">In flight</div></div>
-        <div className={`${card} p-4`}><div className="font-display text-xl text-emerald-300">{salesOrders.filter((s) => s.status === 'Invoiced').length}</div><div className="text-xs text-[var(--muted)]">Invoiced</div></div>
+        <div className={`${card} p-4`}><div className="font-display text-xl text-[var(--ink)]">{salesOrders.length}</div><div className="text-xs text-[var(--muted)]">Orders</div></div>
+        <div className={`${card} p-4`}><div className="font-display text-xl text-[var(--accent)]">{salesOrders.filter((s) => s.status !== 'Invoiced').length}</div><div className="text-xs text-[var(--muted)]">In flight</div></div>
+        <div className={`${card} p-4`}><div className="font-display text-xl text-[var(--ok)]">{salesOrders.filter((s) => s.status === 'Invoiced').length}</div><div className="text-xs text-[var(--muted)]">Invoiced</div></div>
       </div>
       {salesOrders.length === 0 && (
         <div className={`${card} p-10 text-center`}>
@@ -2942,7 +2917,7 @@ function SalesOrdersView({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-xs text-[var(--muted)]"><span className="font-mono">{so.number}</span>{quoteNum(so.quoteId) && <> · from {quoteNum(so.quoteId)}</>}</div>
-                <div className="mt-0.5 truncate font-medium text-white">{byId[so.contactId]?.name ?? '—'}</div>
+                <div className="mt-0.5 truncate font-medium text-[var(--ink)]">{byId[so.contactId]?.name ?? '—'}</div>
                 <div className="mt-0.5 text-sm text-[var(--muted)]">Raised {fmtDate(so.createdAt)}</div>
               </div>
               <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs ${SO_STYLE[so.status]}`}>{so.status}</span>
@@ -2951,16 +2926,16 @@ function SalesOrdersView({
             <Totals lines={so.lines} taxPct={so.taxPct} />
             <div className="mt-4 flex flex-wrap gap-2">
               {so.status === 'Created' && (
-                <button onClick={() => onApprove(so.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs text-amber-300 hover:bg-amber-500/25"><Check size={13} /> Approve</button>
+                <button onClick={() => onApprove(so.id)} className="inline-flex items-center gap-1.5  bg-[var(--warn-bg)] px-3 py-1.5 text-xs text-[var(--warn)] hover:bg-[var(--warn)]"><Check size={13} /> Approve</button>
               )}
               {so.status === 'Approved' && (
-                <button onClick={() => onDeliver(so.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-500/15 px-3 py-1.5 text-xs text-sky-300 hover:bg-sky-500/25"><Send size={13} /> Mark delivered</button>
+                <button onClick={() => onDeliver(so.id)} className="inline-flex items-center gap-1.5  bg-[var(--accent-soft)] px-3 py-1.5 text-xs text-[var(--accent)] hover:bg-[var(--accent)]"><Send size={13} /> Mark delivered</button>
               )}
               {so.status === 'Delivered' && (
-                <button onClick={() => onInvoice(so.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--brand-bright)] px-3 py-1.5 text-xs font-medium text-[#0b0d10] hover:bg-white"><FileText size={13} /> Generate invoice</button>
+                <button onClick={() => onInvoice(so.id)} className="inline-flex items-center gap-1.5  bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90"><FileText size={13} /> Generate invoice</button>
               )}
               {so.status === 'Invoiced' && (
-                <button onClick={onGoInvoices} className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-[var(--muted)] hover:bg-white/10"><FileText size={13} /> View in Invoices</button>
+                <button onClick={onGoInvoices} className="inline-flex items-center gap-1.5  bg-[var(--bg-soft)] px-3 py-1.5 text-xs text-[var(--muted)] hover:bg-[var(--bg-soft)]"><FileText size={13} /> View in Invoices</button>
               )}
             </div>
           </div>
@@ -3005,10 +2980,10 @@ function QuoteModal({
 
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl border border-white/10 bg-[var(--surface)] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/10 p-5">
-          <h2 className="font-display text-lg text-white">New quote</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-white/5 hover:text-white" aria-label="Close"><X size={18} /></button>
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col  border border-[var(--border)] bg-[var(--surface)] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[var(--border)] p-5">
+          <h2 className="font-display text-lg text-[var(--ink)]">New quote</h2>
+          <button onClick={onClose} className=" p-1.5 text-[var(--muted)] hover:bg-[var(--bg-soft)] hover:text-[var(--ink)]" aria-label="Close"><X size={18} /></button>
         </div>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Quote title (optional)" className={field} />
@@ -3022,20 +2997,20 @@ function QuoteModal({
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-wide text-[var(--muted)]">Line items</span><button onClick={addLine} className="inline-flex items-center gap-1 text-xs text-[var(--brand-bright)] hover:underline"><Plus size={13} /> Add line</button></div>
+            <div className="flex items-center justify-between"><span className="text-xs uppercase tracking-wide text-[var(--muted)]">Line items</span><button onClick={addLine} className="inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline"><Plus size={13} /> Add line</button></div>
             {lines.map((l, i) => {
               const p = prod(l.productId);
               const unit = p && book ? bookPrice(p.unitPrice, book) : p?.unitPrice ?? 0;
               return (
-                <div key={i} className="rounded-xl bg-[var(--bg-soft)] p-3">
+                <div key={i} className=" bg-[var(--bg-soft)] p-3">
                   <div className="flex items-center gap-2">
                     <select value={l.productId} onChange={(e) => setLine(i, { productId: e.target.value })} className={`${field} min-w-0 flex-1`}>{products.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}</option>)}</select>
-                    {lines.length > 1 && <button onClick={() => removeLine(i)} className="shrink-0 rounded-lg p-1.5 text-[var(--muted)] hover:bg-white/5 hover:text-rose-300" aria-label="Remove line"><Trash2 size={15} /></button>}
+                    {lines.length > 1 && <button onClick={() => removeLine(i)} className="shrink-0  p-1.5 text-[var(--muted)] hover:bg-[var(--bg-soft)] hover:text-[var(--danger)]" aria-label="Remove line"><Trash2 size={15} /></button>}
                   </div>
                   <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
                     <label className="text-[var(--muted)]">Qty<input type="number" min={1} value={l.qty} onChange={(e) => setLine(i, { qty: Math.max(1, Number(e.target.value) || 1) })} className={`${field} mt-1`} /></label>
                     <label className="text-[var(--muted)]">Disc %<input type="number" min={0} max={100} value={l.discountPct} onChange={(e) => setLine(i, { discountPct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} className={`${field} mt-1`} /></label>
-                    <div className="text-[var(--muted)]">Line total<div className="mt-1 py-2 font-medium text-white">{money(Math.round(Math.max(1, l.qty) * unit * (1 - l.discountPct / 100)))}</div></div>
+                    <div className="text-[var(--muted)]">Line total<div className="mt-1 py-2 font-medium text-[var(--ink)]">{money(Math.round(Math.max(1, l.qty) * unit * (1 - l.discountPct / 100)))}</div></div>
                   </div>
                 </div>
               );
@@ -3047,8 +3022,8 @@ function QuoteModal({
           </label>
           <Totals lines={priced} taxPct={taxPct} />
         </div>
-        <div className="border-t border-white/10 p-5">
-          <button onClick={submit} disabled={!canSave} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-bright)] py-2.5 font-medium text-[#0b0d10] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"><ScrollText size={16} /> Create quote</button>
+        <div className="border-t border-[var(--border)] p-5">
+          <button onClick={submit} disabled={!canSave} className="inline-flex w-full items-center justify-center gap-2  bg-[var(--accent)] py-2.5 font-medium text-[var(--accent-ink)] transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"><ScrollText size={16} /> Create quote</button>
         </div>
       </div>
     </div>

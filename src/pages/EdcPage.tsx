@@ -186,7 +186,7 @@ function OverviewTab({ queries }: { queries: QueryT[] }) {
       </div>
 
       <Section label="Data quality" title="Where the study stands">
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           <Panel label="Recruitment" title="Enrolment by site">
             <div className="space-y-3.5">
               {bySite.map((s) => (
@@ -246,7 +246,7 @@ function ParticipantsTab({ queries }: { queries: QueryT[] }) {
   const rows = SUBJECTS.filter((s) => filter === 'All' || s.status === filter);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-wrap gap-2">
         {SUBJ_FILTERS.map((f) => {
           const n = f === 'All' ? SUBJECTS.length : SUBJECTS.filter((s) => s.status === f).length;
@@ -430,7 +430,7 @@ function CrfTab({ addQueries }: { addQueries: (items: Omit<QueryT, 'id'>[]) => s
     cx('w-full border bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] outline-none transition-colors', LEVEL_BORDER[lvl]);
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
+    <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
       {/* Form */}
       <Panel
         label="Electronic case report form"
@@ -571,7 +571,7 @@ function QueriesTab({ queries, setQueries }: { queries: QueryT[]; setQueries: Re
     setQueries((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-wrap gap-2">
         {QUERY_FILTERS.map((f) => {
           const n = f === 'All' ? queries.length : queries.filter((q) => q.status === f).length;
@@ -672,7 +672,7 @@ export default function EdcPage() {
 
       <TabNav tabs={TABS} active={tab} onChange={setTab} />
 
-      <div className="pt-10">
+      <div className="pt-7">
         {tab === 'overview' && <OverviewTab queries={queries} />}
         {tab === 'participants' && <ParticipantsTab queries={queries} />}
         {tab === 'crf' && <CrfTab addQueries={addQueries} />}

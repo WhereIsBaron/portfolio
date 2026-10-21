@@ -1,13 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { usePageTitle } from '@/hooks/usePageTitle';
 import {
-  ArrowLeft, CheckCircle2, Circle, ChevronRight, ChevronDown, ChevronUp,
+  CheckCircle2, Circle, ChevronRight, ChevronDown, ChevronUp,
   FlaskConical, ShieldCheck, Users, Package, TrendingUp, ClipboardList,
-  AlertTriangle, XCircle, Info, Calculator, BookOpen, Award, Zap,
+  AlertTriangle, XCircle, Info, Calculator, BookOpen, Award, Zap, X,
 } from 'lucide-react';
+import {
+  DemoShell, Masthead, TabNav, Meter, AccentButton, GhostButton,
+  fieldLabel, cx, type TabDef,
+} from '@/components/demo/kit';
 
-/* ─── Types ────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────
+   Operations / Production Supervisor Training — /production — Andrew.OPS
+
+   An interactive onboarding programme for a chemical-plant production
+   supervisor: six lessons (daily management, QC, safety, leadership,
+   inventory, continuous improvement) with scenario decisions, an inline
+   glossary, and a live OEE calculator. Progress persists in localStorage.
+   Rebuilt on the homepage "Stone & blueprint" editorial theme via the
+   shared demo kit; all lesson content and logic are original.
+   ──────────────────────────────────────────────────────────────────────── */
+
 type ModuleId = 'production' | 'quality' | 'safety' | 'leadership' | 'inventory' | 'improvement';
 
 interface GlossaryEntry { term: string; definition: string; example?: string; }
@@ -68,35 +80,75 @@ const GLOSSARY: Record<string, GlossaryEntry> = {
   },
 };
 
+/* Inline glossary-term button. */
+function Term({ id, children, open }: { id: string; children: React.ReactNode; open: (id: string) => void }) {
+  return (
+    <button
+      onClick={() => open(id)}
+      className="inline-flex items-center gap-1 border border-[var(--accent)] bg-[var(--accent-soft)] px-1.5 py-0.5 align-baseline font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--accent)] transition-colors hover:bg-[var(--accent)] hover:text-[var(--accent-ink)]"
+    >
+      {children} <Info size={9} />
+    </button>
+  );
+}
 
-/* ─── Scenario block ────────────────────────────────────────────────────── */
+/* ─── Reusable blocks ─────────────────────────────────────────────────── */
+
+function Lede({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="border border-[var(--border)] bg-[var(--surface)] p-5">
+      <h3 className="mb-2 font-display text-lg font-medium leading-tight text-[var(--ink)]">{title}</h3>
+      <p className="text-sm leading-relaxed text-[var(--muted)]">{children}</p>
+    </div>
+  );
+}
+
+function PanelBox({ label, icon, children, className }: { label: string; icon?: React.ReactNode; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cx('border border-[var(--border)] bg-[var(--surface)]', className)}>
+      <div className="flex items-center gap-2 border-b border-[var(--border)] px-5 py-3">
+        {icon && <span className="text-[var(--accent)]">{icon}</span>}
+        <p className={fieldLabel}>{label}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function ScenarioBlock({ scenario }: { scenario: Scenario }) {
   const [chosen, setChosen] = useState<number | null>(null);
   const result = chosen !== null ? scenario.choices[chosen] : null;
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
-      <p className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-amber-400">
+    <div className="border border-[var(--warn)] bg-[var(--warn-bg)] p-5">
+      <p className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.15em] text-[var(--warn)]">
         <Zap size={12} /> Scenario — what would you do?
       </p>
-      <p className="mb-3 text-sm font-medium text-white">{scenario.situation}</p>
-      <p className="mb-3 text-xs text-[#8fa3bf]">{scenario.question}</p>
+      <p className="mb-3 text-sm font-medium text-[var(--ink)]">{scenario.situation}</p>
+      <p className="mb-3 text-xs text-[var(--muted)]">{scenario.question}</p>
       <div className="space-y-2">
         {scenario.choices.map((c, i) => {
           const isChosen = chosen === i;
-          const bg = !isChosen ? 'border-[#1e2d3d] bg-[#111827] hover:border-[#00c9a7]/40'
-            : c.correct ? 'border-teal-500 bg-teal-500/10' : 'border-red-500 bg-red-500/10';
+          const cls = !isChosen
+            ? 'border-[var(--border)] bg-[var(--bg)] hover:border-[var(--accent)]'
+            : c.correct
+              ? 'border-[var(--ok)] bg-[var(--ok-bg)]'
+              : 'border-[var(--danger)] bg-[var(--danger-bg)]';
+          const txt = isChosen ? (c.correct ? 'text-[var(--ok)]' : 'text-[var(--danger)]') : 'text-[var(--ink)]';
           return (
-            <button key={i} onClick={() => setChosen(i)} disabled={chosen !== null}
-              className={`w-full rounded-lg border px-4 py-3 text-left text-xs transition-colors ${bg} ${chosen === null ? 'cursor-pointer' : 'cursor-default'}`}>
-              <span className={`font-semibold ${isChosen ? (c.correct ? 'text-teal-400' : 'text-red-400') : 'text-[#cbd5e1]'}`}>
-                {String.fromCharCode(65 + i)}. {c.label}
-              </span>
+            <button
+              key={i}
+              onClick={() => setChosen(i)}
+              disabled={chosen !== null}
+              className={cx('w-full border px-4 py-3 text-left text-xs transition-colors', cls, chosen === null ? 'cursor-pointer' : 'cursor-default')}
+            >
+              <span className={cx('font-semibold', txt)}>{String.fromCharCode(65 + i)}. {c.label}</span>
             </button>
           );
         })}
       </div>
       {result && (
-        <div className={`mt-4 rounded-lg p-4 text-xs leading-relaxed ${result.correct ? 'bg-teal-500/10 border border-teal-500/30 text-teal-300' : 'bg-red-500/10 border border-red-500/30 text-red-300'}`}>
+        <div className={cx('mt-4 border p-4 text-xs leading-relaxed',
+          result.correct ? 'border-[var(--ok)] bg-[var(--ok-bg)] text-[var(--ok)]' : 'border-[var(--danger)] bg-[var(--danger-bg)] text-[var(--danger)]')}>
           {result.correct ? <CheckCircle2 size={14} className="mb-1 inline" /> : <XCircle size={14} className="mb-1 inline" />}
           {' '}<strong>{result.correct ? 'Correct. ' : 'Not quite. '}</strong>{result.feedback}
         </div>
@@ -105,18 +157,16 @@ function ScenarioBlock({ scenario }: { scenario: Scenario }) {
   );
 }
 
-/* ─── Concept card ─────────────────────────────────────────────────────── */
 function ConceptCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] overflow-hidden">
-      <button onClick={() => setOpen(o => !o)}
-        className="flex w-full items-center gap-3 p-4 text-left hover:bg-[#162030] transition-colors">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#00c9a7]/10 text-[#00c9a7]">{icon}</span>
-        <span className="flex-1 text-sm font-semibold text-white">{title}</span>
-        {open ? <ChevronUp size={15} className="text-[#8fa3bf]" /> : <ChevronDown size={15} className="text-[#8fa3bf]" />}
+    <div className="border border-[var(--border)] bg-[var(--surface)]">
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-[var(--bg-soft)]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)]">{icon}</span>
+        <span className="flex-1 text-sm font-semibold text-[var(--ink)]">{title}</span>
+        {open ? <ChevronUp size={15} className="text-[var(--muted)]" /> : <ChevronDown size={15} className="text-[var(--muted)]" />}
       </button>
-      {open && <div className="border-t border-[#1e2d3d] px-4 pb-4 pt-3 text-xs leading-relaxed text-[#cbd5e1] space-y-2">{children}</div>}
+      {open && <div className="space-y-2 border-t border-[var(--border)] px-4 pb-4 pt-3 text-xs leading-relaxed text-[var(--muted)]">{children}</div>}
     </div>
   );
 }
@@ -125,16 +175,12 @@ function ConceptCard({ icon, title, children }: { icon: React.ReactNode; title: 
 function ModuleProduction() {
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] p-5">
-        <h3 className="mb-2 font-display text-base font-bold text-white">What does a Production Supervisor actually do all day?</h3>
-        <p className="text-xs leading-relaxed text-[#cbd5e1]">Your job is to ensure the right products are made to the right quality, on time, safely, every shift. You are the link between the production plan on paper and the reality on the factory floor. You don't make the product — you create the conditions where your operators can make it well, consistently, and safely.</p>
-      </div>
+      <Lede title="What does a Production Supervisor actually do all day?">
+        Your job is to ensure the right products are made to the right quality, on time, safely, every shift. You are the link between the production plan on paper and the reality on the factory floor. You don't make the product — you create the conditions where your operators can make it well, consistently, and safely.
+      </Lede>
 
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#0d1117] overflow-hidden">
-        <div className="border-b border-[#1e2d3d] px-5 py-3">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#00c9a7]">The Supervisor's Daily Routine</p>
-        </div>
-        <div className="divide-y divide-[#1e2d3d]">
+      <PanelBox label="The Supervisor's Daily Routine">
+        <div className="divide-y divide-[var(--border)]">
           {[
             { time: '–30 min', action: 'Arrive early. Read the outgoing supervisor\'s handover notes before you take over. Know the status of every batch, any equipment issues, any open safety actions, and any personnel matters. Never walk into a shift blind.' },
             { time: 'Shift start', action: 'Run a 5-minute shift briefing with ALL operators: safety topic of the day, production targets, any schedule changes, any new procedures. This sets the tone. Energy in this briefing determines the shift\'s culture.' },
@@ -142,20 +188,20 @@ function ModuleProduction() {
             { time: 'Ongoing', action: 'Monitor production rate vs. plan every hour. If output falls >10% behind plan, investigate immediately — don\'t wait for the end of shift to discover a problem.' },
             { time: 'Mid-shift', action: 'Review all QC results. Sign off on batch releases or place holds. Escalate any out-of-spec results to quality manager within 30 minutes of receiving the lab result.' },
             { time: 'Last 30 min', action: 'Prepare your handover: batch statuses, any holds, open safety actions, pending maintenance, materials that need ordering. Write it down. Verbal handover is not enough.' },
-          ].map(item => (
+          ].map((item) => (
             <div key={item.time} className="flex gap-4 px-5 py-3">
-              <span className="w-20 shrink-0 font-mono text-[10px] font-bold text-[#00c9a7] pt-0.5">{item.time}</span>
-              <p className="text-xs leading-relaxed text-[#cbd5e1]">{item.action}</p>
+              <span className="w-20 shrink-0 pt-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--accent)]">{item.time}</span>
+              <p className="text-xs leading-relaxed text-[var(--muted)]">{item.action}</p>
             </div>
           ))}
         </div>
-      </div>
+      </PanelBox>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <ConceptCard icon={<ClipboardList size={18} />} title="Reading the Production Schedule">
           <p>Every shift you receive a production schedule: which products to make, how much, on which line, by when. Your job is to execute it and flag conflicts early.</p>
           <p className="mt-2">Key questions to ask before the shift:</p>
-          <ul className="mt-1 ml-3 list-disc space-y-1">
+          <ul className="ml-3 mt-1 list-disc space-y-1">
             <li>Do we have enough raw materials for every batch?</li>
             <li>Is all equipment in working order (no outstanding maintenance)?</li>
             <li>Are we fully staffed, or do I need to redeploy operators between lines?</li>
@@ -164,19 +210,19 @@ function ModuleProduction() {
         </ConceptCard>
         <ConceptCard icon={<TrendingUp size={18} />} title="Monitoring Production Rate">
           <p>Production rate = volume (or units) produced per hour. You track this against the plan.</p>
-          <p className="mt-2 font-semibold text-amber-400">Rule of thumb: if you're behind plan by end of hour 2, the shift will not recover without intervention.</p>
+          <p className="mt-2 font-semibold text-[var(--warn)]">Rule of thumb: if you're behind plan by end of hour 2, the shift will not recover without intervention.</p>
           <p className="mt-2">When you're behind: identify the constraint (machine, material, or person), fix or escalate it, communicate the revised forecast to your manager. Don't hide bad news — it only gets worse.</p>
         </ConceptCard>
         <ConceptCard icon={<AlertTriangle size={18} />} title="Escalation — When and Who">
           <p>Supervisors escalate to the Production Manager when:</p>
-          <ul className="mt-1 ml-3 list-disc space-y-1">
+          <ul className="ml-3 mt-1 list-disc space-y-1">
             <li>A batch will miss its delivery commitment</li>
             <li>Equipment failure cannot be resolved within 30 minutes</li>
             <li>Any safety incident (near-miss or actual)</li>
             <li>A batch fails QC and you're unsure how to proceed</li>
             <li>A raw material shortage threatens the next shift's schedule</li>
           </ul>
-          <p className="mt-2 text-amber-400">Never escalate a problem without also bringing your proposed solution.</p>
+          <p className="mt-2 text-[var(--warn)]">Never escalate a problem without also bringing your proposed solution.</p>
         </ConceptCard>
         <ConceptCard icon={<Users size={18} />} title="Staffing & Redeployment">
           <p>Operators call in sick. Equipment breaks down. Your job is to keep production moving with what you have.</p>
@@ -201,20 +247,17 @@ function ModuleProduction() {
 function ModuleQuality({ openGlossary }: { openGlossary: (id: string) => void }) {
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] p-5">
-        <h3 className="mb-2 font-display text-base font-bold text-white">Quality is YOUR responsibility — not just the lab's</h3>
-        <p className="text-xs leading-relaxed text-[#cbd5e1]">Many supervisors think quality is the quality department's job. Wrong. The supervisor signs the batch release. The lab tests parameters — but you decide what to do with the results. You are accountable for every litre that leaves your line. A batch that slips through out-of-spec is a customer complaint, a recall risk, or a regulatory violation with your name on it.</p>
-        <div className="mt-3 flex gap-2 flex-wrap">
-          <button onClick={() => openGlossary('FPY')} className="inline-flex items-center gap-1 rounded border border-[#00c9a7]/40 bg-[#00c9a7]/10 px-2 py-1 text-xs font-semibold text-[#00c9a7] hover:bg-[#00c9a7]/20">First-Pass Yield <Info size={10} /></button>
-          <button onClick={() => openGlossary('CFU')} className="inline-flex items-center gap-1 rounded border border-[#00c9a7]/40 bg-[#00c9a7]/10 px-2 py-1 text-xs font-semibold text-[#00c9a7] hover:bg-[#00c9a7]/20">CFU/mL <Info size={10} /></button>
+      <div className="border border-[var(--border)] bg-[var(--surface)] p-5">
+        <h3 className="mb-2 font-display text-lg font-medium leading-tight text-[var(--ink)]">Quality is YOUR responsibility — not just the lab's</h3>
+        <p className="text-sm leading-relaxed text-[var(--muted)]">Many supervisors think quality is the quality department's job. Wrong. The supervisor signs the batch release. The lab tests parameters — but you decide what to do with the results. You are accountable for every litre that leaves your line. A batch that slips through out-of-spec is a customer complaint, a recall risk, or a regulatory violation with your name on it.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Term id="FPY" open={openGlossary}>First-Pass Yield</Term>
+          <Term id="CFU" open={openGlossary}>CFU/mL</Term>
         </div>
       </div>
 
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] overflow-hidden">
-        <div className="border-b border-[#1e2d3d] px-5 py-3">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#00c9a7]">QC Parameters — What They Mean & Why They Matter</p>
-        </div>
-        <div className="divide-y divide-[#1e2d3d]">
+      <PanelBox label="QC Parameters — What They Mean & Why They Matter">
+        <div className="divide-y divide-[var(--border)]">
           {[
             { param: 'pH Level', range: '0–14 scale', what: 'Measures acidity/alkalinity of the product. pH 7 = neutral. Below 7 = acidic. Above 7 = alkaline (basic).', why: 'Wrong pH means the product won\'t work and may be hazardous. A degreaser too low in pH becomes corrosive to skin. A hand soap too high in pH strips natural skin oils and causes irritation. pH is often the first indicator that something went wrong in formulation.' },
             { param: 'Viscosity', range: 'Measured in cP (centipoise)', what: 'Resistance to flow. Water = 1 cP. Honey ≈ 10,000 cP. Your product has a target viscosity for pourability and feel.', why: 'Too thin: product runs off surfaces immediately (cleaning products won\'t dwell long enough to work). Too thick: product is hard to dispense, pumps struggle, fill lines jam. Both are customer complaints.' },
@@ -222,34 +265,34 @@ function ModuleQuality({ openGlossary }: { openGlossary: (id: string) => void })
             { param: 'CFU/mL', range: '<100 (cosmetics), <10 (sanitizers)', what: 'Colony Forming Units per millilitre — a count of live bacteria or fungi in the product.', why: 'Contaminated product poses direct public health risk. For antibacterial soaps and sanitizers, it\'s a regulatory breach. Caused by: contaminated water, dirty equipment, incorrect preservative level, or cross-contamination between products. NEVER release a product that fails microbial spec.' },
             { param: 'Density / Specific Gravity', range: 'g/mL, product-specific', what: 'Mass per unit volume. A simple, fast measurement that acts as a fingerprint for the formulation.', why: 'If density is wrong, the formulation is wrong — something was left out, added too much, or the wrong raw material was used. Density is a cheap, quick early-warning check before the full lab panel is ready.' },
             { param: 'Colour & Appearance', range: 'Visual standard', what: 'Compared against a reference standard (a reference bottle or Pantone card). Also includes clarity, haze, and separation check.', why: 'A customer sees the colour before they see any spec. Colour variation between batches = quality inconsistency. Haze or separation = formulation instability (the product may separate on the shelf). Never underestimate visual QC.' },
-          ].map(row => (
+          ].map((row) => (
             <div key={row.param} className="grid gap-2 px-5 py-4 sm:grid-cols-[140px_1fr_1fr]">
               <div>
-                <p className="text-xs font-bold text-white">{row.param}</p>
-                <p className="text-[10px] font-mono text-[#8fa3bf]">{row.range}</p>
+                <p className="text-xs font-bold text-[var(--ink)]">{row.param}</p>
+                <p className="font-mono text-[10px] text-[var(--muted)]">{row.range}</p>
               </div>
               <div>
-                <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-[#8fa3bf]">What it is</p>
-                <p className="text-xs text-[#cbd5e1]">{row.what}</p>
+                <p className={cx('mb-0.5', fieldLabel)}>What it is</p>
+                <p className="text-xs text-[var(--muted)]">{row.what}</p>
               </div>
               <div>
-                <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-400">Why it matters</p>
-                <p className="text-xs text-[#cbd5e1]">{row.why}</p>
+                <p className="mb-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--warn)]">Why it matters</p>
+                <p className="text-xs text-[var(--muted)]">{row.why}</p>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </PanelBox>
 
       <div className="grid gap-3 sm:grid-cols-3">
         {[
-          { status: 'Approved', color: 'teal', icon: <CheckCircle2 size={16} />, desc: 'All parameters within spec. Batch released for bottling/packaging. Supervisor signs batch record. Document the lot numbers of every raw material used.' },
-          { status: 'Hold', color: 'amber', icon: <AlertTriangle size={16} />, desc: 'One or more parameters out of spec. Batch is quarantined — it cannot move or be used until resolved. Investigate root cause, rework if possible, re-test before re-submitting to QC.' },
-          { status: 'Reject', color: 'red', icon: <XCircle size={16} />, desc: 'Batch cannot be reworked to spec (e.g. microbial failure, wrong active ingredient, chemical incompatibility). Batch is destroyed or returned to raw material. Document everything — this data drives process improvement.' },
-        ].map(item => (
-          <div key={item.status} className={`rounded-xl border p-4 ${item.color === 'teal' ? 'border-teal-500/30 bg-teal-500/5' : item.color === 'amber' ? 'border-amber-500/30 bg-amber-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
-            <div className={`mb-2 flex items-center gap-2 ${item.color === 'teal' ? 'text-teal-400' : item.color === 'amber' ? 'text-amber-400' : 'text-red-400'}`}>{item.icon}<span className="font-bold text-sm">{item.status}</span></div>
-            <p className="text-xs leading-relaxed text-[#cbd5e1]">{item.desc}</p>
+          { status: 'Approved', tone: 'ok' as const, icon: <CheckCircle2 size={16} />, desc: 'All parameters within spec. Batch released for bottling/packaging. Supervisor signs batch record. Document the lot numbers of every raw material used.' },
+          { status: 'Hold', tone: 'warn' as const, icon: <AlertTriangle size={16} />, desc: 'One or more parameters out of spec. Batch is quarantined — it cannot move or be used until resolved. Investigate root cause, rework if possible, re-test before re-submitting to QC.' },
+          { status: 'Reject', tone: 'danger' as const, icon: <XCircle size={16} />, desc: 'Batch cannot be reworked to spec (e.g. microbial failure, wrong active ingredient, chemical incompatibility). Batch is destroyed or returned to raw material. Document everything — this data drives process improvement.' },
+        ].map((item) => (
+          <div key={item.status} className="border p-4" style={{ borderColor: `var(--${item.tone})`, background: `var(--${item.tone}-bg)` }}>
+            <div className="mb-2 flex items-center gap-2" style={{ color: `var(--${item.tone})` }}>{item.icon}<span className="text-sm font-bold">{item.status}</span></div>
+            <p className="text-xs leading-relaxed text-[var(--muted)]">{item.desc}</p>
           </div>
         ))}
       </div>
@@ -271,23 +314,19 @@ function ModuleQuality({ openGlossary }: { openGlossary: (id: string) => void })
 function ModuleSafety({ openGlossary }: { openGlossary: (id: string) => void }) {
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-5">
-        <h3 className="mb-2 font-display text-base font-bold text-white">Safety is a culture — not a checklist</h3>
-        <p className="text-xs leading-relaxed text-[#cbd5e1]">A chemical plant where people follow safety rules only when the supervisor is watching is one incident away from a serious injury. Your job is to build an environment where operators follow procedures because they understand why — not because they fear a write-up. That means explaining the reason behind every rule, leading by example, and responding to near-misses with curiosity, not blame.</p>
+      <div className="border border-[var(--danger)] bg-[var(--danger-bg)] p-5">
+        <h3 className="mb-2 font-display text-lg font-medium leading-tight text-[var(--ink)]">Safety is a culture — not a checklist</h3>
+        <p className="text-sm leading-relaxed text-[var(--muted)]">A chemical plant where people follow safety rules only when the supervisor is watching is one incident away from a serious injury. Your job is to build an environment where operators follow procedures because they understand why — not because they fear a write-up. That means explaining the reason behind every rule, leading by example, and responding to near-misses with curiosity, not blame.</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {(['PPE', 'GHS', 'SDS', 'PTW', 'LTI'] as const).map(id => (
-            <button key={id} onClick={() => openGlossary(id)} className="inline-flex items-center gap-1 rounded border border-[#00c9a7]/40 bg-[#00c9a7]/10 px-2 py-1 text-xs font-semibold text-[#00c9a7] hover:bg-[#00c9a7]/20">{id} <Info size={10} /></button>
+          {(['PPE', 'GHS', 'SDS', 'PTW', 'LTI'] as const).map((id) => (
+            <Term key={id} id={id} open={openGlossary}>{id}</Term>
           ))}
         </div>
       </div>
 
       {/* PPE */}
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] overflow-hidden">
-        <div className="border-b border-[#1e2d3d] px-5 py-3 flex items-center gap-2">
-          <ShieldCheck size={14} className="text-[#00c9a7]" />
-          <p className="text-xs font-bold uppercase tracking-widest text-[#00c9a7]">PPE — Personal Protective Equipment</p>
-        </div>
-        <div className="grid gap-px bg-[#1e2d3d] sm:grid-cols-2 lg:grid-cols-3">
+      <PanelBox label="PPE — Personal Protective Equipment" icon={<ShieldCheck size={14} />}>
+        <div className="grid gap-px bg-[var(--border)] sm:grid-cols-2 lg:grid-cols-3">
           {[
             { item: 'Safety Goggles / Face Shield', icon: '🥽', hazard: 'Chemical splash to eyes', detail: 'Required ANY time you handle liquids that are not plain water. Chemical burns to the cornea can cause permanent blindness within seconds. A face shield covers the full face and is required when handling corrosives (acids, alkalis) or pressurised liquids.' },
             { item: 'Nitrile Gloves', icon: '🧤', hazard: 'Skin contact & absorption', detail: 'Nitrile resists a broad range of chemicals including detergents, oils, and mild acids/alkalis. Latex is unsuitable (allergy risk). Cut-resistant gloves are for mechanical hazards. Check gloves for holes before each use — a pinhole in a glove handling NaOH can cause a serious burn.' },
@@ -295,26 +334,23 @@ function ModuleSafety({ openGlossary }: { openGlossary: (id: string) => void }) 
             { item: 'Safety Boots (Steel Toe)', icon: '🥾', hazard: 'Dropped containers, chemical floor spills', detail: 'Steel or composite toe cap protects against heavy drums falling on feet (a 25 L drum of NaOH weighs ~30 kg). Chemical-resistant soles prevent slipping on spills. Never wear open shoes in a production environment.' },
             { item: 'Hard Hat', icon: '⛑️', hazard: 'Falling objects from above', detail: 'Required in areas where overhead work occurs (maintenance on elevated equipment, racking areas). Also protects against hitting your head on low-hanging pipes and structures. Check for cracks — a hard hat with a crack provides zero protection.' },
             { item: 'Respirator / Dust Mask', icon: '😷', hazard: 'Vapours, dusts & fumes', detail: 'A basic dust mask (FFP2) is for powders (citric acid, SLS powder). A half-face respirator with chemical cartridges is required for volatile solvents (ethanol, fragrances in high concentration, aerosol generation). Match the cartridge type to the specific chemical — read the SDS Section 8.' },
-          ].map(ppe => (
-            <div key={ppe.item} className="bg-[#111827] p-4">
+          ].map((ppe) => (
+            <div key={ppe.item} className="bg-[var(--surface)] p-4">
               <div className="mb-2 flex items-center gap-2">
                 <span className="text-xl">{ppe.icon}</span>
-                <span className="text-xs font-bold text-white">{ppe.item}</span>
+                <span className="text-xs font-bold text-[var(--ink)]">{ppe.item}</span>
               </div>
-              <p className="mb-1.5 inline-flex rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400">Protects against: {ppe.hazard}</p>
-              <p className="text-xs leading-relaxed text-[#8fa3bf]">{ppe.detail}</p>
+              <p className="mb-1.5 inline-flex bg-[var(--warn-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warn)]">Protects against: {ppe.hazard}</p>
+              <p className="text-xs leading-relaxed text-[var(--muted)]">{ppe.detail}</p>
             </div>
           ))}
         </div>
-      </div>
+      </PanelBox>
 
       {/* GHS */}
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] overflow-hidden">
-        <div className="border-b border-[#1e2d3d] px-5 py-3">
-          <p className="text-xs font-bold uppercase tracking-widest text-[#00c9a7]">GHS — The 9 Hazard Pictograms</p>
-          <p className="text-[10px] text-[#8fa3bf] mt-1">These appear on every chemical label worldwide. As a supervisor you must recognise all 9 instantly.</p>
-        </div>
-        <div className="grid grid-cols-3 gap-px bg-[#1e2d3d] sm:grid-cols-3 lg:grid-cols-5">
+      <PanelBox label="GHS — The 9 Hazard Pictograms">
+        <div className="border-b border-[var(--border)] px-5 py-2 text-[10px] text-[var(--muted)]">These appear on every chemical label worldwide. As a supervisor you must recognise all 9 instantly.</div>
+        <div className="grid grid-cols-3 gap-px bg-[var(--border)] sm:grid-cols-3 lg:grid-cols-5">
           {[
             { code: 'GHS01', symbol: '💥', name: 'Explosive', desc: 'Can explode from heat, shock, or friction. Detonators, certain organic peroxides.' },
             { code: 'GHS02', symbol: '🔥', name: 'Flammable', desc: 'Catches fire easily. Ethanol, acetone, fragrances, aerosols. Keep away from ignition sources.' },
@@ -325,46 +361,46 @@ function ModuleSafety({ openGlossary }: { openGlossary: (id: string) => void }) 
             { code: 'GHS07', symbol: '⚠️', name: 'Irritant / Harmful', desc: 'Causes skin/eye irritation or mild health effects. SLS, citric acid. Use basic PPE.' },
             { code: 'GHS08', symbol: '🫁', name: 'Health Hazard', desc: 'Serious long-term health effects: carcinogen, reproductive toxin, respiratory sensitiser. Read SDS carefully.' },
             { code: 'GHS09', symbol: '🌿', name: 'Environmental', desc: 'Harmful to aquatic life or the environment. Never pour down drains. Follow disposal SOP.' },
-          ].map(g => (
-            <div key={g.code} className="bg-[#111827] p-3 text-center">
+          ].map((g) => (
+            <div key={g.code} className="bg-[var(--surface)] p-3 text-center">
               <div className="mb-1 text-2xl">{g.symbol}</div>
-              <p className="text-[10px] font-mono text-[#00c9a7]">{g.code}</p>
-              <p className="text-xs font-bold text-white">{g.name}</p>
-              <p className="mt-1 text-[10px] leading-relaxed text-[#8fa3bf]">{g.desc}</p>
+              <p className="font-mono text-[10px] text-[var(--accent)]">{g.code}</p>
+              <p className="text-xs font-bold text-[var(--ink)]">{g.name}</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-[var(--muted)]">{g.desc}</p>
             </div>
           ))}
         </div>
-      </div>
+      </PanelBox>
 
       {/* SDS + PTW + LTI */}
       <div className="grid gap-3 sm:grid-cols-3">
         <ConceptCard icon={<BookOpen size={18} />} title="SDS — Safety Data Sheet">
           <p>Required for every chemical on site. 16 sections. The 5 you must know cold:</p>
-          <ul className="mt-2 ml-3 list-disc space-y-1.5">
-            <li><strong className="text-white">Section 2</strong> — Hazard identification (the GHS codes)</li>
-            <li><strong className="text-white">Section 4</strong> — First aid measures (what to do if someone is exposed)</li>
-            <li><strong className="text-white">Section 7</strong> — Handling & storage conditions</li>
-            <li><strong className="text-white">Section 8</strong> — PPE required (exactly which gloves, respirator type, etc.)</li>
-            <li><strong className="text-white">Section 13</strong> — Disposal (how to legally dispose of waste)</li>
+          <ul className="ml-3 mt-2 list-disc space-y-1.5">
+            <li><strong className="text-[var(--ink)]">Section 2</strong> — Hazard identification (the GHS codes)</li>
+            <li><strong className="text-[var(--ink)]">Section 4</strong> — First aid measures (what to do if someone is exposed)</li>
+            <li><strong className="text-[var(--ink)]">Section 7</strong> — Handling & storage conditions</li>
+            <li><strong className="text-[var(--ink)]">Section 8</strong> — PPE required (exactly which gloves, respirator type, etc.)</li>
+            <li><strong className="text-[var(--ink)]">Section 13</strong> — Disposal (how to legally dispose of waste)</li>
           </ul>
-          <p className="mt-2 text-amber-400">SDS must be physically accessible to operators at all times — not just in a locked office.</p>
+          <p className="mt-2 text-[var(--warn)]">SDS must be physically accessible to operators at all times — not just in a locked office.</p>
         </ConceptCard>
         <ConceptCard icon={<ClipboardList size={18} />} title="PTW — Permit to Work">
           <p>A signed document authorising hazardous non-routine work. The supervisor is responsible for issuing AND closing PTWs.</p>
-          <p className="mt-2 font-semibold text-white">When is a PTW required?</p>
-          <ul className="mt-1 ml-3 list-disc space-y-1">
+          <p className="mt-2 font-semibold text-[var(--ink)]">When is a PTW required?</p>
+          <ul className="ml-3 mt-1 list-disc space-y-1">
             <li>Confined space entry (tanks, vessels, pits)</li>
             <li>Hot work (welding, grinding near flammables)</li>
             <li>Bulk chemical transfer / drum changes</li>
             <li>Electrical maintenance on live panels</li>
             <li>Working at height (&gt;2 metres)</li>
           </ul>
-          <p className="mt-2 text-red-400 font-semibold">If a PTW expires while work is in progress, work must STOP until a new PTW is issued.</p>
+          <p className="mt-2 font-semibold text-[var(--danger)]">If a PTW expires while work is in progress, work must STOP until a new PTW is issued.</p>
         </ConceptCard>
         <ConceptCard icon={<Award size={18} />} title="LTI & Near-Miss Culture">
-          <p><strong className="text-white">LTI (Lost Time Injury)</strong> = a work injury causing the worker to miss their next scheduled shift. The "days since last LTI" counter is a visible symbol of safety culture.</p>
-          <p className="mt-2"><strong className="text-white">Near-miss</strong> = an event that could have caused injury but didn't. Near-misses are gold — they reveal hazards before anyone gets hurt.</p>
-          <p className="mt-2 text-amber-400">Rule: never punish near-miss reporters. Every reported near-miss prevented a future LTI. Build a culture where reporting is rewarded, not blamed.</p>
+          <p><strong className="text-[var(--ink)]">LTI (Lost Time Injury)</strong> = a work injury causing the worker to miss their next scheduled shift. The "days since last LTI" counter is a visible symbol of safety culture.</p>
+          <p className="mt-2"><strong className="text-[var(--ink)]">Near-miss</strong> = an event that could have caused injury but didn't. Near-misses are gold — they reveal hazards before anyone gets hurt.</p>
+          <p className="mt-2 text-[var(--warn)]">Rule: never punish near-miss reporters. Every reported near-miss prevented a future LTI. Build a culture where reporting is rewarded, not blamed.</p>
           <p className="mt-2">Heinrich's Triangle: for every 1 fatal accident, there are ~30 LTIs, ~300 near-misses. Eliminating near-misses eliminates fatalities.</p>
         </ConceptCard>
       </div>
@@ -386,15 +422,14 @@ function ModuleSafety({ openGlossary }: { openGlossary: (id: string) => void }) 
 function ModuleLeadership() {
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] p-5">
-        <h3 className="mb-2 font-display text-base font-bold text-white">People are your production line</h3>
-        <p className="text-xs leading-relaxed text-[#cbd5e1]">The best batch schedule, the finest equipment, and the strictest procedures mean nothing if your operators don't trust you. Trust is built in small moments: learning their names, listening to their concerns, being consistent in your decisions, giving credit when deserved, and having the difficult conversation when standards slip. A supervisor who is only seen when something goes wrong is not a leader — they are an alarm.</p>
-      </div>
+      <Lede title="People are your production line">
+        The best batch schedule, the finest equipment, and the strictest procedures mean nothing if your operators don't trust you. Trust is built in small moments: learning their names, listening to their concerns, being consistent in your decisions, giving credit when deserved, and having the difficult conversation when standards slip. A supervisor who is only seen when something goes wrong is not a leader — they are an alarm.
+      </Lede>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <ConceptCard icon={<Users size={18} />} title="Building Operator Relationships">
-          <p className="font-semibold text-white">Practical steps for your first 30 days:</p>
-          <ul className="mt-2 ml-3 list-disc space-y-1.5">
+          <p className="font-semibold text-[var(--ink)]">Practical steps for your first 30 days:</p>
+          <ul className="ml-3 mt-2 list-disc space-y-1.5">
             <li>Learn every operator's name by the end of week 1. Use it.</li>
             <li>Do daily floor walks — stop and genuinely ask "how's it going?" Don't rush past.</li>
             <li>Ask experienced operators how things were done before you arrived. Their institutional knowledge is invaluable. Listen before you change.</li>
@@ -404,44 +439,44 @@ function ModuleLeadership() {
         </ConceptCard>
         <ConceptCard icon={<ClipboardList size={18} />} title="The Shift Handover — Your Most Important 15 Minutes">
           <p>A good handover prevents the next supervisor from walking into problems blind. Always provide:</p>
-          <ul className="mt-2 ml-3 list-disc space-y-1.5">
-            <li><strong className="text-white">Batch status</strong> — every batch: where it is in the process, any issues</li>
-            <li><strong className="text-white">Equipment status</strong> — anything broken, running rough, or under maintenance</li>
-            <li><strong className="text-white">QC holds</strong> — any batches awaiting results or rework</li>
-            <li><strong className="text-white">Open PTWs</strong> — permits still active that carry over to the next shift</li>
-            <li><strong className="text-white">People issues</strong> — any operator who was spoken to, any performance concern</li>
-            <li><strong className="text-white">Materials</strong> — anything running low that may affect the next shift</li>
+          <ul className="ml-3 mt-2 list-disc space-y-1.5">
+            <li><strong className="text-[var(--ink)]">Batch status</strong> — every batch: where it is in the process, any issues</li>
+            <li><strong className="text-[var(--ink)]">Equipment status</strong> — anything broken, running rough, or under maintenance</li>
+            <li><strong className="text-[var(--ink)]">QC holds</strong> — any batches awaiting results or rework</li>
+            <li><strong className="text-[var(--ink)]">Open PTWs</strong> — permits still active that carry over to the next shift</li>
+            <li><strong className="text-[var(--ink)]">People issues</strong> — any operator who was spoken to, any performance concern</li>
+            <li><strong className="text-[var(--ink)]">Materials</strong> — anything running low that may affect the next shift</li>
           </ul>
-          <p className="mt-2 text-amber-400 font-semibold">Write it down. Verbal handovers get forgotten.</p>
+          <p className="mt-2 font-semibold text-[var(--warn)]">Write it down. Verbal handovers get forgotten.</p>
         </ConceptCard>
         <ConceptCard icon={<TrendingUp size={18} />} title="Shift Briefing — Setting the Tone">
           <p>Every shift starts with a 5-minute briefing — all operators present, no exceptions.</p>
           <p className="mt-2">A good briefing covers:</p>
-          <ol className="mt-1 ml-3 list-decimal space-y-1">
+          <ol className="ml-3 mt-1 list-decimal space-y-1">
             <li>Safety: one safety topic (near-miss from yesterday, a reminder about PPE in chem store, etc.)</li>
             <li>Production: today's targets, any schedule changes, which lines run what</li>
             <li>Quality: any batches on hold, any spec changes, any customer feedback</li>
             <li>People: any announcements (training, visitor, celebration)</li>
           </ol>
-          <p className="mt-2 text-[#00c9a7]">The briefing sets the shift's energy. If you're rushed and dismissive, so is the shift.</p>
+          <p className="mt-2 text-[var(--accent)]">The briefing sets the shift's energy. If you're rushed and dismissive, so is the shift.</p>
         </ConceptCard>
         <ConceptCard icon={<AlertTriangle size={18} />} title="Performance Management — The 3-Step Process">
           <p>When an operator is consistently not meeting expectations:</p>
-          <ul className="mt-2 ml-3 list-disc space-y-2">
-            <li><strong className="text-white">Step 1 — Verbal coaching:</strong> Private, calm, specific. "I've noticed X three times this week. Here's why it matters. Here's what I need from you. Can you commit to that?" Document that this conversation happened.</li>
-            <li><strong className="text-white">Step 2 — Written warning:</strong> If behaviour continues. HR is involved. Formal document signed by both parties. Be factual, not emotional.</li>
-            <li><strong className="text-white">Step 3 — Escalate to HR/management:</strong> If no improvement after step 2. You have documented everything. This is HR's process now.</li>
+          <ul className="ml-3 mt-2 list-disc space-y-2">
+            <li><strong className="text-[var(--ink)]">Step 1 — Verbal coaching:</strong> Private, calm, specific. "I've noticed X three times this week. Here's why it matters. Here's what I need from you. Can you commit to that?" Document that this conversation happened.</li>
+            <li><strong className="text-[var(--ink)]">Step 2 — Written warning:</strong> If behaviour continues. HR is involved. Formal document signed by both parties. Be factual, not emotional.</li>
+            <li><strong className="text-[var(--ink)]">Step 3 — Escalate to HR/management:</strong> If no improvement after step 2. You have documented everything. This is HR's process now.</li>
           </ul>
-          <p className="mt-2 text-amber-400">Most issues never get past Step 1 if you address them early and respectfully.</p>
+          <p className="mt-2 text-[var(--warn)]">Most issues never get past Step 1 if you address them early and respectfully.</p>
         </ConceptCard>
       </div>
 
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#0d1117] p-5">
-        <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8fa3bf]">New vs. Experienced Operators — Different Approaches</p>
+      <div className="border border-[var(--border)] bg-[var(--surface)] p-5">
+        <p className={cx('mb-3', fieldLabel)}>New vs. Experienced Operators — Different Approaches</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <p className="mb-2 text-sm font-semibold text-white">New Operator (0–6 months)</p>
-            <ul className="ml-3 list-disc space-y-1 text-xs text-[#cbd5e1]">
+            <p className="mb-2 text-sm font-semibold text-[var(--ink)]">New Operator (0–6 months)</p>
+            <ul className="ml-3 list-disc space-y-1 text-xs text-[var(--muted)]">
               <li>Pair with a buddy (experienced operator) for the first month</li>
               <li>Follow procedures step by step — don't let shortcuts develop early</li>
               <li>Check in frequently. Ask what's unclear, not "do you understand?" (they'll always say yes)</li>
@@ -449,8 +484,8 @@ function ModuleLeadership() {
             </ul>
           </div>
           <div>
-            <p className="mb-2 text-sm font-semibold text-white">Experienced Operator (2+ years)</p>
-            <ul className="ml-3 list-disc space-y-1 text-xs text-[#cbd5e1]">
+            <p className="mb-2 text-sm font-semibold text-[var(--ink)]">Experienced Operator (2+ years)</p>
+            <ul className="ml-3 list-disc space-y-1 text-xs text-[var(--muted)]">
               <li>Involve them in solving problems — they know things you don't</li>
               <li>Assign ownership: "You're responsible for Line B's output this shift"</li>
               <li>Watch for complacency — experienced operators skip steps they "know" are unnecessary. Re-anchor to the why of the SOP</li>
@@ -477,36 +512,36 @@ function ModuleLeadership() {
 function ModuleInventory({ openGlossary }: { openGlossary: (id: string) => void }) {
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] p-5">
-        <h3 className="mb-2 font-display text-base font-bold text-white">Never let materials stop your line</h3>
-        <p className="text-xs leading-relaxed text-[#cbd5e1]">A production supervisor who runs out of a raw material mid-shift has failed at their job — it's a preventable problem. You are responsible for monitoring stock levels, raising purchase requisitions before you hit the minimum, and ensuring that every delivery is checked against its <button onClick={() => openGlossary('CoA')} className="inline-flex items-center gap-0.5 rounded border border-[#00c9a7]/40 bg-[#00c9a7]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#00c9a7] hover:bg-[#00c9a7]/20">CoA <Info size={9} /></button> before it enters the production area.</p>
+      <div className="border border-[var(--border)] bg-[var(--surface)] p-5">
+        <h3 className="mb-2 font-display text-lg font-medium leading-tight text-[var(--ink)]">Never let materials stop your line</h3>
+        <p className="text-sm leading-relaxed text-[var(--muted)]">A production supervisor who runs out of a raw material mid-shift has failed at their job — it's a preventable problem. You are responsible for monitoring stock levels, raising purchase requisitions before you hit the minimum, and ensuring that every delivery is checked against its <Term id="CoA" open={openGlossary}>CoA</Term> before it enters the production area.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <ConceptCard icon={<Package size={18} />} title="Min/Max Stock Levels — How They Work">
-          <p><strong className="text-white">Minimum stock (reorder point)</strong> = the level at which you must raise a purchase order. It is calculated as: (Average daily usage × Supplier lead time in days) + Safety buffer.</p>
+          <p><strong className="text-[var(--ink)]">Minimum stock (reorder point)</strong> = the level at which you must raise a purchase order. It is calculated as: (Average daily usage × Supplier lead time in days) + Safety buffer.</p>
           <p className="mt-2">Example: You use 50 kg of SLS per day. Your supplier takes 5 days to deliver. Safety buffer = 2 days. Minimum stock = (50 × 5) + (50 × 2) = 350 kg. When stock hits 350 kg, raise the order.</p>
-          <p className="mt-2"><strong className="text-white">Maximum stock</strong> = dictated by storage space, shelf life, and cash flow. Don't over-order perishable materials.</p>
+          <p className="mt-2"><strong className="text-[var(--ink)]">Maximum stock</strong> = dictated by storage space, shelf life, and cash flow. Don't over-order perishable materials.</p>
         </ConceptCard>
         <ConceptCard icon={<ClipboardList size={18} />} title="Certificate of Analysis (CoA)">
           <p>Every delivery of raw material must arrive with a CoA from the supplier — a document showing the test results for that specific lot.</p>
           <p className="mt-2">What to check on a CoA:</p>
-          <ul className="mt-1 ml-3 list-disc space-y-1">
+          <ul className="ml-3 mt-1 list-disc space-y-1">
             <li>Does the lot number on the document match the lot number on the drum/bag?</li>
             <li>Does the supplier's test result meet YOUR internal specification? (Supplier's spec and your spec may differ)</li>
             <li>Is the CoA dated recently? (Some suppliers recycle old CoAs)</li>
             <li>Is it signed by a qualified person at the supplier?</li>
           </ul>
-          <p className="mt-2 text-red-400 font-semibold">No CoA = reject the delivery. No exceptions.</p>
+          <p className="mt-2 font-semibold text-[var(--danger)]">No CoA = reject the delivery. No exceptions.</p>
         </ConceptCard>
         <ConceptCard icon={<TrendingUp size={18} />} title="FEFO vs. FIFO — Using Materials Correctly">
-          <p><strong className="text-white">FIFO (First In, First Out)</strong> — use the oldest stock first. Standard for materials without a fixed expiry.</p>
-          <p className="mt-2"><strong className="text-white">FEFO (First Expired, First Out)</strong> — use the stock with the earliest expiry date first, regardless of when it arrived. Used for preservatives, fragrances, and active ingredients with shelf-life limits.</p>
-          <p className="mt-2 text-amber-400">Using expired raw material is a quality failure. Check expiry dates at each stock count.</p>
+          <p><strong className="text-[var(--ink)]">FIFO (First In, First Out)</strong> — use the oldest stock first. Standard for materials without a fixed expiry.</p>
+          <p className="mt-2"><strong className="text-[var(--ink)]">FEFO (First Expired, First Out)</strong> — use the stock with the earliest expiry date first, regardless of when it arrived. Used for preservatives, fragrances, and active ingredients with shelf-life limits.</p>
+          <p className="mt-2 text-[var(--warn)]">Using expired raw material is a quality failure. Check expiry dates at each stock count.</p>
         </ConceptCard>
         <ConceptCard icon={<BookOpen size={18} />} title="Lot Traceability — Why Every Batch Records Its Ingredients">
           <p>Every finished goods batch must record the lot number of every raw material used. If a quality issue is discovered after the product ships, you need to be able to answer:</p>
-          <ul className="mt-1 ml-3 list-disc space-y-1">
+          <ul className="ml-3 mt-1 list-disc space-y-1">
             <li>Which batches were made with that suspect lot?</li>
             <li>Which customers received those batches?</li>
             <li>Were all affected products recalled?</li>
@@ -515,9 +550,8 @@ function ModuleInventory({ openGlossary }: { openGlossary: (id: string) => void 
         </ConceptCard>
       </div>
 
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] overflow-hidden">
-        <div className="border-b border-[#1e2d3d] px-5 py-3"><p className="text-xs font-bold uppercase tracking-widest text-[#00c9a7]">The Receiving Check — What to Do When a Delivery Arrives</p></div>
-        <div className="divide-y divide-[#1e2d3d]">
+      <PanelBox label="The Receiving Check — What to Do When a Delivery Arrives">
+        <div className="divide-y divide-[var(--border)]">
           {[
             { step: '1', action: 'Check the delivery note matches the purchase order — correct material, quantity, and supplier.' },
             { step: '2', action: 'Physically inspect drums/bags: no damage, no leaks, correct labels (GHS hazard pictograms present), no signs of tampering.' },
@@ -526,14 +560,14 @@ function ModuleInventory({ openGlossary }: { openGlossary: (id: string) => void 
             { step: '5', action: 'Quarantine the material in a designated \'Goods In\' area until QC approves it for use. Label clearly: "HOLD — Awaiting QC Release".' },
             { step: '6', action: 'Once QC approves, move to the correct storage location. Apply FEFO/FIFO — place new stock at the back, old stock at the front.' },
             { step: '7', action: 'Update the stock management system. Record the lot number, quantity, and approval date.' },
-          ].map(row => (
+          ].map((row) => (
             <div key={row.step} className="flex gap-4 px-5 py-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#00c9a7]/10 text-[10px] font-bold text-[#00c9a7]">{row.step}</span>
-              <p className="text-xs leading-relaxed text-[#cbd5e1] pt-0.5">{row.action}</p>
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center bg-[var(--accent-soft)] text-[10px] font-bold text-[var(--accent)]">{row.step}</span>
+              <p className="pt-0.5 text-xs leading-relaxed text-[var(--muted)]">{row.action}</p>
             </div>
           ))}
         </div>
-      </div>
+      </PanelBox>
 
       <ScenarioBlock scenario={{
         situation: "A driver delivers 10 drums of Sodium Lauryl Sulfate (SLS). The drums are correctly labelled and undamaged. However, the Certificate of Analysis is missing — the driver says the supplier will 'email it tomorrow'.",
@@ -553,67 +587,61 @@ function ModuleImprovement({ openGlossary }: { openGlossary: (id: string) => voi
   const [avail, setAvail] = useState(92);
   const [perf, setPerf] = useState(95);
   const [qual, setQual] = useState(98);
-  const oee = Math.round(avail * perf * qual / 10000);
-  const oeeColor = oee >= 85 ? 'text-teal-400' : oee >= 65 ? 'text-amber-400' : 'text-red-400';
+  const oee = Math.round((avail * perf * qual) / 10000);
+  const oeeVar = oee >= 85 ? 'var(--ok)' : oee >= 65 ? 'var(--warn)' : 'var(--danger)';
   const oeeLabel = oee >= 85 ? 'World Class ✓' : oee >= 65 ? 'Average — room to improve' : 'Below Average — urgent action needed';
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] p-5">
-        <h3 className="mb-2 font-display text-base font-bold text-white">Every supervisor should be making the job easier tomorrow than it is today</h3>
-        <p className="text-xs leading-relaxed text-[#cbd5e1]">Continuous improvement isn't a programme you run once a year — it's a daily habit. The best supervisors carry a notebook and write down every small friction they observe: a form in the wrong place, a step that always takes longer than it should, a question operators ask repeatedly because the SOP is unclear. Those small observations become <button onClick={() => openGlossary('Kaizen')} className="inline-flex items-center gap-0.5 rounded border border-[#00c9a7]/40 bg-[#00c9a7]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#00c9a7] hover:bg-[#00c9a7]/20">Kaizen <Info size={9} /></button> improvements that compound over time.</p>
+      <div className="border border-[var(--border)] bg-[var(--surface)] p-5">
+        <h3 className="mb-2 font-display text-lg font-medium leading-tight text-[var(--ink)]">Every supervisor should be making the job easier tomorrow than it is today</h3>
+        <p className="text-sm leading-relaxed text-[var(--muted)]">Continuous improvement isn't a programme you run once a year — it's a daily habit. The best supervisors carry a notebook and write down every small friction they observe: a form in the wrong place, a step that always takes longer than it should, a question operators ask repeatedly because the SOP is unclear. Those small observations become <Term id="Kaizen" open={openGlossary}>Kaizen</Term> improvements that compound over time.</p>
       </div>
 
       {/* OEE Calculator */}
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#111827] overflow-hidden">
-        <div className="border-b border-[#1e2d3d] px-5 py-3 flex items-center gap-2">
-          <Calculator size={14} className="text-[#00c9a7]" />
-          <p className="text-xs font-bold uppercase tracking-widest text-[#00c9a7]">Interactive OEE Calculator</p>
-        </div>
+      <PanelBox label="Interactive OEE Calculator" icon={<Calculator size={14} />}>
         <div className="p-5">
           <div className="mb-6 text-center">
-            <p className="text-[10px] uppercase tracking-widest text-[#8fa3bf]">OEE = Availability × Performance × Quality</p>
-            <p className={`mt-2 font-display text-5xl font-bold ${oeeColor}`} style={{ fontFamily: 'Rajdhani, sans-serif' }}>{oee}%</p>
-            <p className={`mt-1 text-sm font-semibold ${oeeColor}`}>{oeeLabel}</p>
+            <p className={fieldLabel}>OEE = Availability × Performance × Quality</p>
+            <p className="mt-2 font-display text-5xl font-semibold leading-none" style={{ color: oeeVar }}>{oee}%</p>
+            <p className="mt-1 text-sm font-semibold" style={{ color: oeeVar }}>{oeeLabel}</p>
           </div>
           <div className="grid gap-5 sm:grid-cols-3">
             {[
               { label: 'Availability', value: avail, set: setAvail, desc: '(Planned time − Downtime) ÷ Planned time', what: 'Are machines running when they should be? Losses: breakdowns, changeovers, planned maintenance.' },
               { label: 'Performance', value: perf, set: setPerf, desc: 'Actual output ÷ Max possible output at full speed', what: 'When running, is the line going as fast as it can? Losses: slow speeds, micro-stops, jams.' },
               { label: 'Quality', value: qual, set: setQual, desc: 'Good product ÷ Total product made', what: 'Of all product made, how much was first-pass good? Losses: rework, QC failures, startup waste.' },
-            ].map(item => (
+            ].map((item) => (
               <div key={item.label}>
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-xs font-bold text-white">{item.label}</span>
-                  <span className="font-mono text-sm font-bold text-[#00c9a7]">{item.value}%</span>
+                  <span className="text-xs font-bold text-[var(--ink)]">{item.label}</span>
+                  <span className="font-mono text-sm font-bold text-[var(--accent)]">{item.value}%</span>
                 </div>
-                <input type="range" min={0} max={100} value={item.value}
-                  onChange={e => item.set(Number(e.target.value))}
-                  className="w-full accent-[#00c9a7]" />
-                <p className="mt-1 text-[10px] text-[#8fa3bf]">{item.desc}</p>
-                <p className="mt-1 text-[10px] leading-relaxed text-[#8fa3bf]">{item.what}</p>
+                <input type="range" min={0} max={100} value={item.value} onChange={(e) => item.set(Number(e.target.value))} className="w-full accent-[var(--accent)]" />
+                <p className="mt-1 text-[10px] text-[var(--muted)]">{item.desc}</p>
+                <p className="mt-1 text-[10px] leading-relaxed text-[var(--muted)]">{item.what}</p>
               </div>
             ))}
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="rounded-lg bg-red-500/10 p-2"><p className="text-[10px] text-[#8fa3bf]">Below average</p><p className="font-bold text-red-400">&lt; 65%</p></div>
-            <div className="rounded-lg bg-amber-500/10 p-2"><p className="text-[10px] text-[#8fa3bf]">Typical plant</p><p className="font-bold text-amber-400">65–84%</p></div>
-            <div className="rounded-lg bg-teal-500/10 p-2"><p className="text-[10px] text-[#8fa3bf]">World class</p><p className="font-bold text-teal-400">≥ 85%</p></div>
+          <div className="mt-4 grid grid-cols-3 gap-px bg-[var(--border)] text-center text-xs">
+            <div className="bg-[var(--danger-bg)] p-2"><p className="text-[10px] text-[var(--muted)]">Below average</p><p className="font-bold text-[var(--danger)]">&lt; 65%</p></div>
+            <div className="bg-[var(--warn-bg)] p-2"><p className="text-[10px] text-[var(--muted)]">Typical plant</p><p className="font-bold text-[var(--warn)]">65–84%</p></div>
+            <div className="bg-[var(--ok-bg)] p-2"><p className="text-[10px] text-[var(--muted)]">World class</p><p className="font-bold text-[var(--ok)]">≥ 85%</p></div>
           </div>
         </div>
-      </div>
+      </PanelBox>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <ConceptCard icon={<TrendingUp size={18} />} title="The 5 Whys — Root Cause Analysis">
           <p>When something goes wrong, don't stop at the first answer. Ask "Why?" five times to reach the real cause.</p>
           <div className="mt-2 space-y-1.5 text-xs">
-            <p><span className="text-[#00c9a7] font-bold">Problem:</span> Batch BT-0443 failed pH spec.</p>
-            <p><span className="text-amber-400">Why?</span> Caustic soda was under-dosed by 2 kg.</p>
-            <p><span className="text-amber-400">Why?</span> Operator weighed 48 kg instead of 50 kg.</p>
-            <p><span className="text-amber-400">Why?</span> Weighing scale displayed in pounds, operator assumed kilograms.</p>
-            <p><span className="text-amber-400">Why?</span> Scale settings were changed during calibration last week and not reset.</p>
-            <p><span className="text-amber-400">Why?</span> There is no post-calibration checklist to verify scale units before returning to service.</p>
-            <p className="mt-2 text-teal-400 font-semibold">Root cause: Missing post-calibration verification procedure. Fix: add checklist step. This prevents every future batch from failing for the same reason.</p>
+            <p><span className="font-bold text-[var(--accent)]">Problem:</span> Batch BT-0443 failed pH spec.</p>
+            <p><span className="text-[var(--warn)]">Why?</span> Caustic soda was under-dosed by 2 kg.</p>
+            <p><span className="text-[var(--warn)]">Why?</span> Operator weighed 48 kg instead of 50 kg.</p>
+            <p><span className="text-[var(--warn)]">Why?</span> Weighing scale displayed in pounds, operator assumed kilograms.</p>
+            <p><span className="text-[var(--warn)]">Why?</span> Scale settings were changed during calibration last week and not reset.</p>
+            <p><span className="text-[var(--warn)]">Why?</span> There is no post-calibration checklist to verify scale units before returning to service.</p>
+            <p className="mt-2 font-semibold text-[var(--ok)]">Root cause: Missing post-calibration verification procedure. Fix: add checklist step. This prevents every future batch from failing for the same reason.</p>
           </div>
         </ConceptCard>
         <ConceptCard icon={<Zap size={18} />} title="PDCA — The Improvement Cycle">
@@ -624,32 +652,32 @@ function ModuleImprovement({ openGlossary }: { openGlossary: (id: string) => voi
               { step: 'Do', desc: 'Implement the solution on a small scale first (one line, one shift, one operator). Don\'t change everything at once.' },
               { step: 'Check', desc: 'Measure the result against the baseline. Did the problem reduce? Did anything unexpected happen? Use data, not opinion.' },
               { step: 'Act', desc: 'If it worked: standardise it (update the SOP, train all operators). If it didn\'t work: go back to Plan with new information.' },
-            ].map(s => (
+            ].map((s) => (
               <div key={s.step} className="flex gap-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#00c9a7]/10 text-[10px] font-bold text-[#00c9a7]">{s.step[0]}</span>
-                <div><p className="text-xs font-bold text-white">{s.step}</p><p className="text-xs text-[#8fa3bf]">{s.desc}</p></div>
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center bg-[var(--accent-soft)] text-[10px] font-bold text-[var(--accent)]">{s.step[0]}</span>
+                <div><p className="text-xs font-bold text-[var(--ink)]">{s.step}</p><p className="text-xs text-[var(--muted)]">{s.desc}</p></div>
               </div>
             ))}
           </div>
         </ConceptCard>
       </div>
 
-      <div className="rounded-xl border border-[#1e2d3d] bg-[#0d1117] p-5">
-        <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#8fa3bf]">The 6 Big OEE Losses — Know What's Hurting You</p>
+      <div className="border border-[var(--border)] bg-[var(--surface)] p-5">
+        <p className={cx('mb-3', fieldLabel)}>The 6 Big OEE Losses — Know What's Hurting You</p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {[
-            { loss: 'Unplanned Downtime', category: 'Availability', example: 'Mixer motor failure mid-batch', fix: 'Preventive maintenance schedule, operator basic maintenance training' },
-            { loss: 'Planned Downtime', category: 'Availability', example: 'Line changeover, cleaning, shift changeover', fix: 'SMED (Single Minute Exchange of Die) — organise everything needed before the line stops' },
-            { loss: 'Reduced Speed', category: 'Performance', example: 'Running at 80% of rated speed due to "caution"', fix: 'Establish and display the correct running parameters. Remove guesswork.' },
-            { loss: 'Minor Stoppages', category: 'Performance', example: 'Frequent 2-minute jams on the bottling line', fix: 'Map where jams occur. Often one mechanical adjustment eliminates 80% of them.' },
-            { loss: 'Startup Waste', category: 'Quality', example: 'First 50 litres of each batch discarded during line priming', fix: 'Optimise startup procedure. Recirculate rather than discard where safe.' },
-            { loss: 'Production Defects', category: 'Quality', example: 'Batches failing QC and requiring rework', fix: 'Drive FPY improvements through the 5 Whys and consistent operator training.' },
-          ].map(l => (
-            <div key={l.loss} className="rounded-lg border border-[#1e2d3d] bg-[#111827] p-3">
-              <span className={`inline-block mb-1.5 rounded px-2 py-0.5 text-[10px] font-semibold ${l.category === 'Availability' ? 'bg-blue-500/10 text-blue-400' : l.category === 'Performance' ? 'bg-amber-500/10 text-amber-400' : 'bg-red-500/10 text-red-400'}`}>{l.category}</span>
-              <p className="text-xs font-bold text-white">{l.loss}</p>
-              <p className="text-[10px] text-[#8fa3bf] mt-1">e.g. {l.example}</p>
-              <p className="text-[10px] text-teal-400 mt-1">Fix: {l.fix}</p>
+            { loss: 'Unplanned Downtime', category: 'Availability', tone: 'accent', example: 'Mixer motor failure mid-batch', fix: 'Preventive maintenance schedule, operator basic maintenance training' },
+            { loss: 'Planned Downtime', category: 'Availability', tone: 'accent', example: 'Line changeover, cleaning, shift changeover', fix: 'SMED (Single Minute Exchange of Die) — organise everything needed before the line stops' },
+            { loss: 'Reduced Speed', category: 'Performance', tone: 'warn', example: 'Running at 80% of rated speed due to "caution"', fix: 'Establish and display the correct running parameters. Remove guesswork.' },
+            { loss: 'Minor Stoppages', category: 'Performance', tone: 'warn', example: 'Frequent 2-minute jams on the bottling line', fix: 'Map where jams occur. Often one mechanical adjustment eliminates 80% of them.' },
+            { loss: 'Startup Waste', category: 'Quality', tone: 'danger', example: 'First 50 litres of each batch discarded during line priming', fix: 'Optimise startup procedure. Recirculate rather than discard where safe.' },
+            { loss: 'Production Defects', category: 'Quality', tone: 'danger', example: 'Batches failing QC and requiring rework', fix: 'Drive FPY improvements through the 5 Whys and consistent operator training.' },
+          ].map((l) => (
+            <div key={l.loss} className="border border-[var(--border)] bg-[var(--bg-soft)] p-3">
+              <span className="mb-1.5 inline-block px-2 py-0.5 text-[10px] font-semibold" style={{ color: `var(--${l.tone})`, background: `var(--${l.tone}-bg)` }}>{l.category}</span>
+              <p className="text-xs font-bold text-[var(--ink)]">{l.loss}</p>
+              <p className="mt-1 text-[10px] text-[var(--muted)]">e.g. {l.example}</p>
+              <p className="mt-1 text-[10px] text-[var(--ok)]">Fix: {l.fix}</p>
             </div>
           ))}
         </div>
@@ -673,18 +701,18 @@ function GlossaryModal({ termId, onClose }: { termId: string; onClose: () => voi
   const entry = GLOSSARY[termId];
   if (!entry) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-[#00c9a7]/30 bg-[#111827] p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md border border-[var(--border)] bg-[var(--surface)] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
-          <span className="rounded-full bg-[#00c9a7]/10 px-3 py-1 text-xs font-bold text-[#00c9a7]">Definition</span>
-          <button onClick={onClose} className="text-[#8fa3bf] hover:text-white"><XCircle size={18} /></button>
+          <span className={fieldLabel}>Definition</span>
+          <button onClick={onClose} className="text-[var(--muted)] transition-colors hover:text-[var(--ink)]"><X size={18} /></button>
         </div>
-        <h3 className="mb-3 font-display text-base font-bold text-white" style={{ fontFamily: 'Rajdhani, sans-serif' }}>{entry.term}</h3>
-        <p className="text-sm leading-relaxed text-[#cbd5e1]">{entry.definition}</p>
+        <h3 className="mb-3 font-display text-lg font-medium leading-tight text-[var(--ink)]">{entry.term}</h3>
+        <p className="text-sm leading-relaxed text-[var(--muted)]">{entry.definition}</p>
         {entry.example && (
-          <div className="mt-4 rounded-lg border border-[#1e2d3d] bg-[#0d1117] p-3">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-[#8fa3bf]">Real Example</p>
-            <p className="text-xs leading-relaxed text-[#cbd5e1]">{entry.example}</p>
+          <div className="mt-4 border border-[var(--border)] bg-[var(--bg-soft)] p-3">
+            <p className={cx('mb-1', fieldLabel)}>Real Example</p>
+            <p className="text-xs leading-relaxed text-[var(--muted)]">{entry.example}</p>
           </div>
         )}
       </div>
@@ -693,22 +721,19 @@ function GlossaryModal({ termId, onClose }: { termId: string; onClose: () => voi
 }
 
 /* ─── Main Page ─────────────────────────────────────────────────────────── */
-const MODULES: { id: ModuleId; icon: React.ReactNode; title: string; tagline: string }[] = [
-  { id: 'production',   icon: <ClipboardList size={18} />, title: 'Daily Production',      tagline: 'Schedules, floor walks, escalation' },
-  { id: 'quality',      icon: <FlaskConical size={18} />,  title: 'Quality Control',        tagline: 'QC ownership, parameters, batch release' },
-  { id: 'safety',       icon: <ShieldCheck size={18} />,   title: 'Safety & Compliance',   tagline: 'PPE, GHS, SDS, PTW, LTI' },
-  { id: 'leadership',   icon: <Users size={18} />,         title: 'Team Leadership',        tagline: 'Relationships, handover, performance' },
-  { id: 'inventory',    icon: <Package size={18} />,       title: 'Inventory & Materials',  tagline: 'CoA, min/max, FEFO, traceability' },
-  { id: 'improvement',  icon: <TrendingUp size={18} />,    title: 'Continuous Improvement', tagline: 'OEE, Kaizen, 5 Whys, PDCA' },
+const MODULES: { id: ModuleId; title: string; tagline: string }[] = [
+  { id: 'production', title: 'Daily Production', tagline: 'Schedules, floor walks, escalation' },
+  { id: 'quality', title: 'Quality Control', tagline: 'QC ownership, parameters, batch release' },
+  { id: 'safety', title: 'Safety & Compliance', tagline: 'PPE, GHS, SDS, PTW, LTI' },
+  { id: 'leadership', title: 'Team Leadership', tagline: 'Relationships, handover, performance' },
+  { id: 'inventory', title: 'Inventory & Materials', tagline: 'CoA, min/max, FEFO, traceability' },
+  { id: 'improvement', title: 'Continuous Improvement', tagline: 'OEE, Kaizen, 5 Whys, PDCA' },
 ];
 
 export default function ProductionPage() {
-  usePageTitle('Production Supervisor Training');
-  const navigate = useNavigate();
   const [active, setActive] = useState<ModuleId>('production');
   const [completed, setCompleted] = useState<Set<ModuleId>>(new Set());
   const [glossaryOpen, setGlossaryOpen] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -720,147 +745,97 @@ export default function ProductionPage() {
   }, []);
 
   const markComplete = useCallback((id: ModuleId) => {
-    setCompleted(prev => {
+    setCompleted((prev) => {
       const next = new Set(prev);
       next.add(id);
       try { localStorage.setItem('prodTraining_completed', JSON.stringify([...next])); } catch { /* storage unavailable */ }
       return next;
     });
-    const idx = MODULES.findIndex(m => m.id === id);
+    const idx = MODULES.findIndex((m) => m.id === id);
     if (idx < MODULES.length - 1) setActive(MODULES[idx + 1].id);
   }, []);
 
   const openGlossary = useCallback((id: string) => setGlossaryOpen(id), []);
   const progress = Math.round((completed.size / MODULES.length) * 100);
+  const current = MODULES.find((m) => m.id === active)!;
+
+  const TABS: TabDef<ModuleId>[] = MODULES.map((m) => ({ id: m.id, label: m.title }));
 
   const renderModule = () => {
     switch (active) {
-      case 'production':   return <ModuleProduction />;
-      case 'quality':      return <ModuleQuality openGlossary={openGlossary} />;
-      case 'safety':       return <ModuleSafety openGlossary={openGlossary} />;
-      case 'leadership':   return <ModuleLeadership />;
-      case 'inventory':    return <ModuleInventory openGlossary={openGlossary} />;
-      case 'improvement':  return <ModuleImprovement openGlossary={openGlossary} />;
+      case 'production': return <ModuleProduction />;
+      case 'quality': return <ModuleQuality openGlossary={openGlossary} />;
+      case 'safety': return <ModuleSafety openGlossary={openGlossary} />;
+      case 'leadership': return <ModuleLeadership />;
+      case 'inventory': return <ModuleInventory openGlossary={openGlossary} />;
+      case 'improvement': return <ModuleImprovement openGlossary={openGlossary} />;
     }
   };
 
-  const current = MODULES.find(m => m.id === active)!;
-
   return (
-    <div className="min-h-screen bg-[#0d1117] text-[#cbd5e1]" style={{ fontFamily: 'Inter, sans-serif' }}>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap" />
+    <DemoShell title="Production Supervisor Training" wordmark="OPS" revealKey={active}>
+      <Masthead
+        eyebrow="Operations training · Meridian Chemicals"
+        title="Run the floor before you run the floor."
+        lede="An interactive onboarding programme for a chemical-plant production supervisor — six lessons covering daily management, quality ownership, safety culture, leading operators, materials, and continuous improvement. Each lesson ends in a real decision; a live OEE calculator and an inline glossary back up the theory."
+        facts={[
+          { label: 'Lessons', value: `${MODULES.length} modules` },
+          { label: 'Format', value: 'Scenario-led' },
+          { label: 'Progress', value: `${completed.size} / ${MODULES.length} complete` },
+          { label: 'Reference', value: 'WCM · Lean' },
+        ]}
+      />
 
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 border-b border-[#1e2d3d] bg-[#0d1117]/95 backdrop-blur-sm px-4 py-3">
-        <div className="mx-auto flex max-w-[1280px] items-center gap-3">
-          <button onClick={() => navigate('/')} className="flex items-center gap-1.5 rounded-lg border border-[#1e2d3d] px-3 py-1.5 text-xs text-[#8fa3bf] hover:border-[#00c9a7]/40 hover:text-[#00c9a7] transition-colors">
-            <ArrowLeft size={12} /> Portfolio
-          </button>
-          <div className="flex items-center gap-2 overflow-hidden">
-            <span className="hidden sm:flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[#00c9a7]/10">
-              <BookOpen size={14} className="text-[#00c9a7]" />
-            </span>
-            <div className="overflow-hidden">
-              <p className="truncate text-xs font-bold text-white" style={{ fontFamily: 'Rajdhani, sans-serif', letterSpacing: '0.05em' }}>PRODUCTION SUPERVISOR TRAINING</p>
-              <p className="hidden sm:block text-[10px] text-[#8fa3bf]">Meridian Chemicals · Interactive Training Programme</p>
-            </div>
-          </div>
-          <div className="ml-auto flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="h-1.5 w-28 rounded-full bg-[#1e2d3d]">
-                <div className="h-1.5 rounded-full bg-[#00c9a7] transition-all" style={{ width: `${progress}%` }} />
-              </div>
-              <span className="text-xs font-semibold text-[#00c9a7]">{completed.size}/{MODULES.length}</span>
-            </div>
-            <button onClick={() => setSidebarOpen(o => !o)} className="flex items-center gap-1.5 rounded-lg border border-[#1e2d3d] px-3 py-1.5 text-xs text-[#8fa3bf] hover:text-white lg:hidden">
-              <ClipboardList size={12} /> Modules
-            </button>
-          </div>
+      <TabNav tabs={TABS} active={active} onChange={setActive} />
+
+      {/* Progress band */}
+      <div className="mt-6 flex items-center gap-4 border border-[var(--border)] bg-[var(--surface)] px-5 py-3">
+        <p className="shrink-0 font-mono text-[11px] uppercase tracking-[0.15em] text-[var(--muted)]">Your progress</p>
+        <Meter value={progress} max={100} tone={progress === 100 ? 'ok' : 'accent'} className="flex-1" />
+        <p className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink)]">{progress}%</p>
+      </div>
+
+      <div className="pt-7">
+        <div className="mb-5">
+          <p className={fieldLabel}>Lesson {MODULES.findIndex((m) => m.id === active) + 1} of {MODULES.length}</p>
+          <h2 className="mt-1 font-display text-[clamp(1.375rem,2.6vw,1.75rem)] font-medium leading-tight text-[var(--ink)]">{current.title}</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">{current.tagline}</p>
         </div>
-      </header>
 
-      <div className="mx-auto flex max-w-[1280px] gap-0">
-        {/* Sidebar */}
-        <aside className={`${sidebarOpen ? 'flex' : 'hidden'} lg:flex w-64 shrink-0 flex-col fixed lg:sticky top-[49px] h-[calc(100vh-49px)] overflow-y-auto border-r border-[#1e2d3d] bg-[#0d1117] z-20 p-4`}>
-          <div className="mb-4">
-            <div className="mb-1 flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#8fa3bf]">Your Progress</p>
-              <p className="text-xs font-bold text-[#00c9a7]">{progress}%</p>
-            </div>
-            <div className="h-2 w-full rounded-full bg-[#1e2d3d]">
-              <div className="h-2 rounded-full bg-gradient-to-r from-[#00c9a7] to-[#00a88a] transition-all duration-500" style={{ width: `${progress}%` }} />
-            </div>
-          </div>
-          <nav className="space-y-1">
-            {MODULES.map((m) => {
-              const done = completed.has(m.id);
-              const isCurrent = active === m.id;
-              return (
-                <button key={m.id} onClick={() => { setActive(m.id); setSidebarOpen(false); }}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${isCurrent ? 'bg-[#00c9a7]/10 border border-[#00c9a7]/30' : 'hover:bg-[#162030] border border-transparent'}`}>
-                  <span className={`shrink-0 ${done ? 'text-teal-400' : isCurrent ? 'text-[#00c9a7]' : 'text-[#8fa3bf]'}`}>
-                    {done ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-                  </span>
-                  <div className="overflow-hidden">
-                    <p className={`truncate text-xs font-semibold ${isCurrent ? 'text-[#00c9a7]' : 'text-[#cbd5e1]'}`}>{m.title}</p>
-                    <p className="truncate text-[10px] text-[#8fa3bf]">{m.tagline}</p>
-                  </div>
-                </button>
-              );
-            })}
-          </nav>
-          <div className="mt-6 rounded-xl border border-[#1e2d3d] bg-[#111827] p-3">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#8fa3bf]">Quick Glossary</p>
-            <div className="flex flex-wrap gap-1.5">
-              {Object.keys(GLOSSARY).map(key => (
-                <button key={key} onClick={() => openGlossary(key)}
-                  className="rounded border border-[#1e2d3d] bg-[#0d1117] px-2 py-0.5 text-[10px] text-[#8fa3bf] hover:border-[#00c9a7]/40 hover:text-[#00c9a7] transition-colors">
-                  {key}
-                </button>
-              ))}
-            </div>
-          </div>
-        </aside>
+        {renderModule()}
 
-        {/* Main content */}
-        <main className="min-w-0 flex-1 px-4 py-6 lg:px-8">
-          <div className="mb-6">
-            <div className="mb-1 flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#00c9a7]/10 text-[#00c9a7]">{current.icon}</span>
-              <h1 className="font-display text-xl font-bold text-white sm:text-2xl" style={{ fontFamily: 'Rajdhani, sans-serif' }}>{current.title}</h1>
-            </div>
-            <p className="text-sm text-[#8fa3bf]">{current.tagline}</p>
+        {/* Module footer */}
+        <div className="mt-8 flex items-center justify-between border-t border-[var(--border)] pt-6">
+          <div className="text-xs text-[var(--muted)]">
+            {completed.has(active) ? (
+              <span className="flex items-center gap-1.5 text-[var(--ok)]"><CheckCircle2 size={14} /> Lesson complete</span>
+            ) : 'Work through the scenario above, then mark this lesson done.'}
           </div>
-
-          {renderModule()}
-
-          {/* Module footer */}
-          <div className="mt-8 flex items-center justify-between border-t border-[#1e2d3d] pt-6">
-            <div className="text-xs text-[#8fa3bf]">
-              {completed.has(active) ? (
-                <span className="flex items-center gap-1.5 text-teal-400"><CheckCircle2 size={14} /> Module complete</span>
-              ) : 'Complete the scenario above, then mark this module done.'}
-            </div>
-            <button onClick={() => markComplete(active)}
-              className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors ${completed.has(active) ? 'border border-[#1e2d3d] text-[#8fa3bf]' : 'bg-[#00c9a7] text-[#0d1117] hover:bg-[#00b89a]'}`}>
-              {completed.has(active) ? <><CheckCircle2 size={15} /> Done</> : <><ChevronRight size={15} /> Mark complete & continue</>}
-            </button>
-          </div>
-        </main>
+          {completed.has(active) ? (
+            <GhostButton onClick={() => markComplete(active)}><CheckCircle2 size={15} /> Done</GhostButton>
+          ) : (
+            <AccentButton onClick={() => markComplete(active)}><ChevronRight size={15} /> Mark complete & continue</AccentButton>
+          )}
+        </div>
       </div>
 
       {/* Completion banner */}
       {completed.size === MODULES.length && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-2xl border border-teal-500/40 bg-teal-500/10 px-6 py-4 shadow-2xl backdrop-blur-sm">
-          <Award size={20} className="text-teal-400 shrink-0" />
+        <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 border border-[var(--ok)] bg-[var(--ok-bg)] px-6 py-4 shadow-2xl backdrop-blur-sm">
+          <Award size={20} className="shrink-0 text-[var(--ok)]" />
           <div>
-            <p className="text-sm font-bold text-white">Training Complete!</p>
-            <p className="text-xs text-teal-300">All 6 Production Supervisor modules finished.</p>
+            <p className="text-sm font-bold text-[var(--ink)]">Training complete</p>
+            <p className="text-xs text-[var(--ok)]">All {MODULES.length} production-supervisor lessons finished.</p>
           </div>
         </div>
       )}
 
       {glossaryOpen && <GlossaryModal termId={glossaryOpen} onClose={() => setGlossaryOpen(null)} />}
-    </div>
+
+      <p className="mt-10 flex items-center gap-2 border-t border-[var(--border)] pt-6 text-[11px] leading-relaxed text-[var(--muted)]">
+        <ShieldCheck size={13} className="shrink-0 text-[var(--accent)]" />
+        A scenario-led supervisor onboarding programme for chemical manufacturing — training structure modelled on World-Class Manufacturing and Lean practice; all lessons, scenarios and the OEE model are original.
+      </p>
+    </DemoShell>
   );
 }

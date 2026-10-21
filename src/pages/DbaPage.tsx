@@ -305,7 +305,7 @@ function GaugeTile({ label, pct, sub, highGood }: { label: string; pct: number; 
 
 function HealthTab() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="grid grid-cols-2 gap-px bg-[var(--border)] lg:grid-cols-4">
         <GaugeTile label="Host CPU" pct={INSTANCE.cpuPct} sub="8 vCPU · load avg 4.9" />
         <GaugeTile label="Memory" pct={INSTANCE.memPct} sub={`SGA ${INSTANCE.sgaGb}G · PGA ${INSTANCE.pgaGb}G`} />
@@ -317,7 +317,7 @@ function HealthTab() {
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {/* Tablespaces */}
         <Panel label="Storage" title="Tablespace usage" actions={<HardDrive size={15} className="text-[var(--accent)]" />}>
           <div className="space-y-3.5">
@@ -405,7 +405,7 @@ function BackupTab() {
   const lastFull = BACKUP_JOBS.find((j) => j.type === 'L0 Full' && j.status === 'COMPLETED');
   const failed = BACKUP_JOBS.filter((j) => j.status === 'FAILED').length;
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="grid grid-cols-2 gap-px bg-[var(--border)] lg:grid-cols-4">
         <Stat label="Last full (L0)" value={lastFull ? `${lastFull.startedAgoH}h` : '—'} sub={`ago · ${lastFull?.sizeGb} GB`} />
         <Stat label="Recovery window" value="7 days" sub="RMAN retention policy" />
@@ -427,7 +427,7 @@ function BackupTab() {
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-5">
+      <div className="grid gap-4 lg:grid-cols-5">
         {/* Job history */}
         <Panel label="RMAN catalog" title="Backup history" actions={<ShieldCheck size={15} className="text-[var(--accent)]" />} className="lg:col-span-3" bodyClassName="p-0">
           <div className="divide-y divide-[var(--border)]">
@@ -499,7 +499,7 @@ function PerfTab() {
   const maxElapsed = Math.max(...TOP_SQL.map((s) => s.elapsedSec));
 
   return (
-    <div className="grid gap-5 lg:grid-cols-5">
+    <div className="grid gap-4 lg:grid-cols-5">
       {/* Top SQL list */}
       <Panel label="AWR · elapsed time" title="Top SQL" actions={<Search size={15} className="text-[var(--accent)]" />} className="lg:col-span-2" bodyClassName="p-0">
         <div className="divide-y divide-[var(--border)]">
@@ -569,7 +569,7 @@ function ScriptTab() {
     v === 'WARN' ? 'text-[var(--warn)]' : v === 'OK' ? 'text-[var(--ok)]' : 'text-[var(--ink)]';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-wrap gap-2">
         {SCRIPTS.map((s, i) => (
           <button
@@ -672,7 +672,7 @@ export default function DbaPage() {
 
       <TabNav tabs={TABS} active={tab} onChange={setTab} />
 
-      <div className="pt-10">
+      <div className="pt-7">
         {tab === 'health' && <HealthTab />}
         {tab === 'backup' && <BackupTab />}
         {tab === 'perf' && <PerfTab />}

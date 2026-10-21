@@ -241,7 +241,7 @@ function DashboardTab({ tickets }: { tickets: TicketT[] }) {
       </div>
 
       <Section label="Queue health" title="Where the desk stands">
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           <Panel label="By status" title="Queue breakdown">
             <div className="grid grid-cols-4 gap-px bg-[var(--border)]">
               {byStatus.map((s) => (
@@ -333,7 +333,7 @@ function TicketsTab({ tickets, setTickets }: { tickets: TicketT[]; setTickets: R
   });
 
   return (
-    <div className="grid gap-5 lg:grid-cols-5">
+    <div className="grid gap-4 lg:grid-cols-5">
       {/* Queue */}
       <div className="border border-[var(--border)] bg-[var(--surface)] lg:col-span-2">
         <header className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
@@ -479,7 +479,7 @@ function AssetsTab() {
   const warrExpired = ASSETS.filter((a) => a.warrantyMonths < 0).length;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="grid grid-cols-2 gap-px bg-[var(--border)] lg:grid-cols-4">
         {counts.map((c) => {
           const on = filter === c.s;
@@ -568,7 +568,7 @@ function AssetsTab() {
 function SlaTab({ tickets }: { tickets: TicketT[] }) {
   const openTickets = tickets.filter((t) => t.status !== 'Resolved');
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Panel bodyClassName="p-0" label="Policy" title="SLA targets by priority">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -669,7 +669,7 @@ export default function HelpdeskPage() {
 
       <TabNav tabs={TABS} active={tab} onChange={setTab} />
 
-      <div className="pt-10">
+      <div className="pt-7">
         {tab === 'dashboard' && <DashboardTab tickets={tickets} />}
         {tab === 'tickets' && <TicketsTab tickets={tickets} setTickets={setTickets} />}
         {tab === 'assets' && <AssetsTab />}

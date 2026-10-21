@@ -185,7 +185,7 @@ function PosRegister() {
   };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-5">
+    <div className="grid gap-4 lg:grid-cols-5">
       {/* Catalogue */}
       <Panel
         className="lg:col-span-3"
@@ -396,7 +396,7 @@ function OverviewTab() {
       </div>
 
       <Section label="Trading" title="The day so far">
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3">
           <Panel className="lg:col-span-2" label="Revenue by hour" title="Sales curve">
             <div className="flex items-end gap-2" style={{ height: 200 }}>
               {HOURLY_SALES.map((h) => (
@@ -431,7 +431,7 @@ function OverviewTab() {
       </Section>
 
       <Section label="Network" title="By store & tender">
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3">
           <Panel className="lg:col-span-2" bodyClassName="p-0" label="Branches" title="Store performance">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -505,7 +505,7 @@ function InventoryTab() {
     });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="grid grid-cols-2 gap-px bg-[var(--border)] lg:grid-cols-4">
         <Stat label="SKUs tracked" value={String(PRODUCTS.length)} sub={`across ${STORES.length} stores`} />
         <Stat
@@ -615,7 +615,7 @@ const TERM_META: Record<Terminal['status'], { Icon: typeof Wifi; tone: Tone; lab
 function TerminalsTab() {
   const offline = TERMINALS.filter((t) => t.status === 'offline');
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="grid grid-cols-2 gap-px bg-[var(--border)] lg:grid-cols-4">
         <Stat label="Terminals" value={String(TERMINALS.length)} sub="fleet-wide" />
         <Stat label="Online" value={String(TERMINALS_ONLINE)} sub="reporting" tone="ok" />
@@ -644,7 +644,7 @@ function TerminalsTab() {
         </div>
       )}
 
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {TERMINALS.map((t) => {
           const m = TERM_META[t.status];
           return (
@@ -702,7 +702,7 @@ export default function RetailPage() {
 
       <TabNav tabs={TABS} active={tab} onChange={setTab} />
 
-      <div className="pt-10">
+      <div className="pt-7">
         {tab === 'overview' && <OverviewTab />}
         {tab === 'pos' && <PosRegister />}
         {tab === 'inventory' && <InventoryTab />}

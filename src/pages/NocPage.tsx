@@ -194,7 +194,7 @@ function WallTab({ monitors, incidents, live, onToggle, onRun }: {
   const activeInc = incidents.filter((i) => i.status !== 'Resolved').length;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="grid grid-cols-2 gap-px bg-[var(--border)] lg:grid-cols-5">
         <Stat label="Monitors up" value={String(up)} sub={`of ${monitors.length} polled`} tone="ok" />
         <Stat label="Degraded" value={String(degraded)} sub="elevated latency" tone={degraded ? 'warn' : 'neutral'} />
@@ -263,7 +263,7 @@ function LatencyTab({ monitors }: { monitors: MonitorT[] }) {
   const downBeats = m.beats.filter((b) => b.status === 'Down').length;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2.5">
         <span className={fieldLabel}>Monitor</span>
         <select
@@ -322,7 +322,7 @@ function IncidentsTab({ incidents, setIncidents }: { incidents: IncidentT[]; set
     setIncidents((prev) => prev.map((i) => i.id === id ? { ...i, status, resolvedAt: status === 'Resolved' ? Date.now() : i.resolvedAt } : i));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-wrap gap-2">
         {INC_FILTERS.map((f) => {
           const n = f === 'All' ? incidents.length : incidents.filter((i) => i.status === f).length;
@@ -392,7 +392,7 @@ const TIERS: { key: string; label: string; types: MonType[]; desc: string }[] = 
 
 function TopologyTab({ monitors }: { monitors: MonitorT[] }) {
   return (
-    <div className="grid gap-5 lg:grid-cols-3">
+    <div className="grid gap-4 lg:grid-cols-3">
       {TIERS.map((tier) => {
         const members = monitors.filter((m) => tier.types.includes(m.type));
         const upNow = members.filter((m) => m.status === 'Up').length;
@@ -492,7 +492,7 @@ export default function NocPage() {
 
       <TabNav tabs={TABS} active={tab} onChange={setTab} />
 
-      <div className="pt-10">
+      <div className="pt-7">
         {tab === 'wall' && <WallTab monitors={monitors} incidents={incidents} live={live} onToggle={() => setLive((v) => !v)} onRun={tick} />}
         {tab === 'latency' && <LatencyTab monitors={monitors} />}
         {tab === 'incidents' && <IncidentsTab incidents={incidents} setIncidents={setIncidents} />}
