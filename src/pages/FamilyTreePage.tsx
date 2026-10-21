@@ -399,11 +399,13 @@ function FamilyHighlights({
 // ── Profile modal ─────────────────────────────────────────────────────────────
 
 function ProfileModal({
-  person, photos, label, onClose,
+  person, photos, label, isAnchor, onViewFrom, onClose,
 }: {
   person: FamilyPerson;
   photos: FamilyPhoto[];
   label: string;
+  isAnchor: boolean;
+  onViewFrom: () => void;
   onClose: () => void;
 }) {
   const [photoIdx, setPhotoIdx] = useState(0);
@@ -490,6 +492,21 @@ function ProfileModal({
               <FileText size={14} className="shrink-0 mt-0.5" />
               <p className="leading-relaxed">{person.bio}</p>
             </div>
+          )}
+        </div>
+
+        {/* Perspective control */}
+        <div className="mt-5 border-t border-[var(--border)] pt-4">
+          {isAnchor ? (
+            <p className="flex items-center justify-center gap-2 text-xs text-[var(--muted)]">
+              <Users size={14} className="text-[var(--brand-bright)]" />
+              The tree is showing everyone’s relationship to {person.name.split(' ')[0]}.
+            </p>
+          ) : (
+            <button onClick={onViewFrom} className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2.5 text-sm font-medium text-[var(--ink)] transition-colors hover:border-[var(--brand-bright)]/60 hover:text-[var(--brand-bright)]">
+              <Users size={15} />
+              View relationships from {person.name.split(' ')[0]}’s view
+            </button>
           )}
         </div>
       </div>
@@ -1068,6 +1085,10 @@ export default function FamilyTreePage() {
   const [saveError, setSaveError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  // Client-side "view from here": pick anyone as the "You" the labels are
+  // measured from, without touching the stored is_root. null = use the stored
+  // root (if any).
+  const [viewAsId, setViewAsId] = useState<string | null>(null);
 
   // ── Canvas pan/zoom ─────────────────────────────────────────────────────────
   const [offset, setOffset] = useState({ x: 40, y: 40 });
@@ -1103,11 +1124,23 @@ export default function FamilyTreePage() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (isAdmin) loadSubmissions(); }, [isAdmin, loadSubmissions]);
 
+  // ── Perspective ───────────────────────────────────────────────────────────────
+  // The person the relationship labels are measured from: an explicit "view from
+  // here" pick, else the stored root. Re-flag a copy of the people so layout,
+  // generations and labels all re-orient around them (node positions are
+  // unaffected — only the row that counts as generation 0 changes).
+  const storedRoot = people.find(p => p.is_root) ?? null;
+  const anchorId = viewAsId ?? storedRoot?.id ?? null;
+  const anchorPerson = anchorId ? people.find(p => p.id === anchorId) ?? null : null;
+  const rootedPeople = anchorId
+    ? people.map(p => (p.is_root === (p.id === anchorId) ? p : { ...p, is_root: p.id === anchorId }))
+    : people;
+
   // ── Layout ──────────────────────────────────────────────────────────────────
-  const { nodes, width, height } = buildLayout(people, rels);
+  const { nodes, width, height } = buildLayout(rootedPeople, rels);
   const families = computeFamilies(people, rels);
   const nodePosById = new Map(nodes.map(n => [n.person.id, { x: n.x, y: n.y }]));
-  const genMap = computeGenerations(people, rels);
+  const genMap = computeGenerations(rootedPeople, rels);
 
   // ── Initial view: centre horizontally on the grandparent generation ──────────
   // The top generation that still has descendants = the ancestral grandparents
@@ -1338,6 +1371,22 @@ export default function FamilyTreePage() {
         {/* ── Tree canvas ─────────────────────────────────────────────────────── */}
         {panel === 'tree' && (
           <div className="flex-1 relative overflow-hidden">
+            {/* Perspective banner — shown while viewing from a hand-picked person */}
+            {viewAsId && anchorPerson && (
+              <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2 flex items-center gap-2.5 rounded-full border border-[var(--brand-bright)]/40 bg-[var(--surface)]/95 px-3.5 py-1.5 shadow-lg backdrop-blur-sm">
+                <Users size={13} className="text-[var(--brand-bright)]" />
+                <span className="text-xs text-[var(--ink)]">
+                  Relationships shown from <span className="font-semibold">{anchorPerson.name}</span>
+                </span>
+                <button
+                  onClick={() => setViewAsId(null)}
+                  className="flex items-center gap-1 rounded-full bg-[var(--bg-soft)] px-2 py-0.5 text-[11px] text-[var(--muted)] transition-colors hover:text-[var(--ink)]"
+                >
+                  <X size={11} /> Reset
+                </button>
+              </div>
+            )}
+
             {/* Login popover */}
             {showLogin && !isAdmin && (
               <div className="absolute top-4 right-4 z-20 w-72 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xl">
@@ -1466,7 +1515,7 @@ export default function FamilyTreePage() {
                           <TreeNodeCard
                             person={node.person}
                             photos={photos.filter(ph => ph.person_id === node.person.id)}
-                            label={getRelationshipLabel(node.person.id, people, rels)}
+                            label={getRelationshipLabel(node.person.id, rootedPeople, rels)}
                             isRoot={node.person.is_root}
                             onClick={isAdmin ? () => {} : () => setSelectedPerson(node.person)}
                           />
@@ -1587,7 +1636,9 @@ export default function FamilyTreePage() {
         <ProfileModal
           person={selectedPerson}
           photos={photos.filter(ph => ph.person_id === selectedPerson.id)}
-          label={getRelationshipLabel(selectedPerson.id, people, rels)}
+          label={getRelationshipLabel(selectedPerson.id, rootedPeople, rels)}
+          isAnchor={!!anchorId && selectedPerson.id === anchorId}
+          onViewFrom={() => { setViewAsId(selectedPerson.id); setSelectedPerson(null); }}
           onClose={() => setSelectedPerson(null)}
         />
       )}

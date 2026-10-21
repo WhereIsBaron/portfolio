@@ -84,7 +84,8 @@ control that wipes it and re-seeds. ERP state is still in-memory (resets on relo
 
 ### Deliberately NOT built (real system depth we skipped)
 - Real email **send** / IMAP sync (inbox is simulated)
-- An **executing** workflow/automation builder (automations are illustrative)
+- A visual workflow/automation **builder** (rules execute live and log their
+  runs, but you can't author new rules from the UI — the rule set is fixed)
 - Role-based access control / permissions
 - Customer/self-service portal
 - Telephony / call logging
@@ -98,9 +99,7 @@ Ranked by payoff relative to effort:
 1. **Credit notes / sales returns** (ERP) — completes the order-to-cash story
    and exercises reverse GL + stock postings.
 2. **Pricing rules & discounts** (ERP) — visible, realistic, touches invoicing.
-3. **An executing automation rule** (CRM) — e.g. "stage = Won → create invoice
-   task", proving the workflow concept actually runs.
-4. Partial-payment reconciliation (ERP) — makes AR/AP feel real.
+3. Partial-payment reconciliation (ERP) — makes AR/AP feel real.
 
 Not planned unless asked: multi-currency, batch/serial, subcontracting,
 portal, telephony — high effort, low demo payoff.

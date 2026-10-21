@@ -90,25 +90,6 @@ export interface SubmissionData {
 
 // ── Relationship label calculation ────────────────────────────────────────────
 
-type RelMap = Map<string, { id: string; type: 'parent' | 'child' | 'spouse' | 'sibling' }[]>;
-
-function buildAdjacency(rels: FamilyRelationship[]): RelMap {
-  const map: RelMap = new Map();
-  const add = (a: string, b: string, type: FamilyRelationship['relationship_type']) => {
-    if (!map.has(a)) map.set(a, []);
-    map.get(a)!.push({ id: b, type });
-  };
-  for (const r of rels) {
-    add(r.person_a_id, r.person_b_id, r.relationship_type);
-    // mirror symmetric types
-    if (r.relationship_type === 'spouse') add(r.person_b_id, r.person_a_id, 'spouse');
-    else if (r.relationship_type === 'sibling') add(r.person_b_id, r.person_a_id, 'sibling');
-    else if (r.relationship_type === 'parent') add(r.person_b_id, r.person_a_id, 'child');
-    else if (r.relationship_type === 'child') add(r.person_b_id, r.person_a_id, 'parent');
-  }
-  return map;
-}
-
 // Generation number for each person via longest parent-chain (topological depth).
 // Top ancestors = 0, each child sits strictly below ALL of its parents. Spouse and
 // sibling edges only pull married-in (parentless) people onto their blood relative's row.
@@ -167,7 +148,107 @@ export function computeGenerations(
   return gen;
 }
 
-// Returns a human-readable relationship label from root's perspective
+// Blood-relation graph (parent/child edges only) plus an explicit spouse map.
+interface Kin {
+  parentsOf: Map<string, Set<string>>;   // person → their parents
+  spousesOf: Map<string, Set<string>>;   // person → their spouses/partners
+  siblingEdges: Map<string, Set<string>>; // explicit sibling links (no shared parent needed)
+}
+
+function buildKin(people: FamilyPerson[], rels: FamilyRelationship[]): Kin {
+  const ids = new Set(people.map(p => p.id));
+  const parentsOf = new Map<string, Set<string>>();
+  const spousesOf = new Map<string, Set<string>>();
+  const siblingEdges = new Map<string, Set<string>>();
+  const link = (m: Map<string, Set<string>>, k: string, v: string) => {
+    if (!ids.has(k) || !ids.has(v)) return;
+    if (!m.has(k)) m.set(k, new Set());
+    m.get(k)!.add(v);
+  };
+  for (const r of rels) {
+    if (r.relationship_type === 'parent') link(parentsOf, r.person_b_id, r.person_a_id);
+    else if (r.relationship_type === 'child') link(parentsOf, r.person_a_id, r.person_b_id);
+    else if (r.relationship_type === 'spouse') { link(spousesOf, r.person_a_id, r.person_b_id); link(spousesOf, r.person_b_id, r.person_a_id); }
+    else if (r.relationship_type === 'sibling') { link(siblingEdges, r.person_a_id, r.person_b_id); link(siblingEdges, r.person_b_id, r.person_a_id); }
+  }
+  return { parentsOf, spousesOf, siblingEdges };
+}
+
+// Every ancestor of `id` (including id at distance 0) with its generational distance.
+function ancestorDistances(id: string, parentsOf: Map<string, Set<string>>): Map<string, number> {
+  const dist = new Map<string, number>([[id, 0]]);
+  const queue: string[] = [id];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    const d = dist.get(cur)!;
+    for (const p of parentsOf.get(cur) ?? []) {
+      if (!dist.has(p)) { dist.set(p, d + 1); queue.push(p); }
+    }
+  }
+  return dist;
+}
+
+const ORDINALS = ['0th', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
+const ordinal = (n: number) => ORDINALS[n] ?? `${n}th`;
+const removedWord = (n: number) => n === 1 ? 'once' : n === 2 ? 'twice' : n === 3 ? 'three times' : `${n}×`;
+// "great" prefix chain: greats(0)='', greats(1)='Great-', greats(2)='Great-great-', 3+ => 'N× Great-'
+const greats = (n: number) => n <= 0 ? '' : n <= 2 ? 'Great-'.repeat(n) : `${n}× Great-`;
+
+function ancestorLabel(up: number): string {
+  if (up === 1) return 'Parent';
+  if (up === 2) return 'Grandparent';
+  return `${greats(up - 2)}grandparent`;
+}
+function descendantLabel(down: number): string {
+  if (down === 1) return 'Child';
+  if (down === 2) return 'Grandchild';
+  return `${greats(down - 2)}grandchild`;
+}
+function auntUncleLabel(grand: number): string {
+  return grand <= 0 ? 'Aunt / Uncle' : `${greats(grand)}aunt / uncle`;
+}
+function nieceNephewLabel(grand: number): string {
+  return grand <= 0 ? 'Niece / Nephew' : `${greats(grand)}niece / nephew`;
+}
+function cousinLabel(degree: number, removed: number): string {
+  return `${ordinal(degree)} Cousin${removed ? ` ${removedWord(removed)} removed` : ''}`;
+}
+
+// Blood relationship of `target` as seen from `from`, via their lowest common
+// ancestor. null when they share no ancestor (i.e. not blood-related).
+function bloodLabel(fromId: string, targetId: string, parentsOf: Map<string, Set<string>>): string | null {
+  const ancFrom = ancestorDistances(fromId, parentsOf);
+  const ancTarget = ancestorDistances(targetId, parentsOf);
+  let best: { up: number; down: number } | null = null;
+  for (const [anc, up] of ancFrom) {
+    const down = ancTarget.get(anc);
+    if (down === undefined) continue;
+    if (!best || up + down < best.up + best.down || (up + down === best.up + best.down && Math.max(up, down) < Math.max(best.up, best.down))) {
+      best = { up, down };
+    }
+  }
+  if (!best) return null;
+  const { up, down } = best;
+  if (up === 0 && down === 0) return 'You';
+  if (up === 0) return descendantLabel(down);   // target descends from `from`
+  if (down === 0) return ancestorLabel(up);      // target is an ancestor of `from`
+  if (up === 1 && down === 1) return 'Sibling';
+  if (down === 1) return auntUncleLabel(up - 2);     // target is a sibling of an ancestor
+  if (up === 1) return nieceNephewLabel(down - 2);   // target descends from a sibling
+  return cousinLabel(Math.min(up, down) - 1, Math.abs(up - down));
+}
+
+// Bucket a blood label so in-law/step wording can be derived from its category.
+type Kind = 'ancestor' | 'descendant' | 'sibling' | 'collateral';
+function kindOf(label: string): Kind {
+  const l = label.toLowerCase();
+  if (label === 'Sibling') return 'sibling';
+  if (l.endsWith('grandparent') || label === 'Parent') return 'ancestor';
+  if (l.endsWith('grandchild') || label === 'Child') return 'descendant';
+  return 'collateral';
+}
+
+// Returns a human-readable relationship label from the root's perspective.
 export function getRelationshipLabel(
   targetId: string,
   people: FamilyPerson[],
@@ -177,83 +258,67 @@ export function getRelationshipLabel(
   if (!root) return '';
   if (targetId === root.id) return 'You';
 
-  const adj = buildAdjacency(rels);
-  // BFS path from root to target, tracking edge types
-  const visited = new Map<string, { from: string; type: string }>();
-  const queue: string[] = [root.id];
-  visited.set(root.id, { from: '', type: '' });
+  const { parentsOf, spousesOf, siblingEdges } = buildKin(people, rels);
 
-  while (queue.length) {
-    const cur = queue.shift()!;
-    if (cur === targetId) break;
-    for (const { id, type } of adj.get(cur) ?? []) {
-      if (visited.has(id)) continue;
-      visited.set(id, { from: cur, type });
-      queue.push(id);
+  // Direct partner of the root — colour the word by the union's status.
+  if (spousesOf.get(root.id)?.has(targetId)) {
+    const rel = rels.find(r =>
+      r.relationship_type === 'spouse' &&
+      ((r.person_a_id === root.id && r.person_b_id === targetId) ||
+       (r.person_b_id === root.id && r.person_a_id === targetId)));
+    switch (rel?.status) {
+      case 'engaged':   return 'Fiancé(e)';
+      case 'partner':   return 'Partner';
+      case 'divorced':  return 'Ex-spouse';
+      case 'separated': return 'Separated spouse';
+      default:          return 'Spouse';
     }
   }
 
-  if (!visited.has(targetId)) return 'Relative';
-
-  // Reconstruct path as sequence of edge types
-  const path: string[] = [];
-  let cur = targetId;
-  while (cur !== root.id) {
-    const { from, type } = visited.get(cur)!;
-    path.unshift(type);
-    cur = from;
+  // Blood relationship via lowest common ancestor.
+  const blood = bloodLabel(root.id, targetId, parentsOf);
+  if (blood) {
+    // Full vs half sibling: share one parent only (and a distinct parent exists).
+    if (blood === 'Sibling') {
+      const rp = parentsOf.get(root.id) ?? new Set<string>();
+      const tp = parentsOf.get(targetId) ?? new Set<string>();
+      const shared = [...rp].filter(p => tp.has(p)).length;
+      if (shared === 1 && (rp.size > 1 || tp.size > 1)) return 'Half-sibling';
+    }
+    return blood;
   }
 
-  return pathToLabel(path);
+  // Explicit sibling link with no shared parent recorded.
+  if (siblingEdges.get(root.id)?.has(targetId)) return 'Sibling';
+
+  // ── In-law / step layer: allow a single spouse hop on either side ──
+  // (a) target is married to one of the root's blood relatives.
+  for (const sp of spousesOf.get(targetId) ?? []) {
+    const bl = sp === root.id ? 'You' : bloodLabel(root.id, sp, parentsOf);
+    if (!bl || bl === 'You') continue;
+    const k = kindOf(bl);
+    if (k === 'ancestor') return `Step-${ancestorStepWord(bl)}`; // your parent's/grandparent's spouse
+    if (k === 'sibling') return 'Sibling-in-law';
+    if (k === 'descendant') return `${bl}-in-law`;              // your child's spouse
+    return `${bl}-in-law`;                                      // aunt/uncle/cousin's spouse
+  }
+  // (b) target is a blood relative of one of the root's spouses.
+  for (const sp of spousesOf.get(root.id) ?? []) {
+    const bl = bloodLabel(sp, targetId, parentsOf);
+    if (!bl || bl === 'You') continue;
+    const k = kindOf(bl);
+    if (k === 'ancestor') return `${bl}-in-law`;                // your spouse's parent → Parent-in-law
+    if (k === 'sibling') return 'Sibling-in-law';
+    if (k === 'descendant') return `Step-${descendantStepWord(bl)}`; // your spouse's child → Step-child
+    return `${bl}-in-law`;                                      // your spouse's aunt/cousin
+  }
+
+  return 'Relative';
 }
 
-function pathToLabel(path: string[]): string {
-  if (path.length === 0) return 'You';
-  if (path.length === 1) {
-    if (path[0] === 'parent') return 'Parent';
-    if (path[0] === 'child') return 'Child';
-    if (path[0] === 'spouse') return 'Spouse';
-    if (path[0] === 'sibling') return 'Sibling';
-  }
-  if (path.length === 2) {
-    const [a, b] = path;
-    if (a === 'parent' && b === 'parent') return 'Grandparent';
-    if (a === 'parent' && b === 'sibling') return 'Aunt / Uncle';
-    if (a === 'parent' && b === 'spouse') return 'Step-parent';
-    if (a === 'child' && b === 'child') return 'Grandchild';
-    if (a === 'child' && b === 'sibling') return 'Nephew / Niece';
-    if (a === 'sibling' && b === 'child') return 'Nephew / Niece';
-    if (a === 'sibling' && b === 'spouse') return 'Sibling-in-law';
-    if (a === 'spouse' && b === 'sibling') return 'Brother / Sister-in-law';
-    if (a === 'spouse' && b === 'parent') return 'Parent-in-law';
-    if (a === 'spouse' && b === 'child') return 'Step-child';
-  }
-  if (path.length === 3) {
-    const [a, b, c] = path;
-    if (a === 'parent' && b === 'parent' && c === 'parent') return 'Great-grandparent';
-    if (a === 'parent' && b === 'parent' && c === 'sibling') return 'Great-aunt / Great-uncle';
-    if (a === 'parent' && b === 'sibling' && c === 'child') return '1st Cousin';
-    if (a === 'child' && b === 'child' && c === 'child') return 'Great-grandchild';
-    if (a === 'sibling' && b === 'child' && c === 'child') return 'Great-nephew / Niece';
-  }
-  if (path.length === 4) {
-    const [a, b, c, d] = path;
-    if (a === 'parent' && b === 'parent' && c === 'sibling' && d === 'child') return '1st Cousin once removed';
-    if (a === 'parent' && b === 'sibling' && c === 'child' && d === 'child') return '1st Cousin once removed';
-    if (a === 'parent' && b === 'parent' && c === 'parent' && d === 'sibling') return 'Great-great-aunt/uncle';
-  }
-  if (path.length === 5) {
-    const p = path.join(',');
-    if (p === 'parent,parent,sibling,child,child') return '2nd Cousin';
-    if (p === 'parent,parent,parent,sibling,child') return '2nd Cousin once removed';
-  }
-  // Fallback: count generations
-  const up = path.filter(x => x === 'parent').length;
-  const down = path.filter(x => x === 'child').length;
-  if (up > 0 && down === 0) return `${up}× Great-grandparent`;
-  if (down > 0 && up === 0) return `${down}× Great-grandchild`;
-  return 'Distant Relative';
-}
+// Lowercase an ancestor/descendant label for step wording ("Step-grandparent").
+function ancestorStepWord(label: string): string { return label.toLowerCase(); }
+function descendantStepWord(label: string): string { return label.toLowerCase(); }
 
 // ── Tree layout ───────────────────────────────────────────────────────────────
 

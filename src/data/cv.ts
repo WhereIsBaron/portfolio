@@ -263,7 +263,7 @@ export const projects: Project[] = [
     issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
     tags: ['React', 'TypeScript', 'Supabase', 'PostgreSQL', 'RLS', 'Tailwind'],
     highlights: [
-      'BFS-based relationship calculator — derives uncle/aunt, 1st cousin, great-grandparent labels from the graph automatically.',
+      'Lowest-common-ancestor relationship engine — labels any two people automatically (half-siblings, in-laws, step-relations, 2nd cousins twice removed, great-grandparents), and recomputes every label live from any chosen person\'s point of view.',
       'Pannable, zoomable canvas with SVG cubic-bezier connectors for parent/child and dashed gold lines for spouses.',
       'Photo gallery per person (up to 5 images) stored in Supabase Storage with public URLs.',
       'Branch submission flow: family members fill a form, admin reviews pending submissions with approve/reject and notes.',

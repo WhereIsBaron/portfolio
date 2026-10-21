@@ -2392,14 +2392,15 @@ function Reports({
       <div className="grid gap-6 lg:grid-cols-2">
         <div className={`${card} p-6`}>
           <h3 className="font-display text-lg text-white">Revenue (last 6 months)</h3>
-          <div className="mt-6 flex h-44 items-end gap-3">
+          <div className="mt-6 flex h-44 items-stretch gap-3">
             {months.map((m) => (
-              <div key={m.key} className="flex flex-1 flex-col items-center gap-2">
-                <div className="text-[10px] text-[var(--muted)]">{m.total ? money(m.total) : ''}</div>
-                <div className="flex w-full flex-1 items-end">
+              <div key={m.key} className="flex flex-1 flex-col items-center">
+                {/* Value label + bar fill the growable area and sit on the baseline */}
+                <div className="flex w-full flex-1 flex-col items-center justify-end gap-1">
+                  {m.total ? <div className="text-[10px] text-[var(--muted)]">{money(m.total)}</div> : null}
                   <div className="w-full rounded-t-md bg-[var(--brand-bright)] transition-all" style={{ height: `${(m.total / maxRev) * 100}%`, minHeight: m.total ? 4 : 0 }} />
                 </div>
-                <div className="text-xs text-[var(--muted)]">{m.label}</div>
+                <div className="mt-2 text-xs text-[var(--muted)]">{m.label}</div>
               </div>
             ))}
           </div>
