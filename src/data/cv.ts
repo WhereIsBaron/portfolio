@@ -331,6 +331,25 @@ export const projects: Project[] = [
     link: '#',
   },
   {
+    name: 'Health Research Data Platform',
+    category: 'Full-Stack Application',
+    description:
+      'An Electronic Data Capture (EDC) console for a multi-site clinical study — an enrolment and data-quality overview, a de-identified participant register, an electronic Case Report Form whose edit-checks validate every value as you type and auto-raise a data query when a value falls out of range, and a data-query (discrepancy) workbench those queries flow into. The data-management loop is live in-session; all data is fixed and entirely fictional.',
+    year: '2026',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
+    tags: ['React', 'TypeScript', 'Clinical Research', 'EDC', 'Data Quality'],
+    highlights: [
+      'Electronic CRF with live edit-checks: required-field and range validation runs on every keystroke, flagging in-range / out-of-range / implausible values and blocking save until hard errors are fixed.',
+      'Auto-raised data queries: saving a form with out-of-range values raises a discrepancy for each, which appears immediately in the query workbench — mirroring the real site/data-manager loop.',
+      '21 CFR Part 11-style audit trail: every saved value is logged with the entering user, timestamp and form context on save.',
+      'Study overview and de-identified register: enrolment by site, CRF completion by form, 1:1 randomisation balance, and a participant table using site-sequential codes only (no personal identifiers).',
+      'Reference system studied for UX only (OpenClinica) — all logic, data and UI are original.',
+    ],
+    route: '/edc',
+    wordmark: 'EDC',
+    link: '#',
+  },
+  {
     name: 'UN Coding4Integrity Hackathon',
     category: 'Hackathon',
     description:
