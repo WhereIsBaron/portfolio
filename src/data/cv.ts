@@ -274,6 +274,25 @@ export const projects: Project[] = [
     link: '#',
   },
   {
+    name: 'Oracle DBA Console',
+    category: 'Full-Stack Application',
+    description:
+      'A simulated Oracle 19c operations console covering the daily work of a database administrator: instance health monitoring (CPU, memory, tablespaces, wait events, active sessions), RMAN backup & recovery with restore points, SQL performance tuning with a visual EXPLAIN plan tree, and a script runner that executes against a seeded schema. Every metric is generated from a fixed seed, so the console is fully reproducible client-side.',
+    year: '2026',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
+    tags: ['React', 'TypeScript', 'SQL', 'Oracle', 'Tailwind'],
+    highlights: [
+      'Instance-health dashboard: tablespace usage bars with autoextend flags, top wait events by DB-time class, and a live V$SESSION-style active-session monitor.',
+      'Backup & recovery board: RMAN job history with completed/failed states, a real failure diagnosis (ORA-19809 / FRA full), recovery-window policy, and guaranteed restore points by SCN.',
+      'SQL performance tuning: top SQL ranked by elapsed time, each with a recursive EXPLAIN plan-tree visualiser showing per-step row estimates and cost share, plus an indexing/tuning note.',
+      'Script runner: pick a script (health check, index DDL, tablespace report), "execute" it against the seeded schema, and watch an SQL*Plus-style output log with a tabular result grid.',
+      'Reference systems studied for UX only (CloudBeaver, Percona PMM) — all logic, data and UI are original.',
+    ],
+    route: '/dba',
+    wordmark: 'DBA',
+    link: '#',
+  },
+  {
     name: 'UN Coding4Integrity Hackathon',
     category: 'Hackathon',
     description:

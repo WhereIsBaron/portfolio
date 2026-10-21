@@ -10,6 +10,7 @@ import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import CvPage from '@/pages/CvPage';
 import TimetablePage from '@/pages/TimetablePage';
 import FamilyTreePage from '@/pages/FamilyTreePage';
+import DbaPage from '@/pages/DbaPage';
 import NotFound from '@/pages/NotFound';
 import ScrollToHash from '@/components/ScrollToHash';
 import ChatWidget from '@/components/ChatWidget';
@@ -35,6 +36,7 @@ function App() {
             <Route path="/cv" element={<CvPage />} />
             <Route path="/timetable" element={<TimetablePage />} />
             <Route path="/family-tree" element={<FamilyTreePage />} />
+            <Route path="/dba" element={<DbaPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <ChatWidget />
