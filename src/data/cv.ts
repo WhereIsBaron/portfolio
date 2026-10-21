@@ -312,6 +312,25 @@ export const projects: Project[] = [
     link: '#',
   },
   {
+    name: 'IT Helpdesk & Asset Console',
+    category: 'Full-Stack Application',
+    description:
+      'A service-desk cockpit for an IT support officer — a ticket queue with live SLA tracking, a fully interactive ticket detail (reassign, reprioritise, reply, resolve, and watch the SLA recompute), an IT asset register (CMDB-lite) with warranty flags, and an SLA policy board. Tickets are stateful in-session, so the workflow behaves like a real desk. Seeded data is fixed.',
+    year: '2026',
+    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
+    tags: ['React', 'TypeScript', 'ITSM', 'Helpdesk', 'Tailwind'],
+    highlights: [
+      'SLA engine: per-priority response and resolution targets drive live Met / On track / Due soon / Breached states that recompute as you work a ticket — the first agent reply stops the response clock.',
+      'Interactive ticket workflow: change status, priority and assignee from dropdowns, post a threaded reply, and resolve/reopen — all held in React state so the queue, dashboard and SLA board update together.',
+      'Dashboard: open-ticket and SLA-at-risk KPIs, queue-by-status tiles, open tickets by category, and a live at-risk list.',
+      'Asset register (CMDB): laptops, desktops, printers and network gear with status, assignee, location and warranty-expiry flags, filterable by status with an out-of-warranty budget alert.',
+      'Reference systems studied for UX only (GLPI, osTicket) — all logic, data and UI are original.',
+    ],
+    route: '/helpdesk',
+    wordmark: 'DESK',
+    link: '#',
+  },
+  {
     name: 'UN Coding4Integrity Hackathon',
     category: 'Hackathon',
     description:

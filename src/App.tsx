@@ -12,6 +12,7 @@ import TimetablePage from '@/pages/TimetablePage';
 import FamilyTreePage from '@/pages/FamilyTreePage';
 import DbaPage from '@/pages/DbaPage';
 import RetailPage from '@/pages/RetailPage';
+import HelpdeskPage from '@/pages/HelpdeskPage';
 import NotFound from '@/pages/NotFound';
 import ScrollToHash from '@/components/ScrollToHash';
 import ChatWidget from '@/components/ChatWidget';
@@ -39,6 +40,7 @@ function App() {
             <Route path="/family-tree" element={<FamilyTreePage />} />
             <Route path="/dba" element={<DbaPage />} />
             <Route path="/retail" element={<RetailPage />} />
+            <Route path="/helpdesk" element={<HelpdeskPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <ChatWidget />
