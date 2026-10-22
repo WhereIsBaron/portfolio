@@ -42,7 +42,7 @@ export default function Hero() {
         <div className="col-span-2 lg:col-span-3">
           <p className="font-bold text-[var(--ink)]">What I build</p>
           <p className="mt-1 max-w-[24ch] text-[var(--muted)]">
-            Production web &amp; mobile apps, end to end — shipped, not prototyped.
+            Production software — web, mobile &amp; desktop apps, end to end — shipped, not prototyped.
           </p>
         </div>
 
