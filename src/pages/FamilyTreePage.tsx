@@ -3,7 +3,7 @@ import {
 } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Plus, X, Edit2, Trash2, Users, UserPlus, Send,
+  Plus, X, Edit2, Trash2, Users, UserPlus, Send,
   ChevronDown, ChevronRight, ImageOff, Loader2, RefreshCw,
   ShieldCheck, Eye, Globe, Briefcase, Heart, FileText, Camera,
   Link2, CheckCircle, XCircle, Clock, Info,
@@ -11,6 +11,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import Footer from '@/components/Footer';
 import {
   FamilyPerson, FamilyRelationship, FamilyPhoto, FamilySubmission,
   buildLayout, computeGenerations, getRelationshipLabel, generationLabel,
@@ -22,15 +23,15 @@ import {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const inp =
-  'w-full rounded-xl border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--muted)]/60 focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]';
+  'w-full  border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--muted)]/60 focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]';
 
 const sel =
-  'w-full rounded-xl border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none';
+  'w-full  border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none';
 
 const btn = (variant: 'primary' | 'ghost' | 'danger' = 'ghost') => {
-  const base = 'inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40';
+  const base = 'inline-flex items-center gap-1.5  px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40';
   if (variant === 'primary') return `${base} bg-[var(--accent)] text-[var(--accent-ink)] hover:opacity-90`;
-  if (variant === 'danger') return `${base} bg-red-500/10 text-red-500 hover:bg-red-500/20`;
+  if (variant === 'danger') return `${base} bg-[var(--danger-bg)] text-[var(--danger)] hover:bg-[var(--danger-bg)]`;
   return `${base} border border-[var(--border)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--ink)]`;
 };
 
@@ -142,7 +143,7 @@ function TreeNodeCard({
       className="group absolute cursor-pointer"
       style={{ width: 160, top: 0, left: 0 }}
     >
-      <div className={`rounded-2xl border ${isRoot ? 'border-[var(--brand-bright)]' : 'border-[var(--border)]'} bg-[var(--surface)] p-2.5 shadow-lg transition-all group-hover:border-[var(--brand-bright)]/60 group-hover:shadow-[var(--brand-bright)]/10`}>
+      <div className={` border ${isRoot ? 'border-[var(--accent)]' : 'border-[var(--border)]'} bg-[var(--surface)] p-2.5 shadow-lg transition-all group-hover:border-[var(--accent)] group-hover:shadow-[var(--accent-soft)]`}>
         {/* avatar */}
         <div className="mb-2 h-12 w-12 overflow-hidden rounded-full border border-[var(--border)] mx-auto bg-[var(--bg-soft)] flex items-center justify-center">
           {thumb
@@ -151,7 +152,7 @@ function TreeNodeCard({
           }
         </div>
         <p className="text-center text-xs font-semibold text-[var(--ink)] leading-tight truncate">{person.name}</p>
-        {isRoot && <p className="text-center text-[10px] text-[var(--brand-bright)] mt-0.5">You</p>}
+        {isRoot && <p className="text-center text-[10px] text-[var(--accent)] mt-0.5">You</p>}
         {!isRoot && label && (
           <p className="text-center text-[10px] text-[var(--muted)] mt-0.5 truncate">{label}</p>
         )}
@@ -181,7 +182,7 @@ function TreeNodeCard({
 // Line style for a parent→child link, by child-link kind
 // Parent→child links use the muted ink; adopted/foster lean on the brand blue so
 // they read against both the light "Stone" and dark "Slate" grounds.
-const LINK_KIN = 'var(--brand-bright)';
+const LINK_KIN = 'var(--accent)';
 const LINK_INK = 'var(--muted)';
 const LINK_UNION = 'var(--accent)';
 
@@ -414,7 +415,7 @@ function ProfileModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="relative w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-md  border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <button onClick={onClose} className="absolute right-4 top-4 text-[var(--muted)] hover:text-[var(--ink)]">
@@ -424,7 +425,7 @@ function ProfileModal({
         {/* Photo gallery */}
         {sorted.length > 0 ? (
           <div className="mb-4">
-            <div className="relative h-48 rounded-2xl overflow-hidden bg-[var(--bg-soft)]">
+            <div className="relative h-48  overflow-hidden bg-[var(--bg-soft)]">
               <img src={sorted[photoIdx].url} alt={person.name} className="h-full w-full object-cover" />
               {sorted.length > 1 && (
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
@@ -432,7 +433,7 @@ function ProfileModal({
                     <button
                       key={i}
                       onClick={() => setPhotoIdx(i)}
-                      className={`h-1.5 w-1.5 rounded-full transition-colors ${i === photoIdx ? 'bg-white' : 'bg-white/30'}`}
+                      className={`h-1.5 w-1.5 rounded-full transition-colors ${i === photoIdx ? 'bg-[var(--accent)]' : 'bg-white/50'}`}
                     />
                   ))}
                 </div>
@@ -440,13 +441,13 @@ function ProfileModal({
             </div>
           </div>
         ) : (
-          <div className="mb-4 h-20 rounded-2xl bg-[var(--bg-soft)] flex items-center justify-center">
+          <div className="mb-4 h-20  bg-[var(--bg-soft)] flex items-center justify-center">
             <ImageOff size={28} className="text-[var(--muted)]" />
           </div>
         )}
 
         <h2 className="text-xl font-bold text-[var(--ink)] mb-0.5">{person.name}</h2>
-        {label && <p className="text-xs text-[var(--brand-bright)] mb-3">{label}</p>}
+        {label && <p className="text-xs text-[var(--accent)] mb-3">{label}</p>}
 
         <div className="space-y-2 text-sm">
           {(person.country_code || person.city) && (
@@ -499,11 +500,11 @@ function ProfileModal({
         <div className="mt-5 border-t border-[var(--border)] pt-4">
           {isAnchor ? (
             <p className="flex items-center justify-center gap-2 text-xs text-[var(--muted)]">
-              <Users size={14} className="text-[var(--brand-bright)]" />
+              <Users size={14} className="text-[var(--accent)]" />
               The tree is showing everyone’s relationship to {person.name.split(' ')[0]}.
             </p>
           ) : (
-            <button onClick={onViewFrom} className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2.5 text-sm font-medium text-[var(--ink)] transition-colors hover:border-[var(--brand-bright)]/60 hover:text-[var(--brand-bright)]">
+            <button onClick={onViewFrom} className="flex w-full items-center justify-center gap-2  border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2.5 text-sm font-medium text-[var(--ink)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]">
               <Users size={15} />
               View relationships from {person.name.split(' ')[0]}’s view
             </button>
@@ -655,10 +656,10 @@ function PersonForm({
         <div className="flex flex-wrap gap-2">
           {myPhotos.map(ph => (
             <div key={ph.id} className="relative">
-              <img src={ph.url} alt="" className="h-16 w-16 rounded-xl object-cover border border-[var(--border)]" />
+              <img src={ph.url} alt="" className="h-16 w-16  object-cover border border-[var(--border)]" />
               <button
                 onClick={() => onDeletePhoto(ph)}
-                className="absolute -top-1.5 -right-1.5 rounded-full bg-red-500 p-0.5 text-white"
+                className="absolute -top-1.5 -right-1.5 rounded-full bg-[var(--danger)] p-0.5 text-[var(--ink)]"
               >
                 <X size={10} />
               </button>
@@ -669,7 +670,7 @@ function PersonForm({
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="h-16 w-16 rounded-xl border border-dashed border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:border-[var(--accent)] disabled:opacity-40"
+              className="h-16 w-16  border border-dashed border-[var(--border)] flex items-center justify-center text-[var(--muted)] hover:border-[var(--accent)] disabled:opacity-40"
             >
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
             </button>
@@ -687,7 +688,7 @@ function PersonForm({
         />
       </div>
 
-      {error && <p className="text-xs text-red-400 rounded-xl bg-red-500/10 px-3 py-2">{error}</p>}
+      {error && <p className="text-xs text-[var(--danger)]  bg-[var(--danger-bg)] px-3 py-2">{error}</p>}
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" className={btn('ghost')} onClick={onCancel}>Cancel</button>
         <button type="button" className={btn('primary')} onClick={() => {
@@ -727,7 +728,7 @@ function RelPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-soft)] p-4 space-y-3">
+      <div className=" border border-[var(--border)] bg-[var(--bg-soft)] p-4 space-y-3">
         <p className="text-xs text-[var(--muted)] font-medium">Add Relationship</p>
         <div className="grid grid-cols-3 gap-2">
           <select className={sel} value={a} onChange={e => setA(e.target.value)}>
@@ -767,13 +768,13 @@ function RelPanel({
 
       <div className="space-y-2">
         {rels.map(r => (
-          <div key={r.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-xs text-[var(--muted)]">
+          <div key={r.id} className="flex items-center justify-between  border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-xs text-[var(--muted)]">
             <span>
               <span className="text-[var(--ink)] font-medium">{nameOf(r.person_a_id)}</span>
               {' '}is {r.relationship_type === 'spouse' ? statusLabel('spouse', r.status) : r.relationship_type} of{' '}
               <span className="text-[var(--ink)] font-medium">{nameOf(r.person_b_id)}</span>
               {(r.relationship_type === 'parent' || r.relationship_type === 'child') && r.status && r.status !== 'biological' && (
-                <span className="ml-1 rounded bg-[var(--bg-soft)] px-1.5 py-0.5 text-[10px] text-white/60">{statusLabel(r.relationship_type, r.status)}</span>
+                <span className="ml-1 rounded bg-[var(--bg-soft)] px-1.5 py-0.5 text-[10px] text-[var(--muted)]">{statusLabel(r.relationship_type, r.status)}</span>
               )}
             </span>
             <button className={btn('danger')} onClick={() => onDelete(r.id)}><Trash2 size={12} /></button>
@@ -828,7 +829,7 @@ function SubmitBranchForm({ onSubmitted }: { onSubmitted: () => void }) {
   if (sent) {
     return (
       <div className="text-center py-8">
-        <CheckCircle size={36} className="text-green-400 mx-auto mb-3" />
+        <CheckCircle size={36} className="text-[var(--ok)] mx-auto mb-3" />
         <p className="text-[var(--ink)] font-semibold mb-1">Branch Submitted!</p>
         <p className="text-sm text-[var(--muted)]">The admin will review and add your family members to the tree.</p>
       </div>
@@ -855,7 +856,7 @@ function SubmitBranchForm({ onSubmitted }: { onSubmitted: () => void }) {
         </div>
         <div className="space-y-4">
           {members.map((m, i) => (
-            <div key={i} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-soft)] p-4 space-y-3">
+            <div key={i} className=" border border-[var(--border)] bg-[var(--bg-soft)] p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-[var(--muted)]">Person {i + 1}</p>
                 {members.length > 1 && (
@@ -928,7 +929,7 @@ function SubmitBranchForm({ onSubmitted }: { onSubmitted: () => void }) {
         <textarea className={inp} rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any context to help the admin add your branch correctly" />
       </div>
 
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
 
       <button className={btn('primary')} onClick={submit} disabled={sending || !supabase}>
         {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
@@ -951,9 +952,9 @@ function SubmissionsPanel({
   const [notes, setNotes] = useState('');
 
   const statusIcon = (s: FamilySubmission['status']) =>
-    s === 'approved' ? <CheckCircle size={14} className="text-green-400" /> :
-    s === 'rejected' ? <XCircle size={14} className="text-red-400" /> :
-    <Clock size={14} className="text-yellow-400" />;
+    s === 'approved' ? <CheckCircle size={14} className="text-[var(--ok)]" /> :
+    s === 'rejected' ? <XCircle size={14} className="text-[var(--danger)]" /> :
+    <Clock size={14} className="text-[var(--warn)]" />;
 
   return (
     <div className="space-y-3">
@@ -962,7 +963,7 @@ function SubmissionsPanel({
         <p className="text-xs text-[var(--muted)] text-center py-6">No submissions yet</p>
       )}
       {submissions.map(s => (
-        <div key={s.id} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-soft)] overflow-hidden">
+        <div key={s.id} className=" border border-[var(--border)] bg-[var(--bg-soft)] overflow-hidden">
           <div
             className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[var(--bg-soft)]"
             onClick={() => setExpanded(expanded === s.id ? null : s.id)}
@@ -994,7 +995,7 @@ function SubmissionsPanel({
                   {m.photo_urls && m.photo_urls.length > 0 && (
                     <div className="flex gap-1.5 mt-1">
                       {m.photo_urls.map((u, j) => (
-                        <img key={j} src={u} className="h-10 w-10 rounded-lg object-cover border border-[var(--border)]" alt="" />
+                        <img key={j} src={u} className="h-10 w-10  object-cover border border-[var(--border)]" alt="" />
                       ))}
                     </div>
                   )}
@@ -1050,7 +1051,7 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
     <div className="space-y-3">
       <input type="email" className={inp} value={email} onChange={e => setEmail(e.target.value)} placeholder="Admin email" />
       <input type="password" className={inp} value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} placeholder="Password" />
-      {err && <p className="text-xs text-red-400">{err}</p>}
+      {err && <p className="text-xs text-[var(--danger)]">{err}</p>}
       <button className={btn('primary')} onClick={submit} disabled={loading}>
         {loading ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
         Sign In
@@ -1315,17 +1316,11 @@ export default function FamilyTreePage() {
   return (
     <div className="paper min-h-screen bg-[var(--bg)] text-[var(--ink)] flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-[var(--border)]bg-[var(--bg)]/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
-              <ArrowLeft size={18} />
-            </Link>
-            <div className="flex items-center gap-2">
-              <Users size={18} className="text-[var(--brand-bright)]" />
-              <span className="font-semibold text-sm">Family Tree</span>
-            </div>
-          </div>
+      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--bg)_88%,transparent)] backdrop-blur">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
+          <Link to="/" className="font-display text-lg font-semibold tracking-tight text-[var(--ink)]">
+            Andrew<span className="text-[var(--accent)]">.</span>FamilyTree
+          </Link>
           <div className="flex items-center gap-2">
             {!isAdmin && (
               <>
@@ -1348,7 +1343,7 @@ export default function FamilyTreePage() {
                 <button className={`relative ${btn(panel === 'admin-submissions' ? 'primary' : 'ghost')}`} onClick={() => setPanel('admin-submissions')}>
                   <Send size={14} /> Submissions
                   {pendingCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-[10px] flex items-center justify-center text-white font-bold">
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[var(--danger)] text-[10px] flex items-center justify-center text-[var(--ink)] font-bold">
                       {pendingCount}
                     </span>
                   )}
@@ -1373,8 +1368,8 @@ export default function FamilyTreePage() {
           <div className="flex-1 relative overflow-hidden">
             {/* Perspective banner — shown while viewing from a hand-picked person */}
             {viewAsId && anchorPerson && (
-              <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2 flex items-center gap-2.5 rounded-full border border-[var(--brand-bright)]/40 bg-[var(--surface)]/95 px-3.5 py-1.5 shadow-lg backdrop-blur-sm">
-                <Users size={13} className="text-[var(--brand-bright)]" />
+              <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2 flex items-center gap-2.5 rounded-full border border-[var(--accent)] bg-[var(--surface)]/95 px-3.5 py-1.5 shadow-lg backdrop-blur-sm">
+                <Users size={13} className="text-[var(--accent)]" />
                 <span className="text-xs text-[var(--ink)]">
                   Relationships shown from <span className="font-semibold">{anchorPerson.name}</span>
                 </span>
@@ -1389,7 +1384,7 @@ export default function FamilyTreePage() {
 
             {/* Login popover */}
             {showLogin && !isAdmin && (
-              <div className="absolute top-4 right-4 z-20 w-72 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xl">
+              <div className="absolute top-4 right-4 z-20 w-72  border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xl">
                 <div className="flex justify-between items-center mb-3">
                   <p className="text-sm font-semibold">Admin Login</p>
                   <button onClick={() => setShowLogin(false)}><X size={14} /></button>
@@ -1400,7 +1395,7 @@ export default function FamilyTreePage() {
 
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <Loader2 size={32} className="animate-spin text-[var(--brand-bright)]" />
+                <Loader2 size={32} className="animate-spin text-[var(--accent)]" />
               </div>
             )}
 
@@ -1421,7 +1416,7 @@ export default function FamilyTreePage() {
                 {/* Generation legend sidebar */}
                 <div className="absolute left-3 top-3 z-10 space-y-1 pointer-events-none">
                   {genNumbers.map(g => (
-                    <div key={g} className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur-sm px-2 py-1">
+                    <div key={g} className="flex items-center gap-1.5  border border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur-sm px-2 py-1">
                       <span className="text-[10px] text-[var(--muted)]">{g > 0 ? `+${g}` : g}</span>
                       <span className="text-[10px] text-[var(--ink)]/80">{generationLabel(g)}</span>
                     </div>
@@ -1429,7 +1424,7 @@ export default function FamilyTreePage() {
                 </div>
 
                 {/* Line-style legend */}
-                <div className="absolute left-3 bottom-3 z-10 rounded-lg border border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur-sm px-2.5 py-2 pointer-events-none">
+                <div className="absolute left-3 bottom-3 z-10  border border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur-sm px-2.5 py-2 pointer-events-none">
                   <p className="text-[9px] uppercase tracking-wide text-[var(--muted)] mb-1">Key</p>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
                     {[
@@ -1545,7 +1540,7 @@ export default function FamilyTreePage() {
                   </div>
 
                   {editingPerson && (
-                    <div ref={editFormRef} className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 scroll-mt-4">
+                    <div ref={editFormRef} className="mb-6  border border-[var(--border)] bg-[var(--surface)] p-5 scroll-mt-4">
                       <h2 className="text-sm font-semibold mb-4">{editingPerson === 'new' ? 'New Person' : `Edit: ${editingPerson.name}`}</h2>
                       <PersonForm
                         key={editingPerson === 'new' ? 'new' : (editingPerson as FamilyPerson).id}
@@ -1567,7 +1562,7 @@ export default function FamilyTreePage() {
 
                   <div className="space-y-3">
                     {people.map(p => (
-                      <div key={p.id} className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                      <div key={p.id} className="flex items-center justify-between  border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
                         <div className="flex items-center gap-3">
                           {(() => {
                             const ph = photos.find(x => x.person_id === p.id);
@@ -1576,7 +1571,7 @@ export default function FamilyTreePage() {
                               : <div className="h-9 w-9 rounded-full bg-[var(--bg-soft)] flex items-center justify-center"><Users size={16} className="text-[var(--muted)]" /></div>;
                           })()}
                           <div>
-                            <p className="text-sm font-medium">{p.name} {p.is_root && <span className="text-[10px] text-[var(--brand-bright)]">(root)</span>}</p>
+                            <p className="text-sm font-medium">{p.name} {p.is_root && <span className="text-[10px] text-[var(--accent)]">(root)</span>}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               {p.country_code && <img src={flagUrl(p.country_code)} alt={p.country_code} className="h-3" />}
                               <span className="text-xs text-[var(--muted)]">{[p.city, COUNTRY_NAMES[p.country_code ?? '']].filter(Boolean).join(', ') || '—'}</span>
@@ -1621,7 +1616,7 @@ export default function FamilyTreePage() {
                   <h1 className="text-xl font-bold mb-2">Submit Your Branch</h1>
                   <p className="text-sm text-[var(--muted)] mb-6">Add your family members to the tree. The admin will review and publish them.</p>
                   {!supabase
-                    ? <p className="text-sm text-red-400">Supabase is not configured.</p>
+                    ? <p className="text-sm text-[var(--danger)]">Supabase is not configured.</p>
                     : <SubmitBranchForm onSubmitted={() => {}} />
                   }
                 </div>
@@ -1643,6 +1638,7 @@ export default function FamilyTreePage() {
         />
       )}
 
+      <Footer />
     </div>
   );
 }

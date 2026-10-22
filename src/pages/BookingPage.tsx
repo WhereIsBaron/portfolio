@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   BedDouble,
   Briefcase,
   Camera,
   Stethoscope,
   CalendarDays,
-  ArrowLeft,
   ArrowRight,
   Check,
   CalendarClock,
@@ -18,8 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { verticals, type Vertical, type Resource } from '@/data/booking';
-import Footer from '@/components/Footer';
-import { usePageTitle } from '@/hooks/usePageTitle';
+import { DemoShell, Masthead } from '@/components/demo/kit';
 
 const ICONS: Record<Vertical['icon'], LucideIcon> = {
   hotel: BedDouble,
@@ -30,7 +27,7 @@ const ICONS: Record<Vertical['icon'], LucideIcon> = {
 };
 
 const input =
-  'w-full rounded-xl border border-white/10 bg-[var(--bg-soft)] px-4 py-2.5 text-white placeholder:text-[var(--muted)]/50 focus:border-[var(--brand-bright)] focus:outline-none focus:ring-1 focus:ring-[var(--brand-bright)]';
+  'w-full  border border-[var(--border)] bg-[var(--bg-soft)] px-4 py-2.5 text-[var(--ink)] placeholder:text-[var(--muted)]/50 focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]';
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -79,7 +76,7 @@ function SummaryRows({
       {rows.map(([k, v]) => (
         <div key={k} className="flex items-center justify-between gap-4">
           <span className="text-[var(--muted)]">{k}</span>
-          <span className="text-right font-medium text-white">{v}</span>
+          <span className="text-right font-medium text-[var(--ink)]">{v}</span>
         </div>
       ))}
     </>
@@ -87,7 +84,6 @@ function SummaryRows({
 }
 
 export default function BookingPage() {
-  usePageTitle('Universal Booking System');
   const [vertId, setVertId] = useState(verticals[0].id);
   const vert = useMemo(() => verticals.find((v) => v.id === vertId) || verticals[0], [vertId]);
 
@@ -132,44 +128,26 @@ export default function BookingPage() {
   const Icon = ICONS[vert.icon];
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[var(--bg)]/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link to="/" className="font-display text-lg font-semibold tracking-tight text-white">
-            Andrew<span className="text-[var(--brand-bright)]">.</span>Langeveldt
-          </Link>
-          <Link
-            to="/#work"
-            className="inline-flex items-center gap-2 text-sm text-[var(--muted)] transition-colors hover:text-white"
-          >
-            <ArrowLeft size={15} /> Back to portfolio
-          </Link>
-        </div>
-      </header>
-
-      {/* Hero */}
-      <section className="mx-auto max-w-6xl px-6 pb-10 pt-16">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-[var(--muted)]">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--brand-bright)]" /> Live front-end demo
-        </span>
-        <h1 className="mt-6 max-w-3xl font-display text-4xl font-light leading-[1.1] text-white sm:text-6xl">
-          One booking engine, <span className="text-[var(--brand-bright)]">any business.</span>
-        </h1>
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-[var(--muted)]">
-          A universal booking system any business can drop in and run. Configure the resources,
-          availability, and fields once, and the same flow adapts to hotels, clinics, consultants,
-          studios, or anything that runs on appointments. Switch the business type below to see it
-          reconfigure itself.
-        </p>
-        <p className="mt-3 text-sm text-[var(--muted)]/70">
-          This is the front end. The Firebase backend for real availability, storage, and
-          confirmations is next.
-        </p>
-      </section>
+    <DemoShell title="Universal Booking System" wordmark="Booking">
+      <Masthead
+        eyebrow="Product demo · configurable booking engine"
+        title={
+          <>
+            One booking engine, <span className="text-[var(--accent)]">any business.</span>
+          </>
+        }
+        lede="A universal booking system any business can drop in and run. Configure the resources, availability and fields once, and the same flow adapts to hotels, clinics, consultants, studios, or anything that runs on appointments. Switch the business type below to watch it reconfigure itself — the Firebase backend for real availability, storage and confirmations is the next build."
+        facts={[
+          { label: 'Business types', value: verticals.length },
+          { label: 'Booking modes', value: 'Range · Slot' },
+          { label: 'Setup', value: 'No code' },
+          { label: 'Backend', value: 'Firebase · next' },
+        ]}
+        live="Live front-end demo"
+      />
 
       {/* Vertical picker */}
-      <section className="mx-auto max-w-6xl px-6">
+      <section className="pt-8">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {verticals.map((v) => {
             const VIcon = ICONS[v.icon];
@@ -178,20 +156,20 @@ export default function BookingPage() {
               <button
                 key={v.id}
                 onClick={() => selectVertical(v.id)}
-                className={`flex flex-col items-start gap-3 rounded-2xl border p-4 text-left transition-colors ${
+                className={`flex flex-col items-start gap-3  border p-4 text-left transition-colors ${
                   on
-                    ? 'border-[var(--brand-bright)]/50 bg-[var(--brand)]/10'
-                    : 'border-white/10 bg-[var(--surface)] hover:border-white/20'
+                    ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
+                    : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border)]'
                 }`}
               >
                 <span
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                    on ? 'bg-[var(--brand-bright)] text-[#0b0d10]' : 'bg-white/5 text-[var(--brand-bright)]'
+                  className={`flex h-10 w-10 items-center justify-center  ${
+                    on ? 'bg-[var(--accent)] text-[var(--accent-ink)]' : 'bg-[var(--bg-soft)] text-[var(--accent)]'
                   }`}
                 >
                   <VIcon size={18} />
                 </span>
-                <span className="text-sm font-medium text-white">{v.name}</span>
+                <span className="text-sm font-medium text-[var(--ink)]">{v.name}</span>
               </button>
             );
           })}
@@ -199,16 +177,16 @@ export default function BookingPage() {
       </section>
 
       {/* Booking widget */}
-      <section className="mx-auto max-w-6xl px-6 py-10">
+      <section className="pt-8">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
           {/* Form */}
-          <div className="rounded-3xl border border-white/10 bg-[var(--surface)] p-6 sm:p-8 lg:col-span-3">
+          <div className=" border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8 lg:col-span-3">
             <div className="mb-6 flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--brand)]/15 text-[var(--brand-bright)]">
+              <span className="flex h-11 w-11 items-center justify-center  bg-[var(--accent-soft)] text-[var(--accent)]">
                 <Icon size={20} />
               </span>
               <div>
-                <h2 className="font-display text-xl text-white">{vert.name}</h2>
+                <h2 className="font-display text-xl text-[var(--ink)]">{vert.name}</h2>
                 <p className="text-sm text-[var(--muted)]">{vert.blurb}</p>
               </div>
             </div>
@@ -221,15 +199,15 @@ export default function BookingPage() {
                   <button
                     key={r.id}
                     onClick={() => setResourceId(r.id)}
-                    className={`rounded-xl border p-3 text-left transition-colors ${
+                    className={` border p-3 text-left transition-colors ${
                       on
-                        ? 'border-[var(--brand-bright)]/50 bg-[var(--brand)]/10'
-                        : 'border-white/10 bg-[var(--bg-soft)] hover:border-white/20'
+                        ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
+                        : 'border-[var(--border)] bg-[var(--bg-soft)] hover:border-[var(--border)]'
                     }`}
                   >
-                    <div className="text-sm font-medium text-white">{r.name}</div>
+                    <div className="text-sm font-medium text-[var(--ink)]">{r.name}</div>
                     <div className="mt-0.5 text-xs text-[var(--muted)]">{r.detail}</div>
-                    <div className="mt-2 text-xs font-medium text-[var(--brand-bright)]">{r.price}</div>
+                    <div className="mt-2 text-xs font-medium text-[var(--accent)]">{r.price}</div>
                   </button>
                 );
               })}
@@ -283,10 +261,10 @@ export default function BookingPage() {
                     <button
                       key={t}
                       onClick={() => setSlot(t)}
-                      className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                      className={` border px-3 py-1.5 text-sm transition-colors ${
                         slot === t
-                          ? 'border-[var(--brand-bright)] bg-[var(--brand-bright)] text-[#0b0d10]'
-                          : 'border-white/10 text-[var(--muted)] hover:text-white'
+                          ? 'border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-ink)]'
+                          : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)]'
                       }`}
                     >
                       {t}
@@ -333,41 +311,41 @@ export default function BookingPage() {
 
           {/* Summary / confirmation */}
           <div className="lg:col-span-2">
-            <div className="sticky top-24 rounded-3xl border border-white/10 bg-gradient-to-br from-[var(--surface)] to-transparent p-6 sm:p-8">
+            <div className="sticky top-24  border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8">
               {ref ? (
                 <div className="text-center">
-                  <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--brand-bright)] text-[#0b0d10]">
+                  <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--accent-ink)]">
                     <Check size={26} />
                   </span>
-                  <h3 className="mt-4 font-display text-xl text-white">Booking confirmed</h3>
+                  <h3 className="mt-4 font-display text-xl text-[var(--ink)]">Booking confirmed</h3>
                   <p className="mt-1 text-sm text-[var(--muted)]">Reference {ref}</p>
-                  <div className="mt-5 space-y-2 rounded-2xl border border-white/10 bg-[var(--bg-soft)] p-4 text-left text-sm">
+                  <div className="mt-5 space-y-2  border border-[var(--border)] bg-[var(--bg-soft)] p-4 text-left text-sm">
                     <SummaryRows vert={vert} resource={resource} startDate={startDate} endDate={endDate} slot={slot} party={party} name={name} />
                   </div>
-                  <p className="mt-4 text-xs text-[var(--muted)]/70">
+                  <p className="mt-4 text-xs text-[var(--muted)]">
                     Demo only, nothing was saved. Firebase will store real bookings and send a confirmation.
                   </p>
                   <button
                     onClick={() => setRef(null)}
-                    className="mt-5 w-full rounded-xl border border-white/10 py-2.5 text-sm text-white transition-colors hover:border-white/30"
+                    className="mt-5 w-full  border border-[var(--border)] py-2.5 text-sm text-[var(--ink)] transition-colors hover:border-[var(--border)]"
                   >
                     Make another booking
                   </button>
                 </div>
               ) : (
                 <>
-                  <h3 className="font-display text-lg text-white">Your booking</h3>
+                  <h3 className="font-display text-lg text-[var(--ink)]">Your booking</h3>
                   <div className="mt-4 space-y-2 text-sm">
                     <SummaryRows vert={vert} resource={resource} startDate={startDate} endDate={endDate} slot={slot} party={party} name={name} />
                   </div>
-                  {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+                  {error && <p className="mt-4 text-sm text-[var(--danger)]">{error}</p>}
                   <button
                     onClick={book}
-                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-bright)] py-3 text-sm font-medium text-[#0b0d10] transition-colors hover:bg-white"
+                    className="mt-6 inline-flex w-full items-center justify-center gap-2  bg-[var(--accent)] py-3 text-sm font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90"
                   >
                     {vert.cta} <ArrowRight size={16} />
                   </button>
-                  <p className="mt-3 text-center text-xs text-[var(--muted)]/60">No payment taken in this demo.</p>
+                  <p className="mt-3 text-center text-xs text-[var(--muted)]">No payment taken in this demo.</p>
                 </>
               )}
             </div>
@@ -376,29 +354,28 @@ export default function BookingPage() {
       </section>
 
       {/* Features */}
-      <section className="mx-auto max-w-6xl px-6 pb-20">
-        <h2 className="font-display text-2xl text-white">Why it is universal</h2>
+      <section className="mt-10 border-t border-[var(--border)] pt-8 pb-4">
+        <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-[var(--muted)]">Capabilities</p>
+        <h2 className="mt-2 font-display text-[clamp(1.375rem,2.6vw,1.75rem)] font-medium leading-tight text-[var(--ink)]">Why it is universal</h2>
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
-            <div key={f.title} className="rounded-2xl border border-white/10 bg-[var(--surface)] p-6">
+            <div key={f.title} className=" border border-[var(--border)] bg-[var(--surface)] p-6">
               <div className="flex items-center justify-between">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-[var(--brand-bright)]">
+                <span className="flex h-10 w-10 items-center justify-center  bg-[var(--bg-soft)] text-[var(--accent)]">
                   <f.icon size={18} />
                 </span>
                 {f.soon && (
-                  <span className="rounded-full border border-white/10 px-2.5 py-0.5 text-[10px] uppercase tracking-wider text-[var(--muted)]">
+                  <span className="rounded-full border border-[var(--border)] px-2.5 py-0.5 text-[10px] uppercase tracking-wider text-[var(--muted)]">
                     With backend
                   </span>
                 )}
               </div>
-              <h3 className="mt-4 text-white">{f.title}</h3>
+              <h3 className="mt-4 text-[var(--ink)]">{f.title}</h3>
               <p className="mt-2 text-sm text-[var(--muted)]">{f.body}</p>
             </div>
           ))}
         </div>
       </section>
-
-      <Footer />
-    </div>
+    </DemoShell>
   );
 }
