@@ -14,16 +14,17 @@ import {
   CalendarCheck,
   CheckCircle2,
   CircleDot,
-  ChevronDown,
+  FileText,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { projects as allProjects, type Project } from '@/data/cv';
-import { toTicket, type Ticket } from '@/lib/ticket';
+import { toTicket } from '@/lib/ticket';
 import { useReveal } from '@/hooks/useReveal';
 import { useAuth } from '@/context/AuthContext';
 import { useLayout } from '@/context/LayoutContext';
 import { applyOrder, reorder } from '@/lib/reorder';
 import ProjectGallery from '@/components/ProjectGallery';
+import ProjectDetail from '@/components/ProjectDetail';
 
 const categories = ['All', ...Array.from(new Set(allProjects.map((p) => p.category)))];
 
@@ -39,95 +40,11 @@ const categoryIcon: Record<string, React.ReactNode> = {
 };
 
 const fieldLabel = 'font-mono text-[11px] uppercase tracking-[0.15em] text-[var(--muted)]';
-const STEPS_PREVIEW = 2;
-
-// Issue / Steps taken / Resolution blocks of a project "ticket".
-function TicketFields({ ticket, isOwner }: { ticket: Ticket; isOwner: boolean }) {
-  const [expanded, setExpanded] = useState(false);
-  const steps = expanded ? ticket.steps : ticket.steps.slice(0, STEPS_PREVIEW);
-  const hidden = ticket.steps.length - STEPS_PREVIEW;
-
-  // Resolution starts clamped to a few lines; the toggle only shows when the
-  // text is actually long enough to overflow, measured once after first paint.
-  const [resOpen, setResOpen] = useState(false);
-  const [resClamped, setResClamped] = useState(false);
-  const resRef = useRef<HTMLParagraphElement>(null);
-  useEffect(() => {
-    const el = resRef.current;
-    if (el) setResClamped(el.scrollHeight > el.clientHeight + 1);
-  }, [ticket.resolution]);
-
-  return (
-    <>
-      {ticket.issue ? (
-        <div className="mt-3">
-          <p className={fieldLabel}>Issue</p>
-          <p className="mt-1 text-sm text-[var(--muted)]">{ticket.issue}</p>
-        </div>
-      ) : (
-        isOwner && (
-          <div className="mt-4 border border-dashed border-[var(--accent)] p-3">
-            <p className={fieldLabel}>Issue</p>
-            <p className="mt-1.5 text-xs text-[var(--accent)]">
-              TODO: write the problem this project solved (<code>issue</code> in src/data/cv.ts).
-              Hidden from visitors until filled in.
-            </p>
-          </div>
-        )
-      )}
-
-      {ticket.steps.length > 0 && (
-        <div className="mt-3">
-          <p className={fieldLabel}>Steps taken</p>
-          <ol className="mt-1 space-y-1">
-            {steps.map((s, i) => (
-              <li key={s} className="flex gap-2 text-xs text-[var(--muted)]">
-                <span className="w-4 shrink-0 font-mono text-[var(--accent)]">{i + 1}.</span>
-                <span>{s}</span>
-              </li>
-            ))}
-          </ol>
-          {hidden > 0 && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              aria-expanded={expanded}
-              className="mt-2 inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline"
-            >
-              {expanded ? 'Show fewer steps' : `Show ${hidden} more step${hidden > 1 ? 's' : ''}`}
-              <ChevronDown size={14} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="mt-3">
-        <p className={fieldLabel}>Resolution</p>
-        <p
-          ref={resRef}
-          className={`mt-1 text-sm text-[var(--muted)] ${resOpen ? '' : 'line-clamp-3'}`}
-        >
-          {ticket.resolution}
-        </p>
-        {resClamped && (
-          <button
-            type="button"
-            onClick={() => setResOpen((v) => !v)}
-            aria-expanded={resOpen}
-            className="mt-2 inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline"
-          >
-            {resOpen ? 'Show less' : 'Show more'}
-            <ChevronDown size={14} className={`transition-transform ${resOpen ? 'rotate-180' : ''}`} />
-          </button>
-        )}
-      </div>
-    </>
-  );
-}
 
 export default function Projects() {
   const [active, setActive] = useState('All');
   const [selected, setSelected] = useState<Project | null>(null);
+  const [detail, setDetail] = useState<Project | null>(null);
   const navigate = useNavigate();
 
   const { user } = useAuth();
@@ -238,7 +155,7 @@ export default function Projects() {
                       />
                       <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 bg-black/70 px-2.5 py-1 text-xs font-medium text-white">
                         <Images size={14} />
-                        {imgs.length} photos
+                        {imgs.length} {imgs.length === 1 ? 'photo' : 'photos'}
                       </span>
                       <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/30">
                         <span className="inline-flex items-center gap-2 bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] opacity-0 transition-opacity group-hover:opacity-100">
@@ -302,7 +219,14 @@ export default function Projects() {
 
                     <h3 className="mt-2.5 font-display text-base text-[var(--ink)]">{p.name}</h3>
 
-                    <TicketFields ticket={ticket} isOwner={Boolean(user)} />
+                    <p className="mt-2 text-sm leading-snug text-[var(--muted)] line-clamp-2">
+                      {ticket.resolution}
+                    </p>
+                    {user && !ticket.issue && (
+                      <p className="mt-2 inline-flex w-fit items-center gap-1.5 border border-dashed border-[var(--accent)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--accent)]">
+                        Issue: TODO
+                      </p>
+                    )}
 
                     <p className={`${fieldLabel} mt-auto pt-3`}>Stack</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -314,47 +238,43 @@ export default function Projects() {
                           {t}
                         </span>
                       ))}
-                      {hasGallery ? (
-                        <div className="ml-auto flex items-center gap-2">
-                          {p.link && p.link !== '#' && (
-                            <a
-                              href={p.link}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1.5 border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--ink)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--accent-ink)]"
-                            >
-                              Visit site <ArrowUpRight size={14} />
-                            </a>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setSelected(p)}
-                            className="inline-flex items-center gap-1.5 border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--ink)] transition-all group-hover:border-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-[var(--accent-ink)]"
-                          >
-                            <Images size={14} /> {imgs.length} images
-                          </button>
-                        </div>
-                      ) : hasRoute ? (
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-3">
+                      <button
+                        type="button"
+                        onClick={() => setDetail(p)}
+                        className="inline-flex items-center gap-1.5 border border-[var(--accent)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] transition-all hover:bg-[var(--accent)] hover:text-[var(--accent-ink)]"
+                      >
+                        <FileText size={14} /> Details
+                      </button>
+                      {hasGallery && (
+                        <button
+                          type="button"
+                          onClick={() => setSelected(p)}
+                          className="inline-flex items-center gap-1.5 border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--ink)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--accent-ink)]"
+                        >
+                          <Images size={14} /> {imgs.length} {imgs.length === 1 ? 'image' : 'images'}
+                        </button>
+                      )}
+                      {hasRoute && (
                         <button
                           type="button"
                           onClick={() => navigate(p.route!)}
-                          className="ml-auto inline-flex items-center gap-1.5 border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--ink)] transition-all group-hover:border-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-[var(--accent-ink)]"
+                          className="inline-flex items-center gap-1.5 border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--ink)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--accent-ink)]"
                         >
                           Open the demo <ArrowUpRight size={14} />
                         </button>
-                      ) : (
-                        p.link &&
-                        p.link !== '#' && (
-                          <a
-                            href={p.link}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="ml-auto inline-flex h-8 w-8 items-center justify-center border border-[var(--border)] text-[var(--ink)] transition-all duration-300 group-hover:border-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-[var(--accent-ink)]"
-                            aria-label={`View ${p.name}`}
-                          >
-                            <ArrowUpRight size={15} />
-                          </a>
-                        )
+                      )}
+                      {p.link && p.link !== '#' && (
+                        <a
+                          href={p.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="ml-auto inline-flex items-center gap-1.5 border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--ink)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--accent-ink)]"
+                        >
+                          Visit site <ArrowUpRight size={14} />
+                        </a>
                       )}
                     </div>
                   </div>
@@ -364,6 +284,22 @@ export default function Projects() {
           })}
         </div>
       </div>
+
+      {detail && (
+        <ProjectDetail
+          project={detail}
+          isOwner={Boolean(user)}
+          onClose={() => setDetail(null)}
+          onOpenGallery={
+            (detail.images?.length ?? 0) > 0
+              ? () => {
+                  setSelected(detail);
+                  setDetail(null);
+                }
+              : undefined
+          }
+        />
+      )}
 
       {selected && <ProjectGallery project={selected} onClose={() => setSelected(null)} />}
     </section>

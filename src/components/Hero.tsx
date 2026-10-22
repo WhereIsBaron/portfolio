@@ -8,7 +8,8 @@ import { Link } from 'react-router-dom';
  */
 
 const services = [
-  'Full-stack web',
+  'Full-Stack Junior Developer',
+  'Full-Stack Junior Software Engineer',
   'Mobile apps',
   'Databases & APIs',
   'Game development',

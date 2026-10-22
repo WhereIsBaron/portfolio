@@ -443,8 +443,11 @@ export const projects: Project[] = [
     description:
       'Programmed a robotic arm with camera recognition on Arduino and Raspberry Pi OS to simulate mineral separation through color differentiation.',
     year: '2023',
-    issue: '', // TODO(Andrew): the problem this solved, 1-2 sentences (ticket "Issue")
+    issue:
+      'Sorting mined ore by type is slow and labour-intensive when done by hand. The Technology & Skills Transfer Makeathon challenge was to prototype an automated way to separate minerals using low-cost hardware.',
     tags: ['Arduino', 'Raspberry Pi', 'Computer Vision'],
+    slug: 'robotics-make-a-thon',
+    images: gallery('robotics-make-a-thon', 1),
     highlights: [
       'Robotic arm control with Arduino + Raspberry Pi OS.',
       'Camera-based color differentiation for mineral separation.',
