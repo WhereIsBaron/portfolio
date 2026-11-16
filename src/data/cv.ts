@@ -149,6 +149,24 @@ const gallery = (slug: string, count: number): string[] =>
 
 export const projects: Project[] = [
   {
+    name: 'Lima Consulting: Website Concept',
+    category: 'Client Website',
+    description:
+      'A concept website for Lima Consulting, a specialist risk, compliance and finance advisory and training firm in Botswana. An editorial, report styled marketing site built to show the firm a stronger, more credible web presence than their current site, with a live Governance and Controls Readiness check visitors can run in the browser.',
+    year: '2026',
+    issue:
+      'The firm needed prospective clients to feel that its work holds up to scrutiny, but its web presence did not match the seniority of the advice. This concept demonstrates the redesign, built on the firm’s own positioning.',
+    tags: ['React', 'TypeScript', 'Tailwind', 'Marketing Site', 'UI/UX'],
+    highlights: [
+      'Editorial "printed report" art direction: a strict column axis, solid colour blocks and a single deep green accent, set in the same Fraunces and Schibsted Grotesk type as this portfolio.',
+      'A live Governance and Controls Readiness check: five questions score the visitor’s control environment in the browser and point them to the right practice, with no backend.',
+      'Honest by design: real named principals shown by role (no invented portraits), no fabricated testimonials, client logos or statistics, and a clear concept marker throughout.',
+      'Fully responsive, with its own scoped light theme, built as a self contained route inside the portfolio so it ships and is maintained alongside everything else.',
+    ],
+    route: '/lima',
+    link: '#',
+  },
+  {
     name: 'Production Supervisor Training',
     category: 'Product',
     description:
